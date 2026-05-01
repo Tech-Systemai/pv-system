@@ -1,0 +1,1961 @@
+
+<h2 class="sr-only">Pioneers Veneers Enterprise Platform — refined professional command center</h2>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.pv-app {
+  font-family: 'Inter', sans-serif;
+  background: #f5f6f8;
+  color: #1a1f2e;
+  min-height: 800px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e4e7eb;
+  position: relative;
+}
+
+.pv-grid { display: grid; grid-template-columns: 248px 1fr; min-height: 800px; }
+
+/* ===== LOGIN ===== */
+.pv-login {
+  min-height: 800px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px;
+  background: linear-gradient(135deg, #f5f6f8 0%, #e8edf5 100%);
+  position: relative;
+}
+.pv-login::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+  pointer-events: none;
+}
+.pv-login-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px 38px;
+  width: 440px; max-width: 100%;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 12px 36px rgba(15, 23, 42, 0.08);
+  position: relative;
+  border: 1px solid #e4e7eb;
+}
+.pv-brand-mark {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 28px;
+}
+.pv-brand-icon {
+  width: 48px; height: 48px; border-radius: 10px;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 16px; letter-spacing: 0.02em;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+.pv-brand-text-name {
+  font-size: 19px; font-weight: 700; color: #1a1f2e; letter-spacing: -0.01em;
+}
+.pv-brand-text-sub {
+  font-size: 11px; color: #6b7689; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.12em; margin-top: 2px;
+}
+.pv-login-title {
+  font-size: 22px; font-weight: 700; color: #1a1f2e; margin-bottom: 6px;
+  letter-spacing: -0.015em;
+}
+.pv-login-sub { font-size: 13px; color: #6b7689; margin-bottom: 26px; }
+.pv-fld { margin-bottom: 16px; }
+.pv-fld label {
+  display: block; font-size: 12px; font-weight: 500; color: #4a5568;
+  margin-bottom: 6px;
+}
+.pv-fld input, .pv-fld select, .pv-fld textarea {
+  width: 100%; padding: 10px 13px;
+  border: 1px solid #d8dde5; border-radius: 8px;
+  font-family: 'Inter', sans-serif; font-size: 13px; color: #1a1f2e;
+  background: #fff; outline: none;
+  transition: all 0.15s;
+}
+.pv-fld input:focus, .pv-fld select:focus, .pv-fld textarea:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+.pv-role-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px;
+}
+.pv-role-pill {
+  padding: 8px 0; text-align: center; cursor: pointer;
+  font-size: 11px; font-weight: 500; color: #6b7689;
+  background: #f5f6f8; border: 1px solid #e4e7eb; border-radius: 7px;
+  transition: all 0.15s;
+}
+.pv-role-pill:hover { color: #4f46e5; border-color: #c7d2fe; }
+.pv-role-pill.selected {
+  background: #eef2ff; color: #4f46e5;
+  border-color: #4f46e5;
+}
+.pv-btn-primary {
+  width: 100%; padding: 11px;
+  background: #4f46e5; color: #fff; border: none; border-radius: 8px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+  margin-top: 8px;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+}
+.pv-btn-primary:hover { background: #4338ca; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35); }
+.pv-login-foot {
+  margin-top: 22px; padding-top: 18px; border-top: 1px solid #f0f2f5;
+  text-align: center; font-size: 12px; color: #6b7689;
+}
+.pv-login-foot a { color: #4f46e5; text-decoration: none; cursor: pointer; font-weight: 500; }
+.pv-login-status {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 14px; font-size: 11px; color: #6b7689;
+}
+.pv-pulse {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #10b981; animation: pulse 1.8s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ===== SIDEBAR ===== */
+.pv-sidebar {
+  background: #1a1f2e; color: #cbd2e0;
+  display: flex; flex-direction: column;
+  max-height: 800px; overflow-y: auto;
+  border-right: 1px solid #0f1420;
+}
+.pv-sidebar::-webkit-scrollbar { width: 4px; }
+.pv-sidebar::-webkit-scrollbar-thumb { background: #2d3548; border-radius: 2px; }
+.pv-sb-brand {
+  padding: 18px 18px 16px;
+  display: flex; align-items: center; gap: 11px;
+  border-bottom: 1px solid #252b3d;
+}
+.pv-sb-icon {
+  width: 38px; height: 38px; border-radius: 8px;
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 13px;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+}
+.pv-sb-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.005em; }
+.pv-sb-portal { font-size: 9px; color: #6b7689; font-weight: 500; text-transform: uppercase; letter-spacing: 0.15em; margin-top: 2px; }
+.pv-sb-section { padding: 12px 10px 4px; }
+.pv-sb-heading {
+  padding: 4px 12px 8px;
+  font-size: 10px; font-weight: 600; color: #6b7689;
+  text-transform: uppercase; letter-spacing: 0.15em;
+}
+.pv-sb-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; border-radius: 8px; cursor: pointer;
+  border: none; background: transparent; width: 100%; text-align: left;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: #9fa8be;
+  margin-bottom: 1px; transition: all 0.12s;
+}
+.pv-sb-item:hover { background: #252b3d; color: #fff; }
+.pv-sb-item.active {
+  background: #2d3548; color: #818cf8;
+  position: relative;
+}
+.pv-sb-item.active::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
+  width: 3px; background: #818cf8; border-radius: 0 2px 2px 0;
+}
+.pv-sb-icon-i {
+  width: 16px; height: 16px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.pv-sb-badge {
+  margin-left: auto;
+  background: #4f46e5; color: #fff;
+  padding: 2px 7px; border-radius: 10px;
+  font-size: 10px; font-weight: 600;
+}
+.pv-sb-badge.live { background: #10b981; }
+.pv-sb-badge.alert { background: #ef4444; }
+
+.pv-sb-user {
+  margin-top: auto;
+  padding: 14px 16px;
+  border-top: 1px solid #252b3d;
+  display: flex; align-items: center; gap: 10px;
+}
+.pv-sb-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, #6b7689, #4a5568);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 11px; font-weight: 600;
+  flex-shrink: 0;
+}
+.pv-sb-user-info { flex: 1; min-width: 0; }
+.pv-sb-user-name { font-size: 13px; font-weight: 600; color: #fff; }
+.pv-sb-user-role { font-size: 10px; color: #6b7689; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 1px; }
+.pv-sb-logout { color: #6b7689; cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.15s; }
+.pv-sb-logout:hover { color: #ef4444; background: #252b3d; }
+
+/* ===== MAIN ===== */
+.pv-main { padding: 0; max-height: 800px; overflow-y: auto; background: #f5f6f8; }
+.pv-main::-webkit-scrollbar { width: 6px; }
+.pv-main::-webkit-scrollbar-thumb { background: #d8dde5; border-radius: 3px; }
+
+.pv-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 28px; gap: 18px;
+  background: #fff; border-bottom: 1px solid #e4e7eb;
+  position: sticky; top: 0; z-index: 10; flex-wrap: wrap;
+}
+.pv-page-title-block { flex: 0 0 auto; min-width: 180px; }
+.pv-page-title {
+  font-size: 22px; font-weight: 700; color: #1a1f2e;
+  letter-spacing: -0.015em;
+}
+.pv-page-sub { font-size: 12px; color: #6b7689; margin-top: 2px; }
+.pv-system-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px;
+  background: #ecfdf5; color: #047857;
+  font-size: 12px; font-weight: 600;
+}
+.pv-search-wrap { flex: 1; max-width: 320px; position: relative; }
+.pv-search {
+  width: 100%; padding: 9px 14px 9px 36px;
+  background: #f5f6f8; border: 1px solid #e4e7eb; border-radius: 8px;
+  font-family: 'Inter', sans-serif; font-size: 12px; color: #1a1f2e;
+  outline: none; transition: all 0.15s;
+}
+.pv-search:focus { background: #fff; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08); }
+.pv-search-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 14px; color: #9fa8be;
+}
+.pv-clock {
+  text-align: right; font-size: 11px; color: #6b7689; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.pv-clock-time {
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  color: #1a1f2e; font-weight: 600; margin-top: 2px;
+}
+.pv-bell {
+  position: relative; padding: 8px; border-radius: 8px;
+  background: #f5f6f8; border: 1px solid #e4e7eb; cursor: pointer;
+  font-size: 16px; color: #4a5568;
+}
+.pv-bell-dot {
+  position: absolute; top: 6px; right: 6px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #ef4444;
+}
+
+.pv-content { padding: 22px 28px; }
+.pv-page-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ===== STAT CARDS ===== */
+.pv-stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px; margin-bottom: 22px;
+}
+.pv-stat-card {
+  background: #fff; border: 1px solid #e4e7eb; border-radius: 12px;
+  padding: 18px 20px; cursor: pointer; transition: all 0.2s;
+  position: relative;
+}
+.pv-stat-card:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.08);
+  transform: translateY(-1px);
+}
+.pv-stat-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 14px;
+}
+.pv-stat-icon {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.pv-stat-icon.indigo { background: #eef2ff; color: #4f46e5; }
+.pv-stat-icon.green { background: #ecfdf5; color: #10b981; }
+.pv-stat-icon.amber { background: #fef3c7; color: #f59e0b; }
+.pv-stat-icon.red { background: #fee2e2; color: #ef4444; }
+.pv-stat-icon.cyan { background: #e0f2fe; color: #0284c7; }
+.pv-stat-icon.purple { background: #f3e8ff; color: #9333ea; }
+.pv-stat-trend {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 12px;
+  font-size: 11px; font-weight: 600;
+}
+.pv-trend-up { background: #ecfdf5; color: #047857; }
+.pv-trend-down { background: #fee2e2; color: #dc2626; }
+.pv-stat-label {
+  font-size: 11px; font-weight: 600; color: #6b7689;
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;
+}
+.pv-stat-val {
+  font-size: 28px; font-weight: 700; color: #1a1f2e;
+  letter-spacing: -0.02em; line-height: 1.1;
+}
+.pv-stat-val.red { color: #dc2626; }
+.pv-stat-val.green { color: #047857; }
+.pv-stat-sub {
+  font-size: 11px; color: #6b7689; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.06em; margin-top: 8px;
+}
+
+/* ===== PANELS ===== */
+.pv-panel {
+  background: #fff; border: 1px solid #e4e7eb; border-radius: 12px;
+  padding: 20px; margin-bottom: 16px;
+}
+.pv-panel-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.pv-panel-title {
+  font-size: 14px; font-weight: 700; color: #1a1f2e; letter-spacing: -0.005em;
+}
+.pv-panel-sub { font-size: 11px; color: #6b7689; margin-top: 2px; }
+
+.pv-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pv-three { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+
+/* ===== BUTTONS ===== */
+.pv-btn {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  padding: 7px 14px; border-radius: 7px; cursor: pointer;
+  border: 1px solid transparent; transition: all 0.15s;
+}
+.pv-btn-pri {
+  background: #4f46e5; color: #fff;
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.2);
+}
+.pv-btn-pri:hover { background: #4338ca; }
+.pv-btn-sec {
+  background: #fff; color: #4a5568; border-color: #d8dde5;
+}
+.pv-btn-sec:hover { background: #f5f6f8; border-color: #cbd2e0; }
+.pv-btn-danger {
+  background: #fff; color: #dc2626; border-color: #fecaca;
+}
+.pv-btn-danger:hover { background: #fef2f2; }
+.pv-btn-icon {
+  padding: 5px 10px; font-size: 11px;
+  background: #fff; border: 1px solid #e4e7eb;
+  color: #4a5568; cursor: pointer; border-radius: 6px;
+  font-family: 'Inter', sans-serif; font-weight: 500;
+}
+.pv-btn-icon:hover { color: #4f46e5; border-color: #c7d2fe; background: #eef2ff; }
+
+/* ===== BADGES ===== */
+.pv-bdg {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+}
+.pv-bdg-indigo { background: #eef2ff; color: #4338ca; }
+.pv-bdg-green { background: #ecfdf5; color: #047857; }
+.pv-bdg-amber { background: #fef3c7; color: #b45309; }
+.pv-bdg-red { background: #fee2e2; color: #dc2626; }
+.pv-bdg-gray { background: #f5f6f8; color: #4a5568; }
+.pv-bdg-cyan { background: #e0f2fe; color: #075985; }
+.pv-bdg-purple { background: #f3e8ff; color: #6b21a8; }
+
+/* ===== ROWS ===== */
+.pv-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid #f0f2f5;
+}
+.pv-row:last-child { border-bottom: none; }
+.pv-row-card {
+  background: #fff; border: 1px solid #e4e7eb;
+  padding: 14px 16px; border-radius: 10px;
+  display: flex; align-items: center; gap: 12px;
+  transition: all 0.15s; cursor: pointer; margin-bottom: 6px;
+}
+.pv-row-card:hover { border-color: #c7d2fe; background: #fafbff; }
+.pv-avatar {
+  width: 36px; height: 36px; border-radius: 9px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; flex-shrink: 0;
+}
+.pv-avatar.green { background: linear-gradient(135deg, #10b981, #059669); }
+.pv-avatar.amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.pv-avatar.cyan { background: linear-gradient(135deg, #0284c7, #0369a1); }
+.pv-avatar.gray { background: linear-gradient(135deg, #6b7689, #4a5568); }
+
+/* ===== TABS ===== */
+.pv-tabs {
+  display: flex; gap: 4px; padding: 4px;
+  background: #f5f6f8; border-radius: 9px;
+  margin-bottom: 16px; width: fit-content;
+}
+.pv-tab {
+  padding: 7px 14px; border: none; background: transparent;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500; color: #6b7689;
+  border-radius: 6px; cursor: pointer; transition: all 0.15s;
+}
+.pv-tab.active { background: #fff; color: #1a1f2e; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+
+/* ===== ACTIVITY FEED ===== */
+.pv-feed-item {
+  display: flex; gap: 11px; padding: 10px 0;
+  border-bottom: 1px solid #f0f2f5;
+  animation: fadein 0.3s;
+}
+@keyframes fadein { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: translateX(0); } }
+.pv-feed-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: #9fa8be;
+  min-width: 60px;
+}
+.pv-feed-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  margin-top: 5px; flex-shrink: 0;
+}
+.pv-feed-text { flex: 1; font-size: 12px; color: #4a5568; }
+.pv-feed-text strong { color: #1a1f2e; font-weight: 600; }
+
+/* ===== BARS ===== */
+.pv-bar-wrap {
+  height: 6px; background: #f0f2f5; border-radius: 3px;
+  overflow: hidden;
+}
+.pv-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.3s;
+}
+
+/* ===== MODAL ===== */
+.pv-modal-bg {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; animation: fadein 0.15s;
+}
+.pv-modal {
+  background: #fff; border-radius: 14px;
+  padding: 26px; width: 480px; max-width: 100%;
+  max-height: 80vh; overflow-y: auto;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.25);
+}
+.pv-modal-title {
+  font-size: 18px; font-weight: 700; color: #1a1f2e;
+  margin-bottom: 18px; letter-spacing: -0.015em;
+  padding-bottom: 14px; border-bottom: 1px solid #f0f2f5;
+}
+
+/* ===== TOAST ===== */
+.pv-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 2000;
+  background: #1a1f2e; color: #fff;
+  padding: 11px 18px; border-radius: 9px;
+  font-size: 12px; font-weight: 500;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.3);
+  animation: slideup 0.2s;
+}
+@keyframes slideup { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ===== SCREEN VIEW ===== */
+.pv-screen {
+  aspect-ratio: 16/9; background: #1a1f2e; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #9fa8be; position: relative; overflow: hidden;
+}
+.pv-screen::before {
+  content: ""; position: absolute; top: 8px; left: 8px;
+  width: 7px; height: 7px; border-radius: 50%; background: #ef4444;
+  animation: pulse 1.5s infinite;
+  box-shadow: 0 0 8px #ef4444;
+}
+.pv-screen::after {
+  content: "REC"; position: absolute; top: 5px; left: 22px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: #ef4444; font-weight: 600; letter-spacing: 0.1em;
+}
+
+/* ===== FOOTER ===== */
+.pv-footer {
+  padding: 14px 28px; background: #fff; border-top: 1px solid #e4e7eb;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  font-size: 11px; color: #6b7689;
+}
+.pv-footer-item { display: flex; align-items: center; gap: 6px; }
+.pv-footer-version { margin-left: auto; font-family: 'JetBrains Mono', monospace; color: #9fa8be; }
+
+/* ===== POINTS DISPLAY ===== */
+.pv-points {
+  display: inline-flex; gap: 3px; align-items: center;
+}
+.pv-pt {
+  width: 7px; height: 16px; border-radius: 2px;
+  background: #e4e7eb;
+}
+.pv-pt.lost { background: #ef4444; }
+
+/* ===== POLICY ===== */
+.pv-policy {
+  background: #f5f6f8; border-left: 3px solid #cbd2e0;
+  padding: 13px 16px; border-radius: 0 8px 8px 0; margin-bottom: 8px;
+}
+.pv-policy.active { border-left-color: #10b981; background: #f0fdf4; }
+.pv-policy-name { font-size: 13px; font-weight: 600; color: #1a1f2e; margin-bottom: 4px; }
+.pv-policy-detail { font-size: 11px; color: #6b7689; line-height: 1.5; }
+.pv-policy-detail strong { color: #4f46e5; font-weight: 600; }
+
+/* ===== ATTENDANCE ===== */
+.pv-att-grid {
+  display: grid; grid-template-columns: repeat(31, 1fr); gap: 2px;
+  margin: 8px 0;
+}
+.pv-att-cell {
+  aspect-ratio: 1; border-radius: 3px; font-size: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: #f0f2f5; color: #cbd2e0; cursor: pointer;
+  transition: all 0.1s;
+}
+.pv-att-cell:hover { transform: scale(1.3); z-index: 10; }
+.pv-att-cell.present { background: #d1fae5; color: #047857; }
+.pv-att-cell.late { background: #fef3c7; color: #b45309; }
+.pv-att-cell.absent { background: #fee2e2; color: #dc2626; }
+
+/* ===== QA ===== */
+.pv-qa-section {
+  background: #fff; border: 1px solid #e4e7eb;
+  border-radius: 10px; padding: 16px;
+}
+.pv-qa-section.confirmed { border-top: 3px solid #10b981; }
+.pv-qa-section.fail { border-top: 3px solid #ef4444; }
+.pv-qa-section.lost { border-top: 3px solid #f59e0b; }
+.pv-qa-head { font-size: 13px; font-weight: 700; margin-bottom: 14px; }
+.pv-qa-head.confirmed { color: #047857; }
+.pv-qa-head.fail { color: #dc2626; }
+.pv-qa-head.lost { color: #b45309; }
+.pv-qa-attr { margin-bottom: 11px; }
+.pv-qa-name { font-size: 11px; color: #4a5568; margin-bottom: 4px; font-weight: 500; }
+.pv-qa-attr input[type="range"] { width: 100%; accent-color: #4f46e5; height: 4px; }
+.pv-qa-val {
+  display: flex; justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: #9fa8be;
+}
+
+/* ===== ORG TREE ===== */
+.pv-org-level {
+  display: flex; justify-content: center; gap: 14px;
+  flex-wrap: wrap; margin-bottom: 0;
+}
+.pv-org-node {
+  background: #fff; border: 1.5px solid #e4e7eb;
+  padding: 13px 22px; border-radius: 10px;
+  text-align: center; cursor: pointer; min-width: 110px;
+  transition: all 0.2s;
+}
+.pv-org-node:hover {
+  border-color: #4f46e5;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+  transform: translateY(-2px);
+}
+.pv-org-name { font-size: 12px; font-weight: 700; color: #1a1f2e; }
+.pv-org-sub {
+  font-size: 10px; color: #6b7689; margin-top: 3px;
+  font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.pv-org-connect { width: 2px; height: 22px; background: #cbd2e0; margin: 0 auto; }
+
+/* ===== TIERS ===== */
+.pv-tier {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 11px 14px; border: 1px solid #e4e7eb;
+  background: #fff; margin-bottom: 6px; border-radius: 8px;
+  font-size: 12px;
+}
+.pv-tier.met {
+  border-color: #10b981; background: #f0fdf4;
+}
+.pv-tier-label { color: #4a5568; font-weight: 500; }
+.pv-tier-val { color: #4f46e5; font-weight: 700; font-size: 13px; }
+.pv-tier.met .pv-tier-val { color: #047857; }
+
+/* ===== PERMISSION TABLE ===== */
+.pv-perm {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.pv-perm th {
+  font-size: 11px; font-weight: 600; color: #4a5568;
+  padding: 10px; text-align: center; border-bottom: 2px solid #e4e7eb;
+  text-transform: capitalize;
+}
+.pv-perm th:first-child { text-align: left; }
+.pv-perm td {
+  padding: 10px; text-align: center;
+  border-bottom: 1px solid #f0f2f5; color: #1a1f2e;
+}
+.pv-perm td:first-child { text-align: left; text-transform: capitalize; font-weight: 500; }
+.pv-perm input[type="checkbox"] { accent-color: #4f46e5; cursor: pointer; }
+
+/* ===== CHECKBOX ===== */
+.pv-chk {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; cursor: pointer; color: #4a5568;
+}
+.pv-chk input { accent-color: #4f46e5; cursor: pointer; }
+
+/* ===== EMPTY ===== */
+.pv-empty {
+  padding: 36px; text-align: center;
+  color: #9fa8be; font-size: 13px;
+}
+
+/* ===== SPINNER ===== */
+.pv-spin {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid #e4e7eb; border-top-color: #4f46e5;
+  border-radius: 50%; animation: rotate 0.8s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+/* ===== CIRCULAR ===== */
+.pv-circ { position: relative; width: 96px; height: 96px; }
+.pv-circ svg { transform: rotate(-90deg); }
+.pv-circ-text {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.pv-circ-val { font-size: 22px; font-weight: 700; color: #1a1f2e; }
+.pv-circ-lbl {
+  font-size: 9px; color: #6b7689;
+  text-transform: uppercase; letter-spacing: 0.1em; margin-top: 1px;
+  font-weight: 600;
+}
+
+.pv-scrollable { max-height: 360px; overflow-y: auto; padding-right: 4px; }
+.pv-scrollable::-webkit-scrollbar { width: 4px; }
+.pv-scrollable::-webkit-scrollbar-thumb { background: #d8dde5; border-radius: 2px; }
+</style>
+
+<div class="pv-app" id="pv-root">
+  <div id="pv-login-host"></div>
+  <div id="pv-app-host" style="display:none"></div>
+</div>
+<div id="pv-modal-host"></div>
+<div id="pv-toast-host"></div>
+
+<script>
+// ============== DATABASE ==============
+const DB = {
+  currentUser: null,
+  users: [
+    {id:'EMP001',username:'ahmed',password:'demo',name:'Ahmed Hassan',role:'sales',dept:'Sales',salary:2800,points:6,score:94,status:'Active',shifts:['Mon','Tue','Wed','Thu'],location:'Cairo',hired:'2024-03-12',clockedIn:true,doing:'Customer call · Order #4471'},
+    {id:'EMP002',username:'maria',password:'demo',name:'Maria Santos',role:'cx',dept:'CX',salary:2400,points:7,score:88,status:'Active',shifts:['Mon','Wed','Fri'],location:'Manila',hired:'2024-05-20',clockedIn:true,doing:'Logging collection $840'},
+    {id:'EMP003',username:'james',password:'demo',name:'James Okafor',role:'sales',dept:'Sales',salary:2600,points:4,score:72,status:'Active',shifts:['Tue','Thu','Sat'],location:'Lagos',hired:'2024-08-01',clockedIn:false,doing:'Off shift'},
+    {id:'EMP004',username:'lena',password:'demo',name:'Lena Müller',role:'supervisor',dept:'Mgmt',salary:4200,points:7,score:97,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'Berlin',hired:'2023-01-15',clockedIn:true,doing:'Reviewing reports'},
+    {id:'EMP005',username:'priya',password:'demo',name:'Priya Sharma',role:'admin',dept:'Mgmt',salary:3800,points:7,score:95,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'Mumbai',hired:'2023-09-10',clockedIn:true,doing:'Approving schedules'},
+    {id:'OWN001',username:'owner',password:'demo',name:'Chloe Rivera',role:'owner',dept:'Executive',salary:0,points:7,score:100,status:'Active',shifts:[],location:'HQ',hired:'2022-01-01',clockedIn:true,doing:'System overview'},
+    {id:'ACC001',username:'finance',password:'demo',name:'David Chen',role:'accountant',dept:'Finance',salary:3500,points:7,score:96,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'Singapore',hired:'2023-04-20',clockedIn:true,doing:'Processing payroll'},
+  ],
+  applicants: [
+    {id:'APP001',name:'Sara Kim',pos:'Sales',score:93,email:'sara.k@email.com'},
+    {id:'APP002',name:'Tom Bradley',pos:'CX',score:68,email:'t.brad@email.com'},
+    {id:'APP003',name:'Nina Petrov',pos:'Sales',score:96,email:'nina.p@email.com'},
+  ],
+  schedules: [
+    {id:'SCH001',by:'Lena Müller',week:'Apr 28–May 4',team:'Sales Team',status:'Pending',affects:5},
+    {id:'SCH002',by:'Priya Sharma',week:'Apr 28–May 4',team:'CX Team',status:'Approved',affects:6},
+  ],
+  tasks: [
+    {id:'T001',title:'Follow up with Tuesday leads',assignedTo:'Ahmed Hassan',by:'Lena',due:'Today',priority:'High',done:false,seen:true},
+    {id:'T002',title:'Submit weekly summary',assignedTo:'James Okafor',by:'Lena',due:'Apr 27',priority:'High',done:false,seen:true},
+    {id:'T003',title:'Customer escalation review',assignedTo:'Maria Santos',by:'Lena',due:'Apr 26',priority:'High',done:false,seen:true},
+  ],
+  tickets: [
+    {id:'TK001',title:'Payment gateway not processing',from:'Ahmed Hassan',priority:'High',status:'Open',time:'1h ago'},
+    {id:'TK002',title:'CRM sync issue',from:'James Okafor',priority:'Low',status:'In Progress',time:'Yesterday'},
+  ],
+  policies: [
+    {id:'P1',name:'Late Clock-In Penalty',trigger:'Every 5 min late',action:'-0.5 points · -$10 salary',active:true,executed:8},
+    {id:'P2',name:'No-Show Penalty',trigger:'Full day absence',action:'-3 points · -$60 salary',active:true,executed:2},
+    {id:'P3',name:'Coaching Plan Failure',trigger:'Failed action plan',action:'-1 point · auto-warning',active:true,executed:1},
+    {id:'P4',name:'Customer Refund',trigger:'Refund traced to CX',action:'Clawback commission',active:true,executed:3},
+    {id:'P5',name:'Target Miss',trigger:'Below target by 30%',action:'No commission · -2 points',active:true,executed:0},
+    {id:'P6',name:'Termination Trigger',trigger:'7 points lost',action:'Auto-flag for review',active:true,executed:0},
+  ],
+  liveFeed: [
+    {time:'Just now',user:'Ahmed Hassan',action:'Logged revenue $1,200',type:'green'},
+    {time:'2m ago',user:'Lena Müller',action:'Submitted Sales Team schedule',type:'indigo'},
+    {time:'5m ago',user:'Maria Santos',action:'Clocked in (1 min late · flagged)',type:'amber'},
+    {time:'12m ago',user:'System',action:'Auto-deducted -0.5 pts from EMP002',type:'red'},
+    {time:'18m ago',user:'Sara Kim',action:'Application scored 93% · high priority',type:'green'},
+    {time:'25m ago',user:'James Okafor',action:'Clocked out',type:'gray'},
+  ],
+  attendance: {
+    'EMP001':[1,1,1,2,1,1,0,1,1,1,1,2,1,0,1,1,1,1,1,1,2,1,1,1,1,0,1,1,1,1,1],
+    'EMP002':[1,1,2,1,1,3,0,1,1,1,1,1,2,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1],
+    'EMP003':[1,1,1,3,3,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1],
+    'EMP004':[1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1],
+  },
+  targets: {
+    Sales: {type:'orders', monthly:50, collected:34, deadline:'Apr 30'},
+    CX: {type:'revenue', monthly:30000, collected:18400, deadline:'Apr 30'},
+  },
+  permissions: {
+    owner: {tasks:1,schedule:1,reports:1,tickets:1,hr:1,contracts:1,inbox:1,attendance:1,monitoring:1,policy:1,targets:1,coaching:1,planning:1},
+    admin: {tasks:1,schedule:1,reports:1,tickets:1,hr:1,contracts:1,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+    supervisor: {tasks:1,schedule:1,reports:1,tickets:1,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:1,planning:0},
+    accountant: {tasks:0,schedule:0,reports:1,tickets:0,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+    sales: {tasks:1,schedule:1,reports:0,tickets:1,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+    cx: {tasks:1,schedule:1,reports:0,tickets:1,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+  },
+};
+
+const PORTALS = {
+  owner: {label:'Owner', sections:[
+    {head:'Overview', items:[
+      {id:'dashboard',label:'Command Center',icon:'⊞'},
+      {id:'monitoring',label:'Live Monitoring',icon:'◉',badge:'LIVE',badgeType:'live'},
+      {id:'inbox',label:'Inbox',icon:'✉',badge:3},
+    ]},
+    {head:'People', items:[
+      {id:'users',label:'Employee Directory',icon:'👥'},
+      {id:'hr',label:'HR Pipeline',icon:'📋',badge:3},
+      {id:'org',label:'Org Tree',icon:'⬢'},
+      {id:'attendance',label:'Attendance Log',icon:'📅'},
+    ]},
+    {head:'Operations', items:[
+      {id:'schedule',label:'Schedules',icon:'⏱',badge:1,badgeType:'alert'},
+      {id:'tasks',label:'Task Flow',icon:'✓'},
+      {id:'reports',label:'Reports',icon:'📊'},
+      {id:'contracts',label:'Contracts',icon:'📄'},
+      {id:'tickets',label:'Tickets',icon:'🎫',badge:2,badgeType:'alert'},
+      {id:'coaching',label:'Coaching + QA',icon:'🎯'},
+    ]},
+    {head:'Strategy', items:[
+      {id:'planning',label:'Planning',icon:'📈'},
+      {id:'finance',label:'Finance',icon:'$'},
+      {id:'payroll',label:'Payroll',icon:'💵'},
+      {id:'targets',label:'Targets',icon:'⊕'},
+    ]},
+    {head:'System', items:[
+      {id:'permissions',label:'Permissions',icon:'🔐'},
+      {id:'policy',label:'Policy Engine',icon:'⚙'},
+      {id:'design',label:'PDF Templates',icon:'🎨'},
+    ]},
+  ]},
+  admin: {label:'Admin', sections:[
+    {head:'Operations', items:[
+      {id:'dashboard',label:'Dashboard',icon:'⊞'},
+      {id:'schedule',label:'Schedules',icon:'⏱'},
+      {id:'tasks',label:'Tasks',icon:'✓'},
+      {id:'reports',label:'Reports',icon:'📊'},
+      {id:'tickets',label:'Tickets',icon:'🎫'},
+      {id:'inbox',label:'Inbox',icon:'✉'},
+    ]},
+    {head:'People', items:[
+      {id:'users',label:'Employees',icon:'👥'},
+      {id:'hr',label:'HR Pipeline',icon:'📋'},
+      {id:'contracts',label:'Contracts',icon:'📄'},
+    ]},
+  ]},
+  accountant: {label:'Accountant', sections:[
+    {head:'Finance', items:[
+      {id:'finance',label:'Dashboard',icon:'⊞'},
+      {id:'payroll',label:'Payroll',icon:'💵'},
+      {id:'inbox',label:'Inbox',icon:'✉'},
+    ]},
+  ]},
+  supervisor: {label:'Supervisor', sections:[
+    {head:'My Team', items:[
+      {id:'dashboard',label:'Dashboard',icon:'⊞'},
+      {id:'schedule',label:'Schedule',icon:'⏱'},
+      {id:'tasks',label:'Tasks',icon:'✓'},
+      {id:'reports',label:'Reports',icon:'📊'},
+      {id:'coaching',label:'Coaching',icon:'🎯'},
+      {id:'inbox',label:'Inbox',icon:'✉'},
+    ]},
+  ]},
+  sales: {label:'Sales', sections:[
+    {head:'Workspace', items:[
+      {id:'mydash',label:'My Dashboard',icon:'⊞'},
+      {id:'myschedule',label:'My Schedule',icon:'⏱'},
+      {id:'mytasks',label:'My Tasks',icon:'✓'},
+      {id:'revenue',label:'Revenue Tracker',icon:'$'},
+      {id:'mytarget',label:'Target Progress',icon:'⊕'},
+      {id:'tickets',label:'Tickets',icon:'🎫'},
+    ]},
+  ]},
+  cx: {label:'CX', sections:[
+    {head:'Workspace', items:[
+      {id:'mydash',label:'My Dashboard',icon:'⊞'},
+      {id:'myschedule',label:'My Schedule',icon:'⏱'},
+      {id:'mytasks',label:'My Tasks',icon:'✓'},
+      {id:'collections',label:'Collections',icon:'$'},
+      {id:'tickets',label:'Tickets',icon:'🎫'},
+    ]},
+  ]},
+};
+
+let currentNav='dashboard';
+let liveFeedTimer=null;
+let selectedRoleLogin='owner';
+
+// ============== UTILITY ==============
+function bdg(text, type){return `<span class="pv-bdg pv-bdg-${type}">${text}</span>`;}
+function toast(msg){
+  const t=document.createElement('div');
+  t.className='pv-toast';
+  t.textContent=msg;
+  document.getElementById('pv-toast-host').appendChild(t);
+  setTimeout(()=>t.remove(),2400);
+}
+function openModal(html){
+  document.getElementById('pv-modal-host').innerHTML=`<div class="pv-modal-bg" onclick="if(event.target===this)closeModal()"><div class="pv-modal">${html}</div></div>`;
+}
+function closeModal(){document.getElementById('pv-modal-host').innerHTML=''}
+
+// ============== LOGIN ==============
+function renderLogin(){
+  document.getElementById('pv-app-host').style.display='none';
+  document.getElementById('pv-login-host').style.display='block';
+  document.getElementById('pv-login-host').innerHTML=`
+  <div class="pv-login">
+    <div class="pv-login-card">
+      <div class="pv-brand-mark">
+        <div class="pv-brand-icon">PV</div>
+        <div>
+          <div class="pv-brand-text-name">Pioneers Veneers</div>
+          <div class="pv-brand-text-sub">Enterprise Platform</div>
+        </div>
+      </div>
+      <div class="pv-login-title">Sign in to your portal</div>
+      <div class="pv-login-sub">Access your role-specific workspace</div>
+      <div class="pv-fld">
+        <label>Select your portal</label>
+        <div class="pv-role-grid">
+          ${[['owner','Owner'],['admin','Admin'],['supervisor','Supervisor'],['accountant','Accountant'],['sales','Sales'],['cx','CX']].map(([k,l])=>`
+            <div class="pv-role-pill ${selectedRoleLogin===k?'selected':''}" onclick="selectLoginRole('${k}',event)">${l}</div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="pv-fld">
+        <label>Username</label>
+        <input type="text" id="pv-lgn-user" placeholder="Enter username" value="${selectedRoleLogin!=='register'?selectedRoleLogin:''}" />
+      </div>
+      <div class="pv-fld">
+        <label>Password</label>
+        <input type="password" id="pv-lgn-pass" placeholder="Enter password" value="demo" />
+      </div>
+      <button class="pv-btn-primary" onclick="doLogin()">Sign in to portal →</button>
+      <div class="pv-login-foot">
+        Don't have an account? <a onclick="toast('Registration submitted · Owner approval pending')">Request access</a>
+        <div style="margin-top:8px;font-size:11px;color:#9fa8be">Demo credentials auto-filled · click sign in</div>
+      </div>
+      <div class="pv-login-status">
+        <span class="pv-pulse"></span>
+        <span style="font-family:'JetBrains Mono',monospace">Encrypted connection · Online</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function selectLoginRole(role, ev){
+  selectedRoleLogin=role;
+  renderLogin();
+}
+
+function doLogin(){
+  const u=document.getElementById('pv-lgn-user').value || selectedRoleLogin;
+  const found=DB.users.find(x=>x.username===u || x.role===selectedRoleLogin);
+  if(!found){
+    toast('Invalid credentials. Try: owner / demo');
+    return;
+  }
+  DB.currentUser=found;
+  currentNav=PORTALS[found.role]?.sections[0].items[0].id || 'dashboard';
+  renderApp();
+}
+
+function logout(){
+  DB.currentUser=null;
+  if(liveFeedTimer){clearInterval(liveFeedTimer);liveFeedTimer=null;}
+  toast('Signed out');
+  selectedRoleLogin='owner';
+  renderLogin();
+}
+
+// ============== APP ==============
+function renderApp(){
+  document.getElementById('pv-login-host').style.display='none';
+  document.getElementById('pv-app-host').style.display='block';
+  document.getElementById('pv-app-host').innerHTML=`
+  <div class="pv-grid">
+    <aside id="pv-sidebar"></aside>
+    <main class="pv-main">
+      <div id="pv-topbar"></div>
+      <div class="pv-content" id="pv-content"></div>
+      <div class="pv-footer">
+        <div class="pv-footer-item"><span class="pv-pulse"></span>Last system audit: Recently</div>
+        <div class="pv-footer-item">🔒 End-to-end encryption enabled</div>
+        <div class="pv-footer-item">System Log</div>
+        <div class="pv-footer-item">Policy Matrix</div>
+        <div class="pv-footer-version">v4.12.0 · Enterprise</div>
+      </div>
+    </main>
+  </div>`;
+  renderSidebar();
+  renderTopbar();
+  renderMain();
+}
+
+function renderSidebar(){
+  const u=DB.currentUser;
+  const p=PORTALS[u.role]||PORTALS.sales;
+  let html=`
+    <aside class="pv-sidebar">
+      <div class="pv-sb-brand">
+        <div class="pv-sb-icon">PV</div>
+        <div>
+          <div class="pv-sb-name">Pioneers Veneers</div>
+          <div class="pv-sb-portal">Portal · ${p.label}</div>
+        </div>
+      </div>
+  `;
+  p.sections.forEach(sec=>{
+    html+=`<div class="pv-sb-section"><div class="pv-sb-heading">${sec.head}</div>`;
+    sec.items.forEach(item=>{
+      html+=`<button class="pv-sb-item ${currentNav===item.id?'active':''}" onclick="goNav('${item.id}')">
+        <span class="pv-sb-icon-i">${item.icon}</span>
+        ${item.label}
+        ${item.badge?`<span class="pv-sb-badge ${item.badgeType||''}">${item.badge}</span>`:''}
+      </button>`;
+    });
+    html+='</div>';
+  });
+  html+=`
+    <div class="pv-sb-user">
+      <div class="pv-sb-avatar">${u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toLowerCase()}</div>
+      <div class="pv-sb-user-info">
+        <div class="pv-sb-user-name">${u.name.toLowerCase()}</div>
+        <div class="pv-sb-user-role">${u.role}</div>
+      </div>
+      <div class="pv-sb-logout" onclick="logout()" title="Sign out">⏻</div>
+    </div>
+  </aside>`;
+  document.getElementById('pv-sidebar').outerHTML=html;
+}
+
+function renderTopbar(){
+  const u=DB.currentUser;
+  const titles={
+    dashboard:['Command Center','Real-time enterprise overview'],
+    monitoring:['Live Monitoring','Continuous system telemetry'],
+    inbox:['Inbox','PDFs · Reports · Contracts'],
+    users:['Employee Directory','Full personnel database'],
+    hr:['HR Pipeline','Auto-scoring · Hiring decisions'],
+    org:['Organizational Tree','Reporting hierarchy'],
+    attendance:['Attendance Log','Clock-ins · Screen captures'],
+    schedule:['Schedule Management','Approve · Publish · Track'],
+    tasks:['Task Flow','Assign · Track · Acknowledge'],
+    reports:['Reports','Generate · Sign · Archive'],
+    contracts:['Contracts','AI-generated · Multi-country'],
+    tickets:['Ticket System','Backend · Resolve · Track'],
+    coaching:['Coaching + QA','Sessions · Quality scorecards'],
+    planning:['Planning Workspace','Strategic documents · AI assistants'],
+    finance:['Financial Dashboard','Revenue · Expenses · P&L'],
+    payroll:['Payroll Processing','Auto-deductions · Branded payslips'],
+    targets:['Target Management','Revenue or order count'],
+    permissions:['Role Permissions','Per-category access control'],
+    policy:['Policy Engine','Auto-execution rules'],
+    design:['PDF Templates','Branded document identity'],
+    mydash:['My Dashboard','Schedule · Tasks · Targets'],
+    myschedule:['My Schedule','Assigned shifts · Time off'],
+    mytasks:['My Tasks','Acknowledge · Complete'],
+    revenue:['Revenue Tracker','Log sales · Auto-commission'],
+    mytarget:['Target Progress','Real-time monthly progress'],
+    collections:['Collections','Track collections · Commission'],
+  };
+  const [title,sub]=titles[currentNav]||['Dashboard',''];
+  const now=new Date();
+  const time=now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true});
+  document.getElementById('pv-topbar').innerHTML=`
+    <div class="pv-topbar">
+      <div class="pv-page-title-block">
+        <div class="pv-page-title">${title}</div>
+        <div class="pv-page-sub">${sub}</div>
+      </div>
+      <div class="pv-system-pill"><span class="pv-pulse"></span> System Live</div>
+      <div class="pv-search-wrap">
+        <span class="pv-search-icon">⌕</span>
+        <input class="pv-search" type="text" placeholder="Search resources, employees, reports..." />
+      </div>
+      <div class="pv-clock">
+        <div>Local time</div>
+        <div class="pv-clock-time">${time}</div>
+      </div>
+      <div class="pv-bell">🔔<div class="pv-bell-dot"></div></div>
+    </div>
+  `;
+}
+
+function goNav(nav){currentNav=nav;renderSidebar();renderTopbar();renderMain();}
+
+function renderMain(){
+  const m=document.getElementById('pv-content');
+  const views={
+    dashboard:viewDashboard, monitoring:viewMonitoring, inbox:viewInbox,
+    users:viewUsers, hr:viewHR, org:viewOrg, attendance:viewAttendance,
+    schedule:viewSchedule, tasks:viewTasks, reports:viewReports, contracts:viewContracts,
+    tickets:viewTickets, coaching:viewCoaching, planning:viewPlanning,
+    finance:viewFinance, payroll:viewPayroll, targets:viewTargets,
+    permissions:viewPermissions, policy:viewPolicy, design:viewDesign,
+    mydash:viewMyDash, myschedule:viewMySchedule, mytasks:viewMyTasks,
+    revenue:viewRevenue, mytarget:viewMyTarget, collections:viewCollections,
+  };
+  const fn=views[currentNav]||viewDashboard;
+  m.innerHTML=fn();
+  if(currentNav==='monitoring')startLiveFeed();
+  else stopLiveFeed();
+}
+
+// ============== VIEWS ==============
+function viewDashboard(){
+  return `
+    <div class="pv-stat-grid">
+      <div class="pv-stat-card" onclick="goNav('attendance')">
+        <div class="pv-stat-head">
+          <div class="pv-stat-icon indigo">👥</div>
+          <span class="pv-stat-trend pv-trend-down">↘ -5.4%</span>
+        </div>
+        <div class="pv-stat-label">Live Clock-Ins</div>
+        <div class="pv-stat-val">142</div>
+        <div class="pv-stat-sub">92% Attendance Rate</div>
+      </div>
+      <div class="pv-stat-card" onclick="goNav('finance')">
+        <div class="pv-stat-head">
+          <div class="pv-stat-icon green">$</div>
+          <span class="pv-stat-trend pv-trend-up">↗ +12.3%</span>
+        </div>
+        <div class="pv-stat-label">MTD Revenue</div>
+        <div class="pv-stat-val">$482,900</div>
+        <div class="pv-stat-sub">Internal Gross</div>
+      </div>
+      <div class="pv-stat-card" onclick="goNav('hr')">
+        <div class="pv-stat-head">
+          <div class="pv-stat-icon amber">📈</div>
+        </div>
+        <div class="pv-stat-label">Hiring Pipeline</div>
+        <div class="pv-stat-val">${DB.applicants.length}</div>
+        <div class="pv-stat-sub">Active Recruitment</div>
+      </div>
+      <div class="pv-stat-card" onclick="goNav('finance')">
+        <div class="pv-stat-head">
+          <div class="pv-stat-icon red">⚠</div>
+        </div>
+        <div class="pv-stat-label">Total Expenditure</div>
+        <div class="pv-stat-val red">-$1,240</div>
+        <div class="pv-stat-sub">Across Active Terminals</div>
+      </div>
+    </div>
+    <div class="pv-two">
+      <div class="pv-panel">
+        <div class="pv-panel-head">
+          <div>
+            <div class="pv-panel-title">Live Activity Stream</div>
+            <div class="pv-panel-sub">Real-time events across all portals</div>
+          </div>
+          <button class="pv-btn-icon" onclick="goNav('monitoring')">View all →</button>
+        </div>
+        <div class="pv-scrollable" style="max-height:240px">
+          ${DB.liveFeed.map(f=>`
+            <div class="pv-feed-item">
+              <span class="pv-feed-time">${f.time}</span>
+              <span class="pv-feed-dot" style="background:${f.type==='green'?'#10b981':f.type==='red'?'#ef4444':f.type==='amber'?'#f59e0b':f.type==='gray'?'#9fa8be':'#6366f1'}"></span>
+              <div class="pv-feed-text"><strong>${f.user}</strong> · ${f.action}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="pv-panel">
+        <div class="pv-panel-head">
+          <div>
+            <div class="pv-panel-title">Target Progress</div>
+            <div class="pv-panel-sub">${Object.keys(DB.targets).length} active targets</div>
+          </div>
+          <button class="pv-btn-icon" onclick="goNav('targets')">Manage →</button>
+        </div>
+        ${Object.entries(DB.targets).map(([dept,t])=>{const pct=Math.round((t.collected/t.monthly)*100);return `
+          <div style="margin-bottom:18px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+              <span style="color:#1a1f2e;font-weight:600">${dept}</span>
+              <span style="color:#4f46e5;font-weight:600">${t.type==='revenue'?'$'+t.collected.toLocaleString()+' / $'+t.monthly.toLocaleString():t.collected+' / '+t.monthly+' orders'}</span>
+            </div>
+            <div class="pv-bar-wrap"><div class="pv-bar-fill" style="width:${pct}%;background:${pct>=80?'#10b981':pct>=50?'#4f46e5':'#f59e0b'}"></div></div>
+            <div style="font-size:10px;color:#6b7689;margin-top:5px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em">Deadline · ${t.deadline} · ${pct}% achieved</div>
+          </div>
+        `}).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function viewMonitoring(){
+  return `
+    <div class="pv-three" style="grid-template-columns: 2fr 1fr">
+      <div class="pv-panel">
+        <div class="pv-panel-head">
+          <div class="pv-panel-title">Activity Stream</div>
+          <span class="pv-bdg pv-bdg-red">● Recording</span>
+        </div>
+        <div class="pv-scrollable" id="pv-live-feed" style="max-height:340px">${renderLiveFeed()}</div>
+      </div>
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:14px">Active Sessions</div>
+        ${DB.users.filter(u=>u.clockedIn).map(u=>`
+          <div class="pv-row" style="padding:9px 0">
+            <span class="pv-pulse"></span>
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600;color:#1a1f2e">${u.name}</div>
+              <div style="font-size:10px;color:#6b7689">${u.doing}</div>
+            </div>
+            <button class="pv-btn-icon" onclick="watchScreen('${u.id}')">View</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="pv-three">
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:12px">Tickets</div>
+        ${DB.tickets.map(t=>`
+          <div class="pv-row" style="padding:8px 0;flex-wrap:wrap">
+            <div style="flex:1">
+              <div style="font-size:12px;font-weight:600;color:#1a1f2e">${t.title}</div>
+              <div style="font-size:10px;color:#6b7689">${t.from}</div>
+            </div>
+            ${bdg(t.priority,t.priority==='High'?'red':'amber')}
+          </div>
+        `).join('')}
+      </div>
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:12px">Policy Logs</div>
+        ${DB.policies.filter(p=>p.executed>0).slice(0,3).map(p=>`
+          <div style="padding:8px 0;border-bottom:1px solid #f0f2f5">
+            <div style="font-size:12px;font-weight:600;color:#1a1f2e">${p.name}</div>
+            <div style="font-size:10px;color:#dc2626;margin-top:2px;font-weight:500">Executed ${p.executed}× this month</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:12px">Approval Queue</div>
+        ${DB.schedules.filter(s=>s.status==='Pending').map(s=>`
+          <div style="padding:8px 0;border-bottom:1px solid #f0f2f5">
+            <div style="font-size:12px;font-weight:600;color:#1a1f2e">${s.team}</div>
+            <div style="font-size:10px;color:#6b7689">From · ${s.by}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderLiveFeed(){
+  return DB.liveFeed.map(f=>`
+    <div class="pv-feed-item">
+      <span class="pv-feed-time">${f.time}</span>
+      <span class="pv-feed-dot" style="background:${f.type==='green'?'#10b981':f.type==='red'?'#ef4444':f.type==='amber'?'#f59e0b':f.type==='gray'?'#9fa8be':'#6366f1'}"></span>
+      <div class="pv-feed-text"><strong>${f.user}</strong> · ${f.action}</div>
+    </div>
+  `).join('');
+}
+
+function startLiveFeed(){
+  if(liveFeedTimer)clearInterval(liveFeedTimer);
+  liveFeedTimer=setInterval(()=>{
+    const events=[
+      {user:'Ahmed Hassan',action:'Logged revenue $'+(Math.floor(Math.random()*1500)+300),type:'green'},
+      {user:'Maria Santos',action:'Logged collection $'+(Math.floor(Math.random()*800)+200),type:'green'},
+      {user:'System',action:'Idle alert · EMP003 inactive 12 min',type:'amber'},
+      {user:'Lena Müller',action:'Submitted coaching report',type:'indigo'},
+      {user:'System',action:'-0.5 pts auto-deducted (late policy)',type:'red'},
+    ];
+    const ev={...events[Math.floor(Math.random()*events.length)],time:'Just now'};
+    DB.liveFeed.unshift(ev);
+    DB.liveFeed=DB.liveFeed.slice(0,12);
+    const el=document.getElementById('pv-live-feed');
+    if(el)el.innerHTML=renderLiveFeed();
+  },4000);
+}
+function stopLiveFeed(){if(liveFeedTimer){clearInterval(liveFeedTimer);liveFeedTimer=null}}
+
+function watchScreen(id){
+  const u=DB.users.find(x=>x.id===id);
+  openModal(`<div class="pv-modal-title">Screen capture · ${u.name}</div>
+    <div class="pv-screen" style="margin-bottom:14px">${u.doing}</div>
+    <div style="font-size:11px;color:#6b7689;margin-bottom:14px">Capture interval · 60s · Retention · 30 days · Encrypted storage</div>
+    <div style="display:flex;gap:8px"><button class="pv-btn pv-btn-sec" onclick="closeModal()">Close</button><button class="pv-btn pv-btn-pri">View timeline →</button></div>
+  `);
+}
+
+function viewUsers(){
+  return `
+    <div class="pv-panel-head">
+      <div></div>
+      <div class="pv-page-actions">
+        <button class="pv-btn pv-btn-sec">Filter</button>
+        <button class="pv-btn pv-btn-pri" onclick="addUserModal()">+ Add Employee</button>
+      </div>
+    </div>
+    <div class="pv-panel">
+      ${DB.users.map(e=>`
+        <div class="pv-row-card" onclick="openUserProfile('${e.id}')">
+          <div class="pv-avatar ${e.role==='owner'?'':e.role==='supervisor'||e.role==='admin'?'cyan':e.role==='cx'?'green':'amber'}">${e.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1a1f2e;display:flex;align-items:center;gap:8px">
+              ${e.name}
+              ${e.clockedIn?'<span class="pv-pulse" style="width:6px;height:6px"></span>':''}
+            </div>
+            <div style="font-size:11px;color:#6b7689">${e.id} · ${e.dept} · ${e.location}</div>
+          </div>
+          ${bdg(e.role,'indigo')}
+          <div class="pv-points" title="${e.points}/7 points">
+            ${[1,2,3,4,5,6,7].map(n=>`<div class="pv-pt ${n>e.points?'lost':''}"></div>`).join('')}
+          </div>
+          <div style="font-size:13px;font-weight:600;color:#1a1f2e">$${e.salary.toLocaleString()}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function openUserProfile(id){
+  const e=DB.users.find(x=>x.id===id);
+  openModal(`<div class="pv-modal-title">${e.name} · Profile</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px">
+      ${[['ID',e.id],['Role',e.role],['Department',e.dept],['Location',e.location],['Salary','$'+e.salary.toLocaleString()],['Status',e.status],['Points',e.points+'/7'],['Hired',e.hired]].map(([k,v])=>`
+        <div style="background:#f5f6f8;padding:9px 11px;border-radius:7px">
+          <div style="font-size:10px;color:#6b7689;font-weight:600;text-transform:uppercase;letter-spacing:0.06em">${k}</div>
+          <div style="font-size:13px;font-weight:600;color:#1a1f2e;margin-top:2px">${v}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;color:#6b7689;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">Current Activity</div>
+      <div style="font-size:13px;color:#4f46e5;font-weight:500">${e.doing}</div>
+    </div>
+    <div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri">Edit profile</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Close</button></div>
+  `);
+}
+
+function addUserModal(){
+  openModal(`<div class="pv-modal-title">Add new employee</div>
+    <div class="pv-fld"><label>Full name</label><input type="text" id="pv-nu-name" /></div>
+    <div class="pv-fld"><label>Role</label><select id="pv-nu-role"><option>sales</option><option>cx</option><option>supervisor</option><option>admin</option><option>accountant</option></select></div>
+    <div class="pv-fld"><label>Department</label><input type="text" id="pv-nu-dept" value="Sales"/></div>
+    <div class="pv-fld"><label>Salary ($)</label><input type="number" id="pv-nu-salary" value="2500"/></div>
+    <div class="pv-fld"><label>Location</label><input type="text" id="pv-nu-loc"/></div>
+    <div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="saveUser()">Create</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Cancel</button></div>
+  `);
+}
+
+function saveUser(){
+  const n={
+    id:'EMP'+(DB.users.length+10).toString().padStart(3,'0'),
+    username:document.getElementById('pv-nu-name').value.toLowerCase().split(' ')[0]||'newuser',
+    password:'demo',
+    name:document.getElementById('pv-nu-name').value||'New User',
+    role:document.getElementById('pv-nu-role').value,
+    dept:document.getElementById('pv-nu-dept').value,
+    salary:+document.getElementById('pv-nu-salary').value,
+    location:document.getElementById('pv-nu-loc').value||'TBD',
+    points:7,score:0,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],
+    hired:new Date().toISOString().split('T')[0],clockedIn:false,doing:'New hire'
+  };
+  DB.users.push(n);
+  closeModal();renderMain();toast('Employee added · '+n.name);
+}
+
+function viewHR(){
+  return `
+    <div class="pv-three" style="margin-bottom:18px">
+      <div class="pv-stat-card">
+        <div class="pv-stat-label">High Priority · 90+</div>
+        <div class="pv-stat-val green">${DB.applicants.filter(a=>a.score>=90).length}</div>
+      </div>
+      <div class="pv-stat-card">
+        <div class="pv-stat-label">Low Chance · 70-89</div>
+        <div class="pv-stat-val" style="color:#b45309">${DB.applicants.filter(a=>a.score>=70&&a.score<90).length}</div>
+      </div>
+      <div class="pv-stat-card">
+        <div class="pv-stat-label">Auto-Trashed · &lt;50</div>
+        <div class="pv-stat-val red">0</div>
+      </div>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div class="pv-panel-title">Active applicants</div>
+        <button class="pv-btn pv-btn-pri" onclick="addAppModal()">+ Add applicant</button>
+      </div>
+      ${DB.applicants.map(a=>{const sl=a.score>=90?['High priority','green']:a.score>=70?['Low chance','amber']:['Rejected','red'];return `
+        <div class="pv-row-card">
+          <div style="width:42px;height:42px;border-radius:9px;background:${sl[1]==='green'?'#ecfdf5':sl[1]==='amber'?'#fef3c7':'#fee2e2'};border:1.5px solid ${sl[1]==='green'?'#10b981':sl[1]==='amber'?'#f59e0b':'#ef4444'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:${sl[1]==='green'?'#047857':sl[1]==='amber'?'#b45309':'#dc2626'}">${a.score}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1a1f2e">${a.name}</div>
+            <div style="font-size:11px;color:#6b7689">${a.email}</div>
+          </div>
+          ${bdg(a.pos,'indigo')} ${bdg(sl[0],sl[1])}
+          <button class="pv-btn-icon" onclick="hireApp('${a.id}')">Hire</button>
+          <button class="pv-btn-icon" onclick="rejApp('${a.id}')" style="color:#dc2626">Reject</button>
+        </div>
+      `}).join('')}
+    </div>
+  `;
+}
+function hireApp(id){const a=DB.applicants.find(x=>x.id===id);DB.users.push({id:'EMP'+(DB.users.length+10).toString().padStart(3,'0'),username:a.name.toLowerCase().split(' ')[0],password:'demo',name:a.name,role:a.pos.toLowerCase(),dept:a.pos,salary:2500,score:a.score,points:7,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'TBD',hired:new Date().toISOString().split('T')[0],clockedIn:false,doing:'Onboarding'});DB.applicants=DB.applicants.filter(x=>x.id!==id);renderMain();toast(a.name+' · Hired')}
+function rejApp(id){DB.applicants=DB.applicants.filter(x=>x.id!==id);renderMain();toast('Rejected')}
+function addAppModal(){openModal(`<div class="pv-modal-title">Add applicant</div><div class="pv-fld"><label>Name</label><input id="pv-ap-n" type="text"/></div><div class="pv-fld"><label>Position</label><select id="pv-ap-p"><option>Sales</option><option>CX</option><option>Mgmt</option></select></div><div class="pv-fld"><label>Email</label><input id="pv-ap-e" type="email"/></div><div class="pv-fld"><label>Score</label><input id="pv-ap-s" type="number" min="0" max="100" value="80"/></div><div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="saveApp()">Save</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveApp(){DB.applicants.push({id:'APP'+Math.floor(Math.random()*9999),name:document.getElementById('pv-ap-n').value||'New',pos:document.getElementById('pv-ap-p').value,email:document.getElementById('pv-ap-e').value||'no@email',score:+document.getElementById('pv-ap-s').value||75});closeModal();renderMain();toast('Applicant added')}
+
+function viewSchedule(){
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div>
+          <div class="pv-panel-title">Awaiting approval</div>
+          <div class="pv-panel-sub">${DB.schedules.filter(s=>s.status==='Pending').length} schedules pending</div>
+        </div>
+        <button class="pv-btn pv-btn-pri">+ Create schedule</button>
+      </div>
+      ${DB.schedules.filter(s=>s.status==='Pending').map(s=>`
+        <div class="pv-row-card">
+          <div style="width:38px;height:38px;border-radius:9px;background:#fef3c7;display:flex;align-items:center;justify-content:center;color:#b45309;font-size:18px">⏱</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1a1f2e">${s.team} · ${s.week}</div>
+            <div style="font-size:11px;color:#6b7689">By ${s.by} · Affects ${s.affects} employees</div>
+          </div>
+          ${bdg('Pending','amber')}
+          <button class="pv-btn-icon" style="color:#047857" onclick="approveSched('${s.id}')">✓ Approve</button>
+          <button class="pv-btn-icon" style="color:#dc2626" onclick="rejectSched('${s.id}')">× Reject</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-head"><div class="pv-panel-title">Live grid · Apr 21–27</div></div>
+      <div style="overflow-x:auto"><div style="display:grid;grid-template-columns:140px repeat(7,1fr);gap:4px;min-width:600px">
+        <div></div>
+        ${days.map(d=>`<div style="font-size:11px;text-align:center;padding:6px;font-weight:600;color:#4a5568;text-transform:uppercase;letter-spacing:0.08em">${d}</div>`).join('')}
+        ${DB.users.filter(u=>u.role==='sales'||u.role==='cx').map(e=>`
+          <div style="font-size:12px;color:#1a1f2e;padding:8px 6px;display:flex;align-items:center;font-weight:500">${e.name.split(' ')[0]}</div>
+          ${days.map(d=>{const isOn=e.shifts.includes(d);const bg=isOn?(e.role==='sales'?'#fef3c7':'#e0f2fe'):'#f5f6f8';const cl=isOn?(e.role==='sales'?'#b45309':'#075985'):'#9fa8be';return `<div style="height:32px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;background:${bg};color:${cl}">${isOn?(e.role==='sales'?'OUT':'IN'):'—'}</div>`}).join('')}
+        `).join('')}
+      </div></div>
+    </div>
+  `;
+}
+function approveSched(id){DB.schedules.find(s=>s.id===id).status='Approved';renderMain();toast('Schedule approved · Published')}
+function rejectSched(id){DB.schedules.find(s=>s.id===id).status='Rejected';renderMain();toast('Schedule rejected')}
+
+function viewTasks(){
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div class="pv-panel-title">All tasks</div>
+        <button class="pv-btn pv-btn-pri" onclick="addTaskModal()">+ Assign task</button>
+      </div>
+      ${DB.tasks.map(t=>`
+        <div class="pv-row-card">
+          <div onclick="toggleTask('${t.id}')" style="width:20px;height:20px;border-radius:5px;border:1.5px solid ${t.done?'#10b981':'#cbd2e0'};background:${t.done?'#10b981':'#fff'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;cursor:pointer;flex-shrink:0">${t.done?'✓':''}</div>
+          <div style="flex:1;${t.done?'opacity:0.5;text-decoration:line-through':''}">
+            <div style="font-size:13px;font-weight:600;color:#1a1f2e">${t.title}</div>
+            <div style="font-size:11px;color:#6b7689">→ ${t.assignedTo} · By ${t.by} · Due ${t.due}</div>
+          </div>
+          ${t.seen?bdg('Seen','indigo'):bdg('Unseen','amber')}
+          ${bdg(t.priority,t.priority==='High'?'red':'amber')}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+function toggleTask(id){const t=DB.tasks.find(x=>x.id===id);t.done=!t.done;renderMain();toast(t.done?'Completed':'Reopened')}
+function addTaskModal(){openModal(`<div class="pv-modal-title">Assign task</div><div class="pv-fld"><label>Assign to</label><select id="pv-t-a">${DB.users.map(u=>`<option>${u.name}</option>`).join('')}</select></div><div class="pv-fld"><label>Title</label><input id="pv-t-t" type="text"/></div><div class="pv-fld"><label>Due</label><input id="pv-t-d" type="text" placeholder="Apr 30"/></div><div class="pv-fld"><label>Priority</label><select id="pv-t-p"><option>High</option><option>Medium</option><option>Low</option></select></div><div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="saveTask()">Assign</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveTask(){DB.tasks.push({id:'T'+Math.floor(Math.random()*999),title:document.getElementById('pv-t-t').value||'New task',assignedTo:document.getElementById('pv-t-a').value,by:DB.currentUser.name,due:document.getElementById('pv-t-d').value||'TBD',priority:document.getElementById('pv-t-p').value,done:false,seen:false});closeModal();renderMain();toast('Task assigned')}
+
+function viewReports(){
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div class="pv-panel-title">All reports</div>
+        <button class="pv-btn pv-btn-pri" onclick="genReportModal()">+ New report</button>
+      </div>
+      ${[
+        {emp:'Ahmed Hassan',by:'Lena Müller',type:'Performance',status:'Signed',date:'Apr 22'},
+        {emp:'James Okafor',by:'Lena Müller',type:'Corrective',status:'Pending',date:'Apr 24'},
+        {emp:'Maria Santos',by:'Lena Müller',type:'Achievement',status:'Viewed',date:'Apr 23'},
+      ].map(r=>`
+        <div class="pv-row-card">
+          <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;color:#4f46e5">📊</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1a1f2e">${r.emp} · ${r.type}</div>
+            <div style="font-size:11px;color:#6b7689">From ${r.by} · ${r.date}</div>
+          </div>
+          ${bdg(r.status,r.status==='Signed'?'green':r.status==='Viewed'?'indigo':'amber')}
+          <button class="pv-btn-icon" onclick="toast('Opening ' + r.emp)">View</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+async function genReportModal(){
+  openModal(`<div class="pv-modal-title">Generate report</div><div class="pv-fld"><label>Employee</label><select id="pv-r-e">${DB.users.map(u=>`<option>${u.name}</option>`).join('')}</select></div><div class="pv-fld"><label>Type</label><select><option>Performance</option><option>Corrective</option><option>Achievement</option></select></div><div class="pv-fld"><label>Notes</label><textarea id="pv-r-n" rows="4"></textarea></div><div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="aiReport()">✦ AI Generate</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Cancel</button></div><div id="pv-r-o" style="margin-top:14px"></div>`)
+}
+async function aiReport(){
+  const emp=document.getElementById('pv-r-e').value;
+  const notes=document.getElementById('pv-r-n').value||'No notes';
+  const out=document.getElementById('pv-r-o');
+  out.innerHTML='<span class="pv-spin"></span><span style="color:#4f46e5;font-size:12px">Generating report...</span>';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:`Write a 2-paragraph employee performance report for ${emp}. Notes: ${notes}. Be professional.`}]})});
+    const data=await res.json();
+    out.innerHTML=`<div style="background:#f5f6f8;padding:14px;border-radius:8px;font-size:12px;line-height:1.7;color:#4a5568;white-space:pre-wrap">${data.content?.[0]?.text||'Failed'}</div>`;
+    toast('Report generated · Saved');
+  }catch(e){out.innerHTML='<span style="color:#dc2626;font-size:12px">Connection error</span>'}
+}
+
+function viewContracts(){
+  return `
+    <div class="pv-two">
+      <div class="pv-panel">
+        <div class="pv-panel-head">
+          <div class="pv-panel-title">Active contracts</div>
+          <button class="pv-btn pv-btn-pri" onclick="newContractModal()">+ New</button>
+        </div>
+        ${[{emp:'Ahmed Hassan',type:'Sales · Egypt',signed:true,date:'2024-03-12'},{emp:'Maria Santos',type:'CX · Philippines',signed:true,date:'2024-05-20'}].map(c=>`
+          <div class="pv-row-card">
+            <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:16px;color:#4f46e5">📄</div>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600;color:#1a1f2e">${c.emp}</div>
+              <div style="font-size:11px;color:#6b7689">${c.type} · ${c.date}</div>
+            </div>
+            ${bdg('Signed','green')}
+            <button class="pv-btn-icon">↓ PDF</button>
+          </div>
+        `).join('')}
+      </div>
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:14px">Templates</div>
+        ${['Sales · Egypt','CX · Philippines','Supervisor · Mgmt','Sales · UAE'].map(t=>`
+          <div class="pv-row-card">
+            <div style="font-size:18px;color:#4f46e5">📋</div>
+            <div style="flex:1;font-size:12px;color:#1a1f2e;font-weight:500">${t}</div>
+            <button class="pv-btn-icon">Use</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+function newContractModal(){openModal(`<div class="pv-modal-title">New contract</div><div class="pv-fld"><label>Employee</label><input id="pv-ct-n" type="text"/></div><div class="pv-fld"><label>Role</label><input id="pv-ct-r" type="text"/></div><div class="pv-fld"><label>Salary $</label><input id="pv-ct-s" type="number"/></div><div class="pv-fld"><label>Country</label><select id="pv-ct-c"><option>Egypt</option><option>Philippines</option><option>UAE</option><option>USA</option></select></div><div class="pv-fld"><label>Responsibilities</label><textarea id="pv-ct-resp" rows="3"></textarea></div><div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="aiContract()">✦ AI Generate</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Cancel</button></div><div id="pv-ct-o" style="margin-top:14px"></div>`)}
+async function aiContract(){
+  const n=document.getElementById('pv-ct-n').value||'Employee';
+  const r=document.getElementById('pv-ct-r').value||'TBD';
+  const s=document.getElementById('pv-ct-s').value||'TBD';
+  const c=document.getElementById('pv-ct-c').value;
+  const out=document.getElementById('pv-ct-o');
+  out.innerHTML='<span class="pv-spin"></span><span style="color:#4f46e5;font-size:12px">Generating contract...</span>';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:`Write a 2-paragraph employment contract for ${n}, role ${r}, salary $${s}/mo, country ${c}. Formal.`}]})});
+    const data=await res.json();
+    out.innerHTML=`<div style="background:#f5f6f8;padding:14px;border-radius:8px;font-size:12px;line-height:1.7;color:#4a5568;white-space:pre-wrap">${data.content?.[0]?.text||'Failed'}</div>`;
+    toast('Contract saved');
+  }catch(e){out.innerHTML='<span style="color:#dc2626;font-size:12px">Error</span>'}
+}
+
+function viewTickets(){
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div class="pv-panel-title">All tickets</div>
+        <button class="pv-btn pv-btn-pri">+ New ticket</button>
+      </div>
+      ${DB.tickets.map(t=>`
+        <div class="pv-row-card" onclick="toast('Opening · '+t.title)">
+          <div style="width:36px;height:36px;border-radius:8px;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:14px;color:#dc2626">⚠</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1a1f2e">${t.title}</div>
+            <div style="font-size:11px;color:#6b7689">From ${t.from} · ${t.time}</div>
+          </div>
+          ${bdg(t.priority,t.priority==='High'?'red':'amber')}
+          ${bdg(t.status,t.status==='Open'?'amber':'indigo')}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function viewCoaching(){
+  const s={confirmed:['Smiling tone','Customer feels special','Showing excitement','Personal experience','Multiple connections','Discount handling','Congratulating'],fail:['Introduction quality','Customer connection','Price without value','Objection rebuttal','Card request trust'],lost:['Over speaking','Building rapport','Offering alternatives','Pain point questions','Negative answers','Product knowledge','Payment method','Payment tools','System usage']};
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div class="pv-panel-title">Active coaching session</div>
+        <button class="pv-btn pv-btn-pri">+ New session</button>
+      </div>
+      <div class="pv-two">
+        <div>
+          <div class="pv-fld"><label>Agent</label><select>${DB.users.filter(u=>u.role==='sales'||u.role==='cx').map(u=>`<option>${u.name}</option>`).join('')}</select></div>
+          <div class="pv-fld"><label>Session type</label><select><option>Performance</option><option>Corrective</option><option>Skills training</option></select></div>
+          <div class="pv-fld"><label>Discussion notes</label><textarea rows="4"></textarea></div>
+        </div>
+        <div>
+          <div class="pv-fld"><label>Action plan</label><textarea rows="4"></textarea></div>
+          <div class="pv-fld"><label>Next review</label><input type="text" placeholder="May 5"/></div>
+          <button class="pv-btn pv-btn-pri" onclick="toast('Session saved · QA attached')">Save session →</button>
+        </div>
+      </div>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-head"><div class="pv-panel-title">Quality Attributes Scorecard</div></div>
+      <div class="pv-three">
+        ${[['confirmed','Sale Confirmed','confirmed'],['fail','Critical Fail','fail'],['lost','Sale Lost','lost']].map(([k,l,c])=>`
+          <div class="pv-qa-section ${c}">
+            <div class="pv-qa-head ${c}">${l}</div>
+            ${s[k].map((it,i)=>`<div class="pv-qa-attr"><div class="pv-qa-name">${it}</div><input type="range" min="0" max="10" value="0" oninput="document.getElementById('pv-q-${k}-${i}').textContent=this.value"/><div class="pv-qa-val"><span>0</span><span id="pv-q-${k}-${i}">—</span><span>10</span></div></div>`).join('')}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function viewPlanning(){
+  const plans=[
+    {name:'Financial Plan',icon:'$',color:'green',desc:'Budget · Forecast · ROI'},
+    {name:'Marketing Plan',icon:'M',color:'cyan',desc:'Campaigns · Channels · KPIs'},
+    {name:'Business Plan',icon:'B',color:'indigo',desc:'Strategy · Vision · Goals'},
+    {name:'Hiring Plan',icon:'H',color:'amber',desc:'Roles · Timeline · Budget'},
+    {name:'Website Plan',icon:'W',color:'purple',desc:'Architecture · Content · SEO'},
+  ];
+  return `
+    <div class="pv-three">
+      ${plans.map(p=>`
+        <div class="pv-panel" style="cursor:pointer" onclick="toast('Opening '+p.name)">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+            <div class="pv-stat-icon ${p.color}" style="width:44px;height:44px;font-size:18px;font-weight:700">${p.icon}</div>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#1a1f2e">${p.name}</div>
+              <div style="font-size:11px;color:#6b7689;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px">${p.desc}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="pv-btn pv-btn-sec" style="flex:1" onclick="event.stopPropagation();toast('Upload')">↑ Upload</button>
+            <button class="pv-btn pv-btn-pri" style="flex:1" onclick="event.stopPropagation();openChatbot('${p.name}')">⊕ AI Chat</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+function openChatbot(name){
+  openModal(`<div class="pv-modal-title">${name} · AI assistant</div>
+    <div style="background:#eef2ff;padding:14px;border-radius:8px;margin-bottom:14px;font-size:12px;color:#4338ca;line-height:1.6">
+      <div style="font-weight:600;margin-bottom:4px">Pioneers Veneers AI</div>
+      I have analyzed your ${name}. What would you like to know?
+    </div>
+    <div class="pv-fld"><label>Ask anything about this plan</label><input type="text" placeholder="What is the Q3 budget allocation?"/></div>
+    <div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri">Send query →</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Close</button></div>
+  `);
+}
+
+function viewFinance(){
+  return `
+    <div class="pv-stat-grid">
+      <div class="pv-stat-card">
+        <div class="pv-stat-head"><div class="pv-stat-icon green">$</div><span class="pv-stat-trend pv-trend-up">↗ +12%</span></div>
+        <div class="pv-stat-label">Revenue</div>
+        <div class="pv-stat-val green">$184K</div>
+      </div>
+      <div class="pv-stat-card">
+        <div class="pv-stat-head"><div class="pv-stat-icon red">↓</div></div>
+        <div class="pv-stat-label">Expenses</div>
+        <div class="pv-stat-val red">$97K</div>
+      </div>
+      <div class="pv-stat-card">
+        <div class="pv-stat-head"><div class="pv-stat-icon amber">📈</div></div>
+        <div class="pv-stat-label">Net Profit</div>
+        <div class="pv-stat-val">$87K</div>
+        <div class="pv-stat-sub">47% margin</div>
+      </div>
+      <div class="pv-stat-card">
+        <div class="pv-stat-head"><div class="pv-stat-icon indigo">⊕</div></div>
+        <div class="pv-stat-label">Forecast</div>
+        <div class="pv-stat-val">$210K</div>
+        <div class="pv-stat-sub">Next month · AI</div>
+      </div>
+    </div>
+    <div class="pv-two">
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:14px">Expense breakdown</div>
+        ${[['Payroll',68000,70],['Operations',12000,12],['Marketing',9000,9],['Software',5000,5],['Misc',3000,4]].map(([l,a,p])=>`
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="color:#1a1f2e;font-weight:500">${l}</span><span style="color:#1a1f2e;font-weight:700">$${a.toLocaleString()}</span></div>
+            <div class="pv-bar-wrap"><div class="pv-bar-fill" style="width:${p}%;background:#4f46e5"></div></div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:14px">Revenue · Department</div>
+        ${[['Sales',124000,68],['Customer Care',45000,24],['Other',15000,8]].map(([d,a,p])=>`
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span style="color:#1a1f2e;font-weight:500">${d}</span><span style="color:#047857;font-weight:700">$${a.toLocaleString()}</span></div>
+            <div class="pv-bar-wrap"><div class="pv-bar-fill" style="width:${p}%;background:#10b981"></div></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function viewPayroll(){
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div class="pv-panel-title">Process payroll · April 2026</div>
+        <button class="pv-btn pv-btn-pri" onclick="toast('Bulk processed')">Process all →</button>
+      </div>
+      ${DB.users.map(e=>{const lostPts=7-e.points;const ded=lostPts*20;const net=e.salary-ded;return `
+        <div class="pv-row-card">
+          <div class="pv-avatar">${e.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#1a1f2e">${e.name}</div>
+            <div style="font-size:11px;color:#6b7689">${e.id} · ${e.dept}</div>
+          </div>
+          <div style="text-align:right;min-width:80px">
+            <div style="font-size:10px;color:#6b7689;text-transform:uppercase;font-weight:600;letter-spacing:0.06em">Base</div>
+            <div style="font-size:13px;color:#1a1f2e;font-weight:600">$${e.salary.toLocaleString()}</div>
+          </div>
+          ${ded?`<div style="text-align:right;min-width:80px">
+            <div style="font-size:10px;color:#6b7689;text-transform:uppercase;font-weight:600;letter-spacing:0.06em">Deduct</div>
+            <div style="font-size:13px;color:#dc2626;font-weight:600">-$${ded}</div>
+          </div>`:''}
+          <div style="text-align:right;min-width:90px">
+            <div style="font-size:10px;color:#047857;text-transform:uppercase;font-weight:600;letter-spacing:0.06em">Net pay</div>
+            <div style="font-size:15px;color:#047857;font-weight:700">$${net.toLocaleString()}</div>
+          </div>
+          <button class="pv-btn-icon" onclick="toast('Payslip sent')">↓ Slip</button>
+        </div>
+      `}).join('')}
+    </div>
+  `;
+}
+
+function viewTargets(){
+  return `
+    <div class="pv-panel-head">
+      <div></div>
+      <button class="pv-btn pv-btn-pri" onclick="newTargetModal()">+ Set target</button>
+    </div>
+    ${Object.entries(DB.targets).map(([dept,t])=>{const pct=Math.round((t.collected/t.monthly)*100);return `
+      <div class="pv-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div>
+            <div style="font-size:16px;font-weight:700;color:#1a1f2e">${dept} Team</div>
+            <div style="font-size:11px;color:#6b7689;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;margin-top:3px">Target · ${t.type} · Deadline · ${t.deadline}</div>
+          </div>
+          <div class="pv-circ">
+            <svg width="96" height="96">
+              <circle cx="48" cy="48" r="40" stroke="#e4e7eb" stroke-width="6" fill="none"/>
+              <circle cx="48" cy="48" r="40" stroke="${pct>=80?'#10b981':pct>=50?'#4f46e5':'#f59e0b'}" stroke-width="6" fill="none" stroke-dasharray="251" stroke-dashoffset="${251-(251*pct/100)}" stroke-linecap="round"/>
+            </svg>
+            <div class="pv-circ-text"><div class="pv-circ-val">${pct}%</div><div class="pv-circ-lbl">Achieved</div></div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:#4a5568;margin-bottom:8px;font-weight:500">${t.type==='revenue'?'$'+t.collected.toLocaleString()+' of $'+t.monthly.toLocaleString():t.collected+' of '+t.monthly+' orders'}</div>
+        <div class="pv-bar-wrap"><div class="pv-bar-fill" style="width:${pct}%;background:${pct>=80?'#10b981':pct>=50?'#4f46e5':'#f59e0b'}"></div></div>
+        <div style="display:flex;gap:8px;margin-top:14px"><button class="pv-btn pv-btn-sec" onclick="editTargetModal('${dept}')">Edit target</button><button class="pv-btn pv-btn-pri">Push to agents →</button></div>
+      </div>
+    `}).join('')}
+  `;
+}
+function newTargetModal(){openModal(`<div class="pv-modal-title">Set new target</div><div class="pv-fld"><label>Department</label><select id="pv-tg-d"><option>Sales</option><option>CX</option></select></div><div class="pv-fld"><label>Target type</label><select id="pv-tg-t"><option value="revenue">Revenue ($)</option><option value="orders">Order count</option></select></div><div class="pv-fld"><label>Target value</label><input id="pv-tg-v" type="number"/></div><div class="pv-fld"><label>Deadline</label><input id="pv-tg-dl" type="text" placeholder="May 31"/></div><div class="pv-fld"><label>Reset mode</label><select><option>Manual</option><option>Auto · Monthly 1st</option></select></div><div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="saveTarget()">Save & push</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveTarget(){const d=document.getElementById('pv-tg-d').value;DB.targets[d]={type:document.getElementById('pv-tg-t').value,monthly:+document.getElementById('pv-tg-v').value,collected:0,deadline:document.getElementById('pv-tg-dl').value};closeModal();renderMain();toast('Target set · Pushed to '+d)}
+function editTargetModal(d){const t=DB.targets[d];openModal(`<div class="pv-modal-title">Edit ${d}</div><div class="pv-fld"><label>Target value</label><input id="pv-te-v" type="number" value="${t.monthly}"/></div><div class="pv-fld"><label>Deadline</label><input id="pv-te-dl" type="text" value="${t.deadline}"/></div><div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="saveTargetEdit('${d}')">Save</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveTargetEdit(d){DB.targets[d].monthly=+document.getElementById('pv-te-v').value;DB.targets[d].deadline=document.getElementById('pv-te-dl').value;closeModal();renderMain();toast('Updated')}
+
+function viewPermissions(){
+  const cats=['tasks','schedule','reports','tickets','hr','contracts','inbox','attendance','monitoring','policy','targets','coaching','planning'];
+  const roles=Object.keys(DB.permissions);
+  return `
+    <div class="pv-panel" style="overflow-x:auto">
+      <table class="pv-perm">
+        <thead><tr><th>Category</th>${roles.map(r=>`<th>${r}</th>`).join('')}</tr></thead>
+        <tbody>${cats.map(c=>`<tr><td>${c}</td>${roles.map(r=>`<td><input type="checkbox" ${DB.permissions[r][c]?'checked':''} onchange="DB.permissions['${r}']['${c}']=this.checked?1:0;toast('${r} · ${c} updated')"/></td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function viewPolicy(){
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head">
+        <div class="pv-panel-title">Active rules · ${DB.policies.filter(p=>p.active).length}</div>
+        <button class="pv-btn pv-btn-pri">+ New rule</button>
+      </div>
+      ${DB.policies.map(p=>`
+        <div class="pv-policy ${p.active?'active':''}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div class="pv-policy-name">${p.name}</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              ${bdg(p.executed+'× fired','indigo')}
+              <label class="pv-chk"><input type="checkbox" ${p.active?'checked':''} onchange="DB.policies.find(x=>x.id==='${p.id}').active=this.checked;toast('Updated')"/> Active</label>
+            </div>
+          </div>
+          <div class="pv-policy-detail"><strong>Trigger →</strong> ${p.trigger}</div>
+          <div class="pv-policy-detail" style="margin-top:3px"><strong>Action →</strong> ${p.action}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function viewAttendance(){
+  return `
+    <div class="pv-three" style="margin-bottom:18px">
+      <div class="pv-stat-card"><div class="pv-stat-label">Clocked in</div><div class="pv-stat-val green">${DB.users.filter(u=>u.clockedIn).length}</div></div>
+      <div class="pv-stat-card"><div class="pv-stat-label">Late today</div><div class="pv-stat-val" style="color:#b45309">1</div></div>
+      <div class="pv-stat-card"><div class="pv-stat-label">No-shows</div><div class="pv-stat-val red">0</div></div>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-head"><div class="pv-panel-title">April 2026 · Daily status</div><button class="pv-btn pv-btn-sec">⚙ API settings</button></div>
+      <div style="display:flex;gap:14px;font-size:11px;color:#6b7689;margin-bottom:14px;flex-wrap:wrap">
+        <span><span class="pv-att-cell present" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Present</span>
+        <span><span class="pv-att-cell late" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Late · -0.5 pt</span>
+        <span><span class="pv-att-cell absent" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Absent · -3 pt</span>
+      </div>
+      ${DB.users.filter(u=>DB.attendance[u.id]).map(u=>{const att=DB.attendance[u.id];const late=att.filter(d=>d===2).length;const abs=att.filter(d=>d===3).length;return `
+        <div style="margin-bottom:18px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:#1a1f2e;font-weight:600">${u.name}</span><span style="font-size:11px;color:#6b7689;font-weight:500">${late} late · ${abs} absent</span></div>
+          <div class="pv-att-grid">${att.map((d,i)=>{const cls=d===0?'':d===1?'present':d===2?'late':'absent';const sym=d===0?'':d===1?'·':d===2?'L':'A';return `<div class="pv-att-cell ${cls}" title="Day ${i+1}" onclick="toast('Day ${i+1} · ${u.name}')">${sym}</div>`}).join('')}</div>
+        </div>
+      `}).join('')}
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Live screen captures</div>
+      <div class="pv-three">
+        ${DB.users.filter(u=>u.clockedIn).slice(0,3).map(u=>`
+          <div>
+            <div class="pv-screen">${u.doing}</div>
+            <div style="font-size:12px;font-weight:600;color:#1a1f2e;margin-top:8px">${u.name}</div>
+            <div style="font-size:10px;color:#6b7689;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Capture · 60s interval</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function viewOrg(){
+  const tree=[
+    [{r:'Owner',sub:'Full access',k:'owner'}],
+    [{r:'Admin',sub:'Operations',k:'admin'},{r:'Accountant',sub:'Finance',k:'accountant'}],
+    [{r:'Sales Supervisor',sub:'Sales team',k:'supervisor'},{r:'CX Supervisor',sub:'CX team',k:'supervisor'}],
+    [{r:'Sales Agent',sub:'Front-line',k:'sales'},{r:'CX Agent',sub:'Front-line',k:'cx'}],
+  ];
+  return `
+    <div class="pv-panel">
+      ${tree.map((level,li)=>`${li>0?'<div class="pv-org-connect"></div>':''}<div class="pv-org-level">${level.map(n=>`<div class="pv-org-node" onclick="orgClick('${n.k}')"><div class="pv-org-name">${n.r}</div><div class="pv-org-sub">${n.sub}</div></div>`).join('')}</div>`).join('')}
+    </div>
+  `;
+}
+function orgClick(role){const perms=DB.permissions[role]||{};const allowed=Object.entries(perms).filter(([k,v])=>v).map(([k])=>k);openModal(`<div class="pv-modal-title">${role} · permissions</div><div style="font-size:12px;color:#6b7689;margin-bottom:10px">Access granted to ${allowed.length} categories</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px">${allowed.length?allowed.map(p=>bdg(p,'indigo')).join(''):'<span style="font-size:12px;color:#9fa8be">No access</span>'}</div><div style="display:flex;gap:8px"><button class="pv-btn pv-btn-pri" onclick="closeModal();goNav('permissions')">Edit →</button><button class="pv-btn pv-btn-sec" onclick="closeModal()">Close</button></div>`)}
+
+function viewInbox(){
+  const inbox=[
+    {type:'PDF',subject:'Coaching · Ahmed Hassan',from:'Lena Müller',time:'10m ago',unread:true},
+    {type:'REPORT',subject:'Weekly · James Okafor',from:'Lena Müller',time:'1h ago',unread:true},
+    {type:'CONTRACT',subject:'Renewal · Maria Santos',from:'Priya Sharma',time:'3h ago',unread:false},
+    {type:'PDF',subject:'P&L Report · April 2026',from:'David Chen',time:'1d ago',unread:false},
+    {type:'PAYSLIP',subject:'Payslip · March',from:'Accountant',time:'2d ago',unread:false},
+  ];
+  return `
+    <div class="pv-panel" style="padding:0">
+      <div style="padding:14px 18px;border-bottom:1px solid #e4e7eb;display:flex;justify-content:space-between;align-items:center">
+        <div class="pv-panel-title">Messages</div>
+        <button class="pv-btn pv-btn-pri">+ Compose</button>
+      </div>
+      ${inbox.map(i=>`
+        <div class="pv-row-card" style="margin:0;border-radius:0;border-left:none;border-right:none;border-top:none;${i.unread?'background:#fafbff':''}" onclick="toast('Opening · '+i.subject)">
+          <div style="width:36px;height:36px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#4f46e5">${i.type}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:${i.unread?700:500};color:#1a1f2e">${i.subject}</div>
+            <div style="font-size:11px;color:#6b7689">From ${i.from}</div>
+          </div>
+          ${i.unread?bdg('New','indigo'):''}
+          <div style="font-size:11px;color:#9fa8be;font-family:'JetBrains Mono',monospace">${i.time}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function viewDesign(){
+  return `
+    <div class="pv-two">
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:14px">Brand configuration</div>
+        <div class="pv-fld"><label>Company logo</label><input type="text" placeholder="Upload .png or .svg"/></div>
+        <div class="pv-fld"><label>Primary color</label><input type="text" value="#4F46E5"/></div>
+        <div class="pv-fld"><label>Accent color</label><input type="text" value="#10B981"/></div>
+        <div class="pv-fld"><label>Header font</label><select><option>Inter</option><option>Helvetica</option><option>Times</option></select></div>
+        <div class="pv-fld"><label>Apply template to</label>
+          <div style="display:grid;gap:6px">
+            <label class="pv-chk"><input type="checkbox" checked/> Payslips</label>
+            <label class="pv-chk"><input type="checkbox" checked/> Contracts</label>
+            <label class="pv-chk"><input type="checkbox" checked/> Reports</label>
+            <label class="pv-chk"><input type="checkbox" checked/> Coaching records</label>
+            <label class="pv-chk"><input type="checkbox" checked/> Termination notices</label>
+          </div>
+        </div>
+        <button class="pv-btn pv-btn-pri" style="margin-top:6px">Save template</button>
+      </div>
+      <div class="pv-panel">
+        <div class="pv-panel-title" style="margin-bottom:14px">Live preview</div>
+        <div style="background:#fff;border:1px solid #e4e7eb;padding:24px;border-radius:8px;min-height:380px">
+          <div style="border-bottom:2px solid #4f46e5;padding-bottom:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+            <div style="width:42px;height:42px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#6366f1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700">PV</div>
+            <div>
+              <div style="font-size:18px;font-weight:700;color:#1a1f2e">Pioneers Veneers</div>
+              <div style="font-size:10px;color:#6b7689;text-transform:uppercase;letter-spacing:0.15em">Performance Report</div>
+            </div>
+          </div>
+          <div style="font-size:13px;line-height:1.7;color:#4a5568">All generated PDFs will follow this template format. Headers, body text, brand colors, and corporate identity will appear consistently across payroll documents, contracts, and all reports.</div>
+          <div style="margin-top:24px;padding-top:14px;border-top:1px solid #e4e7eb;font-size:10px;color:#9fa8be;font-family:'JetBrains Mono',monospace">Confidential · Pioneers Veneers · v4.12.0</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============== AGENT VIEWS ==============
+function viewMyDash(){
+  const u=DB.currentUser;
+  const lostPts=7-u.points;
+  return `
+    <div class="pv-stat-grid">
+      <div class="pv-stat-card"><div class="pv-stat-head"><div class="pv-stat-icon indigo">📊</div></div><div class="pv-stat-label">Sales · Month</div><div class="pv-stat-val">14</div><div class="pv-stat-sub">Target met ✓</div></div>
+      <div class="pv-stat-card"><div class="pv-stat-head"><div class="pv-stat-icon green">$</div></div><div class="pv-stat-label">Revenue brought</div><div class="pv-stat-val green">$8,400</div></div>
+      <div class="pv-stat-card"><div class="pv-stat-head"><div class="pv-stat-icon amber">⊕</div></div><div class="pv-stat-label">Commission</div><div class="pv-stat-val">$190</div></div>
+      <div class="pv-stat-card"><div class="pv-stat-head"><div class="pv-stat-icon ${u.points>=6?'green':u.points>=4?'amber':'red'}">●</div></div><div class="pv-stat-label">Points</div><div class="pv-stat-val ${u.points>=6?'green':u.points>=4?'':'red'}">${u.points}/7</div></div>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Target progress</div>
+      <div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#4a5568;font-weight:500">Monthly sales target</span><span style="color:#4f46e5;font-weight:700">14 / 50</span></div><div class="pv-bar-wrap"><div class="pv-bar-fill" style="width:28%;background:#4f46e5"></div></div></div>
+      <div style="font-size:11px;color:#6b7689;font-weight:500;text-transform:uppercase;letter-spacing:0.06em">Deadline · Apr 30 · 36 sales remaining</div>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Discipline status</div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <div class="pv-points" style="gap:5px">${[1,2,3,4,5,6,7].map(n=>`<div class="pv-pt ${n>u.points?'lost':''}" style="width:14px;height:24px"></div>`).join('')}</div>
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:700;color:${u.points>=6?'#047857':u.points>=4?'#b45309':'#dc2626'}">${u.points} of 7 points</div>
+          <div style="font-size:11px;color:#6b7689;font-weight:500;margin-top:3px">${lostPts*20>0?'$'+(lostPts*20)+' deducted this cycle':'No deductions · clean record'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function viewMySchedule(){
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const u=DB.currentUser;
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-head"><div class="pv-panel-title">This week · Apr 21–27</div><button class="pv-btn pv-btn-pri" onclick="toast('Time-off submitted')">+ Request time off</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">
+        ${days.map(d=>`<div style="text-align:center"><div style="font-size:11px;color:#6b7689;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">${d}</div><div style="height:70px;border-radius:8px;background:${u.shifts.includes(d)?'#fef3c7':'#f5f6f8'};border:1px solid ${u.shifts.includes(d)?'#f59e0b':'#e4e7eb'};color:${u.shifts.includes(d)?'#b45309':'#9fa8be'};display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:600">${u.shifts.includes(d)?'OUT<br>8AM-4PM':'OFF'}</div></div>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function viewMyTasks(){
+  const u=DB.currentUser;
+  const myTasks=DB.tasks.filter(t=>t.assignedTo===u.name);
+  return `
+    <div class="pv-panel">
+      ${myTasks.length?myTasks.map(t=>`
+        <div class="pv-row-card">
+          <div onclick="toggleTask('${t.id}')" style="width:20px;height:20px;border-radius:5px;border:1.5px solid ${t.done?'#10b981':'#cbd2e0'};background:${t.done?'#10b981':'#fff'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;cursor:pointer;flex-shrink:0">${t.done?'✓':''}</div>
+          <div style="flex:1;${t.done?'opacity:0.5;text-decoration:line-through':''}"><div style="font-size:13px;font-weight:600;color:#1a1f2e">${t.title}</div><div style="font-size:11px;color:#6b7689">From ${t.by} · Due ${t.due}</div></div>
+          ${bdg(t.priority,t.priority==='High'?'red':'amber')}
+        </div>
+      `).join(''):'<div class="pv-empty">No tasks assigned</div>'}
+    </div>
+  `;
+}
+
+function viewRevenue(){
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Log new entry</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div class="pv-fld"><label>Customer ID</label><input type="text" placeholder="CID-0001"/></div>
+        <div class="pv-fld"><label>Amount $</label><input type="number" placeholder="600"/></div>
+        <div class="pv-fld"><label>Type</label><select><option>New customer</option><option>Existing</option></select></div>
+      </div>
+      <button class="pv-btn pv-btn-pri" onclick="toast('Entry logged · Commission updated')">+ Log entry →</button>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Recent entries</div>
+      ${[['CID-0091','$1,200','New','Today 2:14 pm'],['CID-0087','$600','Existing','Today 11:30 am']].map(([i,a,t,tm])=>`
+        <div class="pv-row">
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#1a1f2e">${i}</div><div style="font-size:11px;color:#6b7689">${tm}</div></div>
+          ${bdg(t,t==='New'?'green':'indigo')}
+          <div style="font-size:14px;font-weight:700;color:#047857">${a}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function viewMyTarget(){
+  return `
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Monthly target progress</div>
+      <div style="margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:#4a5568;font-weight:500">Sales count</span><span style="color:#4f46e5;font-size:15px;font-weight:700">14 / 50</span></div>
+        <div class="pv-bar-wrap" style="height:8px"><div class="pv-bar-fill" style="width:28%;background:#4f46e5"></div></div>
+        <div style="font-size:11px;color:#6b7689;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;margin-top:6px">Deadline · Apr 30 · Commission activates after 10 sales</div>
+      </div>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Commission ladder</div>
+      ${[[1,'1–10 sales','$10/sale',10],[2,'11–20 sales','$15/sale',20],[3,'21–30 sales','$20/sale',30],[4,'31–40 sales','$25/sale',40],[5,'41+ sales','$40/sale',50]].map(([i,r,v,th])=>`<div class="pv-tier ${14>=th-9?'met':''}"><span class="pv-tier-label">${r}</span><span class="pv-tier-val">${v}</span></div>`).join('')}
+    </div>
+  `;
+}
+
+function viewCollections(){
+  return `
+    <div class="pv-stat-grid">
+      <div class="pv-stat-card"><div class="pv-stat-head"><div class="pv-stat-icon green">$</div></div><div class="pv-stat-label">Collected · Month</div><div class="pv-stat-val green">$7,200</div></div>
+      <div class="pv-stat-card"><div class="pv-stat-head"><div class="pv-stat-icon amber">⊕</div></div><div class="pv-stat-label">Commission</div><div class="pv-stat-val">$60</div></div>
+      <div class="pv-stat-card"><div class="pv-stat-head"><div class="pv-stat-icon red">⚠</div></div><div class="pv-stat-label">Deductions</div><div class="pv-stat-val red">2</div></div>
+    </div>
+    <div class="pv-panel">
+      <div class="pv-panel-title" style="margin-bottom:14px">Log collection</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="pv-fld"><label>Customer ID</label><input type="text"/></div>
+        <div class="pv-fld"><label>Amount $</label><input type="number"/></div>
+      </div>
+      <button class="pv-btn pv-btn-pri" onclick="toast('Logged')">+ Log collection →</button>
+    </div>
+  `;
+}
+
+// ============== INIT ==============
+renderLogin();
+</script>

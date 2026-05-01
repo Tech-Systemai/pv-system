@@ -1,0 +1,1763 @@
+
+<h2 class="sr-only">NEXUS Enterprise OS — futuristic interactive command center with cyberpunk aesthetic</h2>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+.nexus {
+  font-family: 'Rajdhani', sans-serif;
+  background: #050810;
+  color: #c8d4e6;
+  min-height: 800px;
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(0, 220, 255, 0.15);
+}
+
+.nexus::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 25%, rgba(0, 220, 255, 0.06) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(255, 0, 153, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(0, 255, 200, 0.03) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.nexus::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 220, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 220, 255, 0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.nx-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 240px 1fr; min-height: 800px; }
+
+/* ============== LOGIN ============== */
+.login-screen {
+  position: relative; z-index: 2;
+  min-height: 800px; display: flex; align-items: center; justify-content: center; padding: 40px;
+}
+.login-bg-glow {
+  position: absolute; top: 50%; left: 50%; width: 600px; height: 600px;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 220, 255, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.login-card {
+  background: rgba(8, 14, 26, 0.85); backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 220, 255, 0.2); border-radius: 4px;
+  padding: 50px 45px; width: 460px; max-width: 100%; position: relative;
+  box-shadow: 0 0 80px rgba(0, 220, 255, 0.08), inset 0 0 60px rgba(0, 220, 255, 0.02);
+}
+.login-card::before {
+  content: ""; position: absolute; top: -1px; left: 20px; right: 20px; height: 1px;
+  background: linear-gradient(90deg, transparent, #00dcff, transparent);
+}
+.corner-mark { position: absolute; width: 14px; height: 14px; border: 1px solid #00dcff; }
+.cm-tl { top: 8px; left: 8px; border-right: none; border-bottom: none; }
+.cm-tr { top: 8px; right: 8px; border-left: none; border-bottom: none; }
+.cm-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
+.cm-br { bottom: 8px; right: 8px; border-left: none; border-top: none; }
+.brand {
+  font-family: 'Orbitron', sans-serif; font-size: 38px; font-weight: 900;
+  letter-spacing: 0.18em; text-align: center;
+  background: linear-gradient(180deg, #ffffff 0%, #00dcff 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 4px;
+}
+.brand-sub {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.5em;
+  text-align: center; color: #4a6584; margin-bottom: 36px; text-transform: uppercase;
+}
+.field-grp { margin-bottom: 18px; }
+.field-lbl {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.3em;
+  color: #5a7896; text-transform: uppercase; margin-bottom: 8px; display: block;
+}
+.field-input {
+  width: 100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(0, 220, 255, 0.2);
+  color: #ffffff; padding: 12px 14px; font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; border-radius: 2px; outline: none; transition: all 0.2s;
+}
+.field-input:focus { border-color: #00dcff; box-shadow: 0 0 16px rgba(0, 220, 255, 0.25); }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 22px; }
+.role-pill {
+  background: rgba(0, 220, 255, 0.04); border: 1px solid rgba(0, 220, 255, 0.15);
+  color: #5a7896; padding: 7px 0; text-align: center; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.1em;
+  text-transform: uppercase; border-radius: 2px; transition: all 0.15s;
+}
+.role-pill:hover { color: #00dcff; border-color: rgba(0, 220, 255, 0.4); }
+.role-pill.selected {
+  background: rgba(0, 220, 255, 0.12); border-color: #00dcff; color: #00dcff;
+  box-shadow: 0 0 12px rgba(0, 220, 255, 0.3);
+}
+.btn-cyber {
+  width: 100%; background: linear-gradient(90deg, #0088aa, #00dcff);
+  color: #050810; border: none; padding: 13px; font-family: 'Orbitron', sans-serif;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.2em; cursor: pointer;
+  border-radius: 2px; text-transform: uppercase; transition: all 0.2s; margin-top: 8px;
+}
+.btn-cyber:hover { box-shadow: 0 0 24px rgba(0, 220, 255, 0.6); transform: translateY(-1px); }
+.login-foot {
+  margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(0, 220, 255, 0.1);
+  text-align: center; font-size: 11px; color: #5a7896;
+}
+.login-foot a { color: #00dcff; text-decoration: none; cursor: pointer; }
+.login-status {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  color: #4a6584; letter-spacing: 0.2em;
+}
+.pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: #00ff88; animation: pulse 1.5s infinite; box-shadow: 0 0 6px #00ff88; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* ============== APP ============== */
+.sidebar {
+  background: rgba(6, 11, 22, 0.95); backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(0, 220, 255, 0.12);
+  display: flex; flex-direction: column; max-height: 800px; overflow-y: auto;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(0, 220, 255, 0.2); border-radius: 2px; }
+.sb-brand { padding: 20px 18px 16px; border-bottom: 1px solid rgba(0, 220, 255, 0.08); }
+.sb-brand-name {
+  font-family: 'Orbitron', sans-serif; font-size: 20px; font-weight: 800;
+  letter-spacing: 0.15em; color: #ffffff;
+}
+.sb-brand-name span { color: #00dcff; }
+.sb-brand-sub {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.4em;
+  color: #4a6584; margin-top: 2px; text-transform: uppercase;
+}
+.sb-user {
+  padding: 13px 16px; border-bottom: 1px solid rgba(0, 220, 255, 0.08);
+  display: flex; align-items: center; gap: 10px;
+}
+.sb-avatar {
+  width: 32px; height: 32px; border-radius: 2px;
+  background: linear-gradient(135deg, #00dcff, #ff0099);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700; color: #050810;
+}
+.sb-user-info { flex: 1; min-width: 0; }
+.sb-user-name { font-size: 12px; font-weight: 600; color: #ffffff; }
+.sb-user-role {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.2em;
+  color: #00dcff; text-transform: uppercase; margin-top: 2px;
+}
+.sb-section { padding: 12px 10px; }
+.sb-heading {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; letter-spacing: 0.35em;
+  color: #4a6584; padding: 4px 10px 8px; text-transform: uppercase;
+}
+.sb-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  border-radius: 2px; border: none; background: transparent; cursor: pointer;
+  width: 100%; text-align: left; color: #6a8aa8; font-family: 'Rajdhani', sans-serif;
+  font-size: 13px; font-weight: 500; margin-bottom: 1px; transition: all 0.15s;
+  position: relative; letter-spacing: 0.02em;
+}
+.sb-item:hover { background: rgba(0, 220, 255, 0.05); color: #c8d4e6; }
+.sb-item.active {
+  background: rgba(0, 220, 255, 0.1); color: #00dcff;
+  border-left: 2px solid #00dcff; padding-left: 8px;
+}
+.sb-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+.sb-badge {
+  margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+  padding: 1px 5px; border-radius: 2px; background: rgba(255, 0, 153, 0.15); color: #ff0099;
+}
+.sb-live {
+  padding: 12px 14px; margin-top: auto;
+  border-top: 1px solid rgba(0, 220, 255, 0.08);
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #5a7896;
+  letter-spacing: 0.2em; text-transform: uppercase;
+}
+.sb-live-users { padding: 6px 10px 10px; }
+.sb-live-user {
+  font-size: 11px; padding: 3px 0; color: #6a8aa8; display: flex; align-items: center; gap: 6px;
+}
+.sb-live-dot { width: 5px; height: 5px; border-radius: 50%; background: #00ff88; box-shadow: 0 0 4px #00ff88; }
+
+/* MAIN */
+.main { padding: 22px 26px; overflow-y: auto; max-height: 800px; position: relative; }
+.main::-webkit-scrollbar { width: 4px; }
+.main::-webkit-scrollbar-thumb { background: rgba(0, 220, 255, 0.2); border-radius: 2px; }
+
+.page-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 22px; flex-wrap: wrap; gap: 14px;
+}
+.page-title-block { flex: 1; min-width: 240px; }
+.page-tag {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.4em;
+  color: #00dcff; margin-bottom: 4px; text-transform: uppercase;
+}
+.page-title {
+  font-family: 'Orbitron', sans-serif; font-size: 24px; font-weight: 700;
+  color: #ffffff; letter-spacing: 0.06em;
+}
+.page-sub {
+  font-size: 12px; color: #6a8aa8; margin-top: 6px;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em;
+}
+
+.action-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* STAT CARDS */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.stat-card {
+  background: rgba(8, 14, 26, 0.6); border: 1px solid rgba(0, 220, 255, 0.12);
+  border-radius: 3px; padding: 16px 18px; cursor: pointer; transition: all 0.2s;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, #00dcff, transparent); opacity: 0.5;
+}
+.stat-card:hover {
+  border-color: rgba(0, 220, 255, 0.4); transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 220, 255, 0.15);
+}
+.stat-label {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.3em;
+  color: #5a7896; text-transform: uppercase; margin-bottom: 8px;
+}
+.stat-val {
+  font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 700;
+  color: #ffffff; letter-spacing: 0.04em; line-height: 1;
+}
+.stat-val.cyan { color: #00dcff; text-shadow: 0 0 18px rgba(0, 220, 255, 0.4); }
+.stat-val.pink { color: #ff0099; text-shadow: 0 0 18px rgba(255, 0, 153, 0.4); }
+.stat-val.green { color: #00ff88; text-shadow: 0 0 18px rgba(0, 255, 136, 0.4); }
+.stat-val.amber { color: #ffaa00; text-shadow: 0 0 18px rgba(255, 170, 0, 0.4); }
+.stat-sub { font-size: 11px; color: #6a8aa8; margin-top: 5px; font-family: 'JetBrains Mono', monospace; }
+
+/* CARDS */
+.panel {
+  background: rgba(8, 14, 26, 0.5); border: 1px solid rgba(0, 220, 255, 0.1);
+  border-radius: 3px; padding: 18px; margin-bottom: 14px; position: relative;
+}
+.panel-title {
+  font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 600;
+  letter-spacing: 0.1em; color: #ffffff; margin-bottom: 14px;
+  text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;
+}
+.panel-title::before {
+  content: "▸"; color: #00dcff; margin-right: 8px; font-size: 11px;
+}
+.title-text { display: flex; align-items: center; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.three-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+
+/* BUTTONS */
+.btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
+  padding: 8px 14px; border-radius: 2px; cursor: pointer; transition: all 0.15s;
+  text-transform: uppercase; border: 1px solid transparent;
+}
+.btn-pri {
+  background: rgba(0, 220, 255, 0.12); color: #00dcff; border-color: rgba(0, 220, 255, 0.4);
+}
+.btn-pri:hover { background: rgba(0, 220, 255, 0.2); box-shadow: 0 0 14px rgba(0, 220, 255, 0.4); }
+.btn-sec {
+  background: transparent; color: #6a8aa8; border-color: rgba(106, 138, 168, 0.3);
+}
+.btn-sec:hover { color: #ffffff; border-color: #6a8aa8; }
+.btn-pink {
+  background: rgba(255, 0, 153, 0.1); color: #ff0099; border-color: rgba(255, 0, 153, 0.35);
+}
+.btn-pink:hover { background: rgba(255, 0, 153, 0.18); box-shadow: 0 0 14px rgba(255, 0, 153, 0.4); }
+.btn-danger { background: transparent; color: #ff3366; border-color: rgba(255, 51, 102, 0.3); }
+.btn-icon {
+  background: transparent; border: 1px solid rgba(0, 220, 255, 0.15); color: #6a8aa8;
+  padding: 5px 9px; font-size: 10px; cursor: pointer; border-radius: 2px;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em;
+}
+.btn-icon:hover { color: #00dcff; border-color: #00dcff; }
+
+/* BADGES */
+.bdg {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em;
+  padding: 2px 7px; border-radius: 2px; text-transform: uppercase; white-space: nowrap;
+}
+.bdg-cyan { background: rgba(0, 220, 255, 0.12); color: #00dcff; border: 1px solid rgba(0, 220, 255, 0.3); }
+.bdg-green { background: rgba(0, 255, 136, 0.12); color: #00ff88; border: 1px solid rgba(0, 255, 136, 0.3); }
+.bdg-pink { background: rgba(255, 0, 153, 0.12); color: #ff0099; border: 1px solid rgba(255, 0, 153, 0.3); }
+.bdg-amber { background: rgba(255, 170, 0, 0.12); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3); }
+.bdg-red { background: rgba(255, 51, 102, 0.12); color: #ff3366; border: 1px solid rgba(255, 51, 102, 0.3); }
+.bdg-gray { background: rgba(106, 138, 168, 0.12); color: #8aa6c4; border: 1px solid rgba(106, 138, 168, 0.3); }
+
+/* ROWS */
+.row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 0;
+  border-bottom: 1px solid rgba(0, 220, 255, 0.06);
+}
+.row:last-child { border-bottom: none; }
+.row-card {
+  background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(0, 220, 255, 0.08);
+  padding: 11px 14px; border-radius: 2px; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 10px; transition: all 0.15s; cursor: pointer;
+}
+.row-card:hover { border-color: rgba(0, 220, 255, 0.3); background: rgba(0, 220, 255, 0.03); }
+
+/* INPUTS */
+.fld { margin-bottom: 12px; }
+.fld label {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.25em;
+  color: #5a7896; text-transform: uppercase; display: block; margin-bottom: 5px;
+}
+.fld input, .fld select, .fld textarea {
+  width: 100%; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(0, 220, 255, 0.15);
+  color: #ffffff; padding: 9px 12px; font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; border-radius: 2px; outline: none; transition: all 0.15s;
+}
+.fld input:focus, .fld select:focus, .fld textarea:focus {
+  border-color: #00dcff; box-shadow: 0 0 8px rgba(0, 220, 255, 0.2);
+}
+
+/* TABS */
+.tab-row { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 3px; width: fit-content; }
+.tab {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
+  padding: 6px 14px; border: none; background: transparent; color: #6a8aa8;
+  cursor: pointer; border-radius: 2px; text-transform: uppercase;
+}
+.tab.active { background: rgba(0, 220, 255, 0.15); color: #00dcff; }
+
+/* MODAL */
+.modal-host { position: fixed; inset: 0; pointer-events: none; z-index: 1000; }
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center; padding: 20px; pointer-events: all;
+  animation: fadein 0.15s;
+}
+.modal {
+  background: rgba(8, 14, 26, 0.95); border: 1px solid rgba(0, 220, 255, 0.3);
+  border-radius: 3px; padding: 26px; width: 480px; max-width: 100%; max-height: 80vh;
+  overflow-y: auto; position: relative;
+  box-shadow: 0 0 60px rgba(0, 220, 255, 0.2);
+}
+.modal-title {
+  font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 600;
+  letter-spacing: 0.1em; color: #ffffff; margin-bottom: 16px; text-transform: uppercase;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(0, 220, 255, 0.15);
+}
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 2000;
+  background: rgba(8, 14, 26, 0.95); border: 1px solid #00dcff; border-radius: 2px;
+  padding: 11px 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: #ffffff; box-shadow: 0 0 24px rgba(0, 220, 255, 0.3); animation: slidein 0.2s;
+  letter-spacing: 0.1em;
+}
+.toast::before { content: "▸ "; color: #00dcff; }
+@keyframes slidein { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
+/* SCREEN VIEW */
+.screen-view {
+  aspect-ratio: 16/9; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 51, 102, 0.4);
+  border-radius: 2px; display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6a8aa8;
+  letter-spacing: 0.2em; position: relative; overflow: hidden;
+}
+.screen-view::before {
+  content: ""; position: absolute; top: 8px; left: 8px; width: 8px; height: 8px;
+  border-radius: 50%; background: #ff3366; animation: pulse 1.2s infinite;
+  box-shadow: 0 0 10px #ff3366;
+}
+.screen-view::after {
+  content: "REC"; position: absolute; top: 6px; left: 22px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #ff3366; letter-spacing: 0.2em;
+}
+
+/* CIRCULAR PROGRESS */
+.circ-prog { position: relative; width: 100px; height: 100px; }
+.circ-prog svg { transform: rotate(-90deg); }
+.circ-prog-text {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; font-family: 'Orbitron', sans-serif;
+}
+.circ-prog-val { font-size: 22px; font-weight: 700; color: #ffffff; }
+.circ-prog-lbl {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #6a8aa8;
+  letter-spacing: 0.2em; text-transform: uppercase; margin-top: 1px;
+}
+
+/* PROGRESS BARS */
+.bar { height: 4px; background: rgba(0, 220, 255, 0.08); border-radius: 1px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #00dcff, #ff0099); border-radius: 1px; box-shadow: 0 0 8px rgba(0, 220, 255, 0.4); }
+
+/* ACTIVITY FEED */
+.feed-item {
+  display: flex; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 220, 255, 0.05); font-size: 12px;
+  animation: feedin 0.3s; align-items: center;
+}
+@keyframes feedin { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+.feed-time {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #4a6584;
+  letter-spacing: 0.1em; min-width: 50px;
+}
+.feed-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.feed-text { flex: 1; color: #c8d4e6; font-size: 11px; }
+.feed-text strong { color: #ffffff; font-weight: 600; }
+
+/* COMMISSION TIERS */
+.tier {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 12px; border: 1px solid rgba(0, 220, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25); margin-bottom: 5px; border-radius: 2px;
+  font-size: 11px; transition: all 0.15s;
+}
+.tier.met {
+  border-color: #00ff88; background: rgba(0, 255, 136, 0.06);
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.15);
+}
+.tier-label { color: #c8d4e6; font-family: 'JetBrains Mono', monospace; }
+.tier-val { color: #00dcff; font-weight: 600; font-family: 'Orbitron', sans-serif; letter-spacing: 0.05em; }
+.tier.met .tier-val { color: #00ff88; }
+
+/* POLICY ITEMS */
+.policy {
+  background: rgba(0, 0, 0, 0.3); border-left: 2px solid rgba(106, 138, 168, 0.4);
+  padding: 12px 14px; margin-bottom: 8px; border-radius: 0 2px 2px 0; transition: all 0.15s;
+}
+.policy.active { border-left-color: #00ff88; }
+.policy:hover { background: rgba(0, 220, 255, 0.04); }
+.policy-name { font-size: 12px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
+.policy-detail { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6a8aa8; line-height: 1.5; }
+.policy-detail strong { color: #00dcff; }
+
+/* ATTENDANCE GRID */
+.att-grid { display: grid; grid-template-columns: repeat(31, 1fr); gap: 2px; margin: 8px 0; }
+.att-cell {
+  aspect-ratio: 1; border-radius: 1px; font-size: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(106, 138, 168, 0.08); color: rgba(106, 138, 168, 0.4);
+  cursor: pointer; transition: all 0.1s;
+}
+.att-cell:hover { transform: scale(1.3); z-index: 10; }
+.att-cell.present { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+.att-cell.late { background: rgba(255, 170, 0, 0.2); color: #ffaa00; }
+.att-cell.absent { background: rgba(255, 51, 102, 0.25); color: #ff3366; }
+
+/* QA SCORECARD */
+.qa-section {
+  border: 1px solid rgba(0, 220, 255, 0.12); padding: 14px; border-radius: 2px;
+  background: rgba(0, 0, 0, 0.2);
+}
+.qa-section.confirmed { border-top: 2px solid #00ff88; }
+.qa-section.fail { border-top: 2px solid #ff3366; }
+.qa-section.lost { border-top: 2px solid #ffaa00; }
+.qa-head {
+  font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 12px;
+}
+.qa-head.confirmed { color: #00ff88; }
+.qa-head.fail { color: #ff3366; }
+.qa-head.lost { color: #ffaa00; }
+.qa-attr { margin-bottom: 9px; }
+.qa-attr-name { font-size: 10px; color: #c8d4e6; margin-bottom: 4px; }
+.qa-attr input[type="range"] { width: 100%; accent-color: #00dcff; height: 3px; }
+.qa-attr-val {
+  display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; color: #5a7896; letter-spacing: 0.1em;
+}
+
+/* ORG TREE */
+.org-level { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-bottom: 0; }
+.org-node {
+  padding: 11px 18px; border: 1px solid rgba(0, 220, 255, 0.2);
+  background: rgba(0, 0, 0, 0.4); border-radius: 2px; cursor: pointer;
+  text-align: center; min-width: 100px; transition: all 0.2s;
+}
+.org-node:hover {
+  border-color: #00dcff; background: rgba(0, 220, 255, 0.06);
+  box-shadow: 0 0 16px rgba(0, 220, 255, 0.2);
+}
+.org-name {
+  font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 600;
+  color: #ffffff; letter-spacing: 0.05em;
+}
+.org-sub {
+  font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #5a7896;
+  margin-top: 3px; letter-spacing: 0.15em; text-transform: uppercase;
+}
+.org-connect { width: 1px; height: 18px; background: rgba(0, 220, 255, 0.25); margin: 0 auto; }
+
+/* EMPTY */
+.empty {
+  padding: 30px; text-align: center; color: #5a7896;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em;
+}
+
+/* CHECKBOX */
+.chk { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 10px; color: #c8d4e6; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em; }
+.chk input { accent-color: #00dcff; cursor: pointer; }
+
+/* PERMISSION TABLE */
+.perm-tbl { width: 100%; border-collapse: collapse; font-size: 10px; }
+.perm-tbl th {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.2em;
+  color: #00dcff; text-transform: uppercase; padding: 8px; text-align: center;
+  border-bottom: 1px solid rgba(0, 220, 255, 0.2);
+}
+.perm-tbl th:first-child { text-align: left; }
+.perm-tbl td {
+  padding: 8px; text-align: center; border-bottom: 1px solid rgba(0, 220, 255, 0.05);
+  color: #c8d4e6;
+}
+.perm-tbl td:first-child {
+  text-align: left; text-transform: capitalize; font-family: 'Rajdhani', sans-serif;
+  font-size: 12px; color: #c8d4e6;
+}
+.perm-tbl input { accent-color: #00dcff; cursor: pointer; }
+
+/* ANIMATIONS */
+.spin {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(0, 220, 255, 0.2); border-top-color: #00dcff;
+  border-radius: 50%; animation: rotate 0.8s linear infinite; vertical-align: middle; margin-right: 6px;
+}
+@keyframes rotate { to { transform: rotate(360deg); } }
+
+.points-display {
+  display: flex; gap: 4px; align-items: center;
+}
+.point-bar {
+  width: 10px; height: 18px; border-radius: 1px;
+  background: rgba(106, 138, 168, 0.15); border: 1px solid rgba(106, 138, 168, 0.3);
+}
+.point-bar.lost { background: rgba(255, 51, 102, 0.6); border-color: #ff3366; box-shadow: 0 0 6px rgba(255, 51, 102, 0.4); }
+
+.scrollable { max-height: 360px; overflow-y: auto; padding-right: 4px; }
+.scrollable::-webkit-scrollbar { width: 3px; }
+.scrollable::-webkit-scrollbar-thumb { background: rgba(0, 220, 255, 0.2); border-radius: 1px; }
+</style>
+
+<div class="nexus" id="nexus-app">
+  <div id="login-host"></div>
+  <div id="app-host" style="display:none"></div>
+</div>
+<div class="modal-host" id="modal-host"></div>
+<div id="toast-host"></div>
+
+<script>
+// ============== DATABASE ==============
+const DB = {
+  currentUser: null,
+  users: [
+    {id:'EMP001',username:'ahmed',password:'demo',name:'Ahmed Hassan',role:'sales',dept:'Sales',salary:2800,points:6,score:94,status:'Active',shifts:['Mon','Tue','Wed','Thu'],location:'Cairo',hired:'2024-03-12',clockedIn:true,doing:'Customer call · Order #4471'},
+    {id:'EMP002',username:'maria',password:'demo',name:'Maria Santos',role:'cx',dept:'CX',salary:2400,points:7,score:88,status:'Active',shifts:['Mon','Wed','Fri'],location:'Manila',hired:'2024-05-20',clockedIn:true,doing:'Logging collection $840'},
+    {id:'EMP003',username:'james',password:'demo',name:'James Okafor',role:'sales',dept:'Sales',salary:2600,points:4,score:72,status:'Active',shifts:['Tue','Thu','Sat'],location:'Lagos',hired:'2024-08-01',clockedIn:false,doing:'Off shift'},
+    {id:'EMP004',username:'lena',password:'demo',name:'Lena Müller',role:'supervisor',dept:'Mgmt',salary:4200,points:7,score:97,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'Berlin',hired:'2023-01-15',clockedIn:true,doing:'Reviewing reports'},
+    {id:'EMP005',username:'priya',password:'demo',name:'Priya Sharma',role:'admin',dept:'Mgmt',salary:3800,points:7,score:95,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'Mumbai',hired:'2023-09-10',clockedIn:true,doing:'Approving schedules'},
+    {id:'OWN001',username:'owner',password:'demo',name:'Alexandra Voss',role:'owner',dept:'Executive',salary:0,points:7,score:100,status:'Active',shifts:[],location:'HQ',hired:'2022-01-01',clockedIn:true,doing:'System overview'},
+    {id:'ACC001',username:'finance',password:'demo',name:'David Chen',role:'accountant',dept:'Finance',salary:3500,points:7,score:96,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'Singapore',hired:'2023-04-20',clockedIn:true,doing:'Processing payroll'},
+  ],
+  applicants: [
+    {id:'APP001',name:'Sara Kim',pos:'Sales',score:93,email:'sara.k@email.com'},
+    {id:'APP002',name:'Tom Bradley',pos:'CX',score:68,email:'t.brad@email.com'},
+    {id:'APP003',name:'Nina Petrov',pos:'Sales',score:96,email:'nina.p@email.com'},
+  ],
+  schedules: [
+    {id:'SCH001',by:'Lena Müller',week:'Apr 28–May 4',team:'Sales Team',status:'Pending',affects:5},
+    {id:'SCH002',by:'Priya Sharma',week:'Apr 28–May 4',team:'CX Team',status:'Approved',affects:6},
+  ],
+  tasks: [
+    {id:'T001',title:'Follow up with Tuesday leads',assignedTo:'Ahmed Hassan',by:'Lena',due:'Today',priority:'High',done:false,seen:true},
+    {id:'T002',title:'Submit weekly summary',assignedTo:'James Okafor',by:'Lena',due:'Apr 27',priority:'High',done:false,seen:true},
+    {id:'T003',title:'Customer escalation review',assignedTo:'Maria Santos',by:'Lena',due:'Apr 26',priority:'High',done:false,seen:true},
+  ],
+  tickets: [
+    {id:'TK001',title:'Payment gateway not processing',from:'Ahmed Hassan',priority:'High',status:'Open',time:'1h ago'},
+    {id:'TK002',title:'CRM sync issue',from:'James Okafor',priority:'Low',status:'In Progress',time:'Yesterday'},
+  ],
+  policies: [
+    {id:'P1',name:'Late Clock-In Penalty',trigger:'Every 5 min late',action:'-0.5 points · -$10 salary',active:true,executed:8},
+    {id:'P2',name:'No-Show Penalty',trigger:'Full day absence',action:'-3 points · -$60 salary',active:true,executed:2},
+    {id:'P3',name:'Coaching Plan Failure',trigger:'Failed to follow action plan',action:'-1 point · auto-warning',active:true,executed:1},
+    {id:'P4',name:'Customer Refund',trigger:'Refund traced to CX agent',action:'Clawback commission · -1 point',active:true,executed:3},
+    {id:'P5',name:'Target Miss',trigger:'Below monthly target by 30%',action:'No commission · -2 points',active:true,executed:0},
+    {id:'P6',name:'Termination Trigger',trigger:'7 points lost in cycle',action:'Auto-flag for termination review',active:true,executed:0},
+  ],
+  liveFeed: [
+    {time:'Just now',user:'Ahmed Hassan',action:'Logged revenue $1,200',type:'green'},
+    {time:'2m',user:'Lena Müller',action:'Submitted Sales Team schedule',type:'cyan'},
+    {time:'5m',user:'Maria Santos',action:'Clocked in (1 min late · flagged)',type:'amber'},
+    {time:'12m',user:'System',action:'Auto-deducted -0.5 pts from EMP002',type:'pink'},
+    {time:'18m',user:'Sara Kim',action:'Application scored 93% · high priority',type:'green'},
+    {time:'25m',user:'James Okafor',action:'Clocked out',type:'gray'},
+  ],
+  attendance: {
+    'EMP001':[1,1,1,2,1,1,0,1,1,1,1,2,1,0,1,1,1,1,1,1,2,1,1,1,1,0,1,1,1,1,1],
+    'EMP002':[1,1,2,1,1,3,0,1,1,1,1,1,2,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1],
+    'EMP003':[1,1,1,3,3,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1],
+    'EMP004':[1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1],
+  },
+  targets: {
+    Sales: {type:'orders', monthly:50, collected:34, deadline:'Apr 30'},
+    CX: {type:'revenue', monthly:30000, collected:18400, deadline:'Apr 30'},
+  },
+  permissions: {
+    owner: {tasks:1,schedule:1,reports:1,tickets:1,hr:1,contracts:1,inbox:1,attendance:1,monitoring:1,policy:1,targets:1,coaching:1,planning:1},
+    admin: {tasks:1,schedule:1,reports:1,tickets:1,hr:1,contracts:1,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+    supervisor: {tasks:1,schedule:1,reports:1,tickets:1,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:1,planning:0},
+    accountant: {tasks:0,schedule:0,reports:1,tickets:0,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+    sales: {tasks:1,schedule:1,reports:0,tickets:1,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+    cx: {tasks:1,schedule:1,reports:0,tickets:1,hr:0,contracts:0,inbox:1,attendance:0,monitoring:0,policy:0,targets:0,coaching:0,planning:0},
+  },
+};
+
+const PORTALS = {
+  owner: {label:'Owner / Executive', sections:[
+    {head:'Command', items:[
+      {id:'dashboard',label:'Dashboard'},
+      {id:'monitoring',label:'Live Monitoring',badge:'LIVE'},
+      {id:'inbox',label:'Inbox',badge:3},
+    ]},
+    {head:'People', items:[
+      {id:'users',label:'All Users'},
+      {id:'hr',label:'HR Pipeline',badge:3},
+      {id:'org',label:'Org Tree'},
+      {id:'attendance',label:'Attendance'},
+    ]},
+    {head:'Operations', items:[
+      {id:'schedule',label:'Schedules',badge:1},
+      {id:'tasks',label:'Tasks'},
+      {id:'reports',label:'Reports'},
+      {id:'contracts',label:'Contracts'},
+      {id:'tickets',label:'Tickets',badge:2},
+      {id:'coaching',label:'Coaching + QA'},
+    ]},
+    {head:'Strategy', items:[
+      {id:'planning',label:'Planning'},
+      {id:'finance',label:'Finance'},
+      {id:'payroll',label:'Payroll'},
+      {id:'targets',label:'Targets'},
+    ]},
+    {head:'System', items:[
+      {id:'permissions',label:'Permissions'},
+      {id:'policy',label:'Policy Engine'},
+      {id:'design',label:'PDF Templates'},
+    ]},
+  ]},
+  admin: {label:'Admin', sections:[
+    {head:'Operations', items:[
+      {id:'dashboard',label:'Dashboard'},
+      {id:'schedule',label:'Schedules'},
+      {id:'tasks',label:'Tasks'},
+      {id:'reports',label:'Reports'},
+      {id:'tickets',label:'Tickets'},
+      {id:'inbox',label:'Inbox'},
+    ]},
+    {head:'People', items:[
+      {id:'users',label:'Users'},
+      {id:'hr',label:'HR Pipeline'},
+      {id:'contracts',label:'Contracts'},
+    ]},
+  ]},
+  accountant: {label:'Accountant', sections:[
+    {head:'Finance', items:[
+      {id:'finance',label:'Dashboard'},
+      {id:'payroll',label:'Payroll'},
+      {id:'inbox',label:'Inbox'},
+    ]},
+  ]},
+  supervisor: {label:'Supervisor', sections:[
+    {head:'My Team', items:[
+      {id:'dashboard',label:'Dashboard'},
+      {id:'schedule',label:'Schedule'},
+      {id:'tasks',label:'Assign Tasks'},
+      {id:'reports',label:'Reports'},
+      {id:'coaching',label:'Coaching + QA'},
+      {id:'inbox',label:'Inbox'},
+    ]},
+  ]},
+  sales: {label:'Sales Agent', sections:[
+    {head:'Workspace', items:[
+      {id:'mydash',label:'My Dashboard'},
+      {id:'myschedule',label:'My Schedule'},
+      {id:'mytasks',label:'My Tasks'},
+      {id:'revenue',label:'Revenue Tracker'},
+      {id:'mytarget',label:'Target Progress'},
+      {id:'tickets',label:'Tickets'},
+    ]},
+  ]},
+  cx: {label:'CX Agent', sections:[
+    {head:'Workspace', items:[
+      {id:'mydash',label:'My Dashboard'},
+      {id:'myschedule',label:'My Schedule'},
+      {id:'mytasks',label:'My Tasks'},
+      {id:'collections',label:'Collections'},
+      {id:'tickets',label:'Tickets'},
+    ]},
+  ]},
+};
+
+let currentNav = 'dashboard';
+let liveFeedTimer = null;
+let selectedRoleLogin = 'owner';
+
+// ============== UTILITY ==============
+function bdg(text, type){return `<span class="bdg bdg-${type}">${text}</span>`;}
+function toast(msg){
+  const t=document.createElement('div');
+  t.className='toast';
+  t.textContent=msg;
+  document.getElementById('toast-host').appendChild(t);
+  setTimeout(()=>t.remove(),2600);
+}
+function openModal(html){
+  document.getElementById('modal-host').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><span class="corner-mark cm-tl"></span><span class="corner-mark cm-tr"></span><span class="corner-mark cm-bl"></span><span class="corner-mark cm-br"></span>${html}</div></div>`;
+}
+function closeModal(){document.getElementById('modal-host').innerHTML=''}
+
+// ============== LOGIN ==============
+function renderLogin(){
+  document.getElementById('app-host').style.display='none';
+  document.getElementById('login-host').style.display='block';
+  document.getElementById('login-host').innerHTML=`
+  <div class="login-screen">
+    <div class="login-bg-glow"></div>
+    <div class="login-card">
+      <span class="corner-mark cm-tl"></span>
+      <span class="corner-mark cm-tr"></span>
+      <span class="corner-mark cm-bl"></span>
+      <span class="corner-mark cm-br"></span>
+      <div class="brand">NEXUS</div>
+      <div class="brand-sub">Enterprise OS · v2.0</div>
+      <div class="field-grp">
+        <label class="field-lbl">Select Portal</label>
+        <div class="role-grid">
+          ${[['owner','Owner'],['admin','Admin'],['supervisor','Supervisor'],['accountant','Accountant'],['sales','Sales'],['cx','CX'],['register','Register'],['demo','Demo']].map(([k,l])=>`
+            <div class="role-pill ${selectedRoleLogin===k?'selected':''}" onclick="selectLoginRole('${k}',event)">${l}</div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="field-grp">
+        <label class="field-lbl">Username</label>
+        <input class="field-input" type="text" id="lgn-user" placeholder="${selectedRoleLogin==='register'?'Choose a username':'Enter username'}" value="${selectedRoleLogin!=='register'&&selectedRoleLogin!=='demo'?selectedRoleLogin:''}" />
+      </div>
+      <div class="field-grp">
+        <label class="field-lbl">Access Key</label>
+        <input class="field-input" type="password" id="lgn-pass" placeholder="Enter password" value="${selectedRoleLogin!=='register'?'demo':''}" />
+      </div>
+      ${selectedRoleLogin==='register'?`
+        <div class="field-grp">
+          <label class="field-lbl">Full Name</label>
+          <input class="field-input" type="text" id="lgn-name" placeholder="Your full name" />
+        </div>
+        <div class="field-grp">
+          <label class="field-lbl">Requested Role</label>
+          <select class="field-input" id="lgn-role">
+            <option value="sales">Sales Agent</option>
+            <option value="cx">CX Agent</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="admin">Admin</option>
+            <option value="accountant">Accountant</option>
+          </select>
+        </div>
+      `:''}
+      <button class="btn-cyber" onclick="${selectedRoleLogin==='register'?'submitRegister()':'doLogin()'}">${selectedRoleLogin==='register'?'Submit for Approval ▸':'Initialize Session ▸'}</button>
+      <div class="login-foot">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px">Demo credentials auto-filled · click <a onclick="doLogin()">Initialize</a> to enter</span>
+      </div>
+      <div class="login-status">
+        <span class="pulse-dot"></span>
+        <span>Network · Encrypted · Online</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function selectLoginRole(role, ev){
+  selectedRoleLogin=role;
+  if(role==='demo'){
+    selectedRoleLogin='owner';
+    setTimeout(()=>doLogin(),100);
+    return;
+  }
+  renderLogin();
+}
+
+function doLogin(){
+  const u=document.getElementById('lgn-user').value || selectedRoleLogin;
+  const found=DB.users.find(x=>x.username===u || x.role===selectedRoleLogin);
+  if(!found){
+    toast('Invalid credentials. Try: owner / demo');
+    return;
+  }
+  DB.currentUser=found;
+  currentNav=PORTALS[found.role]?.sections[0].items[0].id || 'dashboard';
+  renderApp();
+}
+
+function submitRegister(){
+  toast('Registration submitted · Awaiting Owner approval');
+  setTimeout(()=>{selectedRoleLogin='owner';renderLogin()},1500);
+}
+
+function logout(){
+  DB.currentUser=null;
+  if(liveFeedTimer){clearInterval(liveFeedTimer);liveFeedTimer=null;}
+  toast('Session terminated');
+  selectedRoleLogin='owner';
+  renderLogin();
+}
+
+// ============== APP ==============
+function renderApp(){
+  document.getElementById('login-host').style.display='none';
+  document.getElementById('app-host').style.display='block';
+  document.getElementById('app-host').innerHTML=`
+  <div class="nx-grid">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main" id="main"></main>
+  </div>`;
+  renderSidebar();
+  renderMain();
+}
+
+function renderSidebar(){
+  const u=DB.currentUser;
+  const p=PORTALS[u.role]||PORTALS.sales;
+  let html=`
+    <div class="sb-brand">
+      <div class="sb-brand-name">NEX<span>US</span></div>
+      <div class="sb-brand-sub">Enterprise · v2.0</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar">${u.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+      <div class="sb-user-info">
+        <div class="sb-user-name">${u.name}</div>
+        <div class="sb-user-role">${p.label}</div>
+      </div>
+    </div>
+  `;
+  p.sections.forEach(sec=>{
+    html+=`<div class="sb-section"><div class="sb-heading">${sec.head}</div>`;
+    sec.items.forEach(item=>{
+      html+=`<button class="sb-item ${currentNav===item.id?'active':''}" onclick="goNav('${item.id}')">
+        <span class="sb-dot"></span>${item.label}
+        ${item.badge?`<span class="sb-badge">${item.badge}</span>`:''}
+      </button>`;
+    });
+    html+='</div>';
+  });
+  if(u.role==='owner'||u.role==='admin'||u.role==='supervisor'){
+    html+=`<div class="sb-section"><div class="sb-heading">Live · Active</div><div class="sb-live-users">`;
+    DB.users.filter(x=>x.clockedIn&&x.id!==u.id).slice(0,4).forEach(x=>{
+      html+=`<div class="sb-live-user"><span class="sb-live-dot"></span>${x.name.split(' ')[0]} · ${x.doing.substring(0,18)}${x.doing.length>18?'…':''}</div>`;
+    });
+    html+=`</div></div>`;
+  }
+  html+=`<div class="sb-section" style="margin-top:auto"><button class="sb-item" onclick="logout()" style="color:#ff3366"><span class="sb-dot"></span>Terminate Session</button></div>`;
+  html+=`<div class="sb-live"><span class="pulse-dot"></span> System · Online</div>`;
+  document.getElementById('sidebar').innerHTML=html;
+}
+
+function goNav(nav){currentNav=nav;renderSidebar();renderMain();}
+
+function renderMain(){
+  const m=document.getElementById('main');
+  const views={
+    dashboard:viewDashboard, monitoring:viewMonitoring, inbox:viewInbox,
+    users:viewUsers, hr:viewHR, org:viewOrg, attendance:viewAttendance,
+    schedule:viewSchedule, tasks:viewTasks, reports:viewReports, contracts:viewContracts,
+    tickets:viewTickets, coaching:viewCoaching, planning:viewPlanning,
+    finance:viewFinance, payroll:viewPayroll, targets:viewTargets,
+    permissions:viewPermissions, policy:viewPolicy, design:viewDesign,
+    mydash:viewMyDash, myschedule:viewMySchedule, mytasks:viewMyTasks,
+    revenue:viewRevenue, mytarget:viewMyTarget, collections:viewCollections,
+  };
+  const fn=views[currentNav]||viewDashboard;
+  m.innerHTML=fn();
+  if(currentNav==='monitoring')startLiveFeed();
+  else stopLiveFeed();
+}
+
+// ============== VIEWS ==============
+function viewDashboard(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Command Center</div>
+        <div class="page-title">Operations Dashboard</div>
+        <div class="page-sub">All systems synchronized · Real-time data feed active</div>
+      </div>
+      <div class="action-row">${bdg('● Online','green')}<button class="btn btn-pri" onclick="goNav('monitoring')">Open Monitoring</button></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card" onclick="goNav('users')"><div class="stat-label">Total Workforce</div><div class="stat-val cyan">${DB.users.length}</div><div class="stat-sub">${DB.users.filter(u=>u.clockedIn).length} active now</div></div>
+      <div class="stat-card" onclick="goNav('finance')"><div class="stat-label">Monthly Revenue</div><div class="stat-val green">$184K</div><div class="stat-sub">↑ 12% MoM</div></div>
+      <div class="stat-card" onclick="goNav('hr')"><div class="stat-label">HR Pipeline</div><div class="stat-val amber">${DB.applicants.length}</div><div class="stat-sub">${DB.applicants.filter(a=>a.score>=90).length} high priority</div></div>
+      <div class="stat-card" onclick="goNav('schedule')"><div class="stat-label">Pending Approvals</div><div class="stat-val pink">${DB.schedules.filter(s=>s.status==='Pending').length}</div><div class="stat-sub">Awaiting review</div></div>
+      <div class="stat-card" onclick="goNav('policy')"><div class="stat-label">Auto-Executions</div><div class="stat-val cyan">${DB.policies.reduce((s,p)=>s+p.executed,0)}</div><div class="stat-sub">Policy actions today</div></div>
+      <div class="stat-card" onclick="goNav('tickets')"><div class="stat-label">Open Tickets</div><div class="stat-val amber">${DB.tickets.length}</div><div class="stat-sub">${DB.tickets.filter(t=>t.priority==='High').length} priority</div></div>
+    </div>
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Live Activity Stream</span><button class="btn-icon" onclick="goNav('monitoring')">Expand ▸</button></div>
+        <div class="scrollable" style="max-height:240px">
+          ${DB.liveFeed.map(f=>`<div class="feed-item"><span class="feed-time">${f.time}</span><span class="feed-dot" style="background:var(--c,#00dcff);box-shadow:0 0 6px var(--c,#00dcff);--c:${f.type==='green'?'#00ff88':f.type==='pink'?'#ff0099':f.type==='amber'?'#ffaa00':f.type==='gray'?'#6a8aa8':'#00dcff'}"></span><div class="feed-text"><strong>${f.user}</strong> · ${f.action}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Target Progress · ${Object.keys(DB.targets).length} Active</span><button class="btn-icon" onclick="goNav('targets')">Manage ▸</button></div>
+        ${Object.entries(DB.targets).map(([dept,t])=>{const pct=Math.round((t.collected/t.monthly)*100);return `
+          <div style="margin-bottom:18px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px"><span style="color:#fff;font-weight:600;letter-spacing:0.05em">${dept}</span><span style="color:#00dcff;font-family:'JetBrains Mono',monospace">${t.type==='revenue'?'$'+t.collected.toLocaleString()+' / $'+t.monthly.toLocaleString():t.collected+' / '+t.monthly+' orders'}</span></div>
+            <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+            <div style="font-size:9px;color:#5a7896;margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em">DEADLINE · ${t.deadline} · ${pct}% ACHIEVED</div>
+          </div>`}).join('')}
+      </div>
+    </div>`;
+}
+
+function viewMonitoring(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Real-Time</div>
+        <div class="page-title">Live Monitoring Center</div>
+        <div class="page-sub">Continuous system telemetry · Updates every 4 seconds</div>
+      </div>
+      <div class="action-row">${bdg('● Recording','red')}</div>
+    </div>
+    <div class="three-col" style="grid-template-columns: 2fr 1fr">
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Activity Stream</span></div>
+        <div class="scrollable" id="live-feed-content" style="max-height:340px">${renderLiveFeed()}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Active Sessions</span></div>
+        ${DB.users.filter(u=>u.clockedIn).map(u=>`
+          <div class="row" style="padding:8px 0">
+            <span class="sb-live-dot"></span>
+            <div style="flex:1"><div style="font-size:11px;font-weight:600;color:#fff">${u.name}</div><div style="font-size:10px;color:#6a8aa8;font-family:'JetBrains Mono',monospace;letter-spacing:0.05em">${u.doing}</div></div>
+            <button class="btn-icon" onclick="watchScreen('${u.id}')">VIEW</button>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="three-col">
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Tickets</span></div>
+        ${DB.tickets.map(t=>`<div class="row" style="padding:6px 0;flex-wrap:wrap"><div style="flex:1"><div style="font-size:11px;color:#fff;font-weight:500">${t.title}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">${t.from}</div></div>${bdg(t.priority,t.priority==='High'?'red':'amber')}</div>`).join('')}
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Policy Logs</span></div>
+        ${DB.policies.filter(p=>p.executed>0).slice(0,3).map(p=>`<div style="padding:6px 0;border-bottom:1px solid rgba(0,220,255,0.05)"><div style="font-size:11px;color:#fff;font-weight:500">${p.name}</div><div style="font-size:10px;color:#ff0099;font-family:'JetBrains Mono',monospace;margin-top:2px">EXECUTED ${p.executed}× THIS MONTH</div></div>`).join('')}
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Approval Queue</span></div>
+        ${DB.schedules.filter(s=>s.status==='Pending').map(s=>`<div style="padding:6px 0;border-bottom:1px solid rgba(0,220,255,0.05)"><div style="font-size:11px;color:#fff;font-weight:500">${s.team}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">FROM · ${s.by.split(' ')[0].toUpperCase()}</div></div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderLiveFeed(){
+  return DB.liveFeed.map(f=>`<div class="feed-item"><span class="feed-time">${f.time}</span><span class="feed-dot" style="background:${f.type==='green'?'#00ff88':f.type==='pink'?'#ff0099':f.type==='amber'?'#ffaa00':f.type==='gray'?'#6a8aa8':'#00dcff'};box-shadow:0 0 6px ${f.type==='green'?'#00ff88':f.type==='pink'?'#ff0099':f.type==='amber'?'#ffaa00':f.type==='gray'?'#6a8aa8':'#00dcff'}"></span><div class="feed-text"><strong>${f.user}</strong> · ${f.action}</div></div>`).join('');
+}
+
+function startLiveFeed(){
+  if(liveFeedTimer)clearInterval(liveFeedTimer);
+  liveFeedTimer=setInterval(()=>{
+    const events=[
+      {user:'Ahmed Hassan',action:'Logged revenue $'+(Math.floor(Math.random()*1500)+300),type:'green'},
+      {user:'Maria Santos',action:'Logged collection $'+(Math.floor(Math.random()*800)+200),type:'green'},
+      {user:'System',action:'Idle alert · EMP003 inactive 12 min',type:'amber'},
+      {user:'Lena Müller',action:'Submitted coaching report',type:'cyan'},
+      {user:'System',action:'-0.5 pts auto-deducted (late policy)',type:'pink'},
+    ];
+    const ev={...events[Math.floor(Math.random()*events.length)],time:'Just now'};
+    DB.liveFeed.unshift(ev);
+    DB.liveFeed=DB.liveFeed.slice(0,12);
+    const el=document.getElementById('live-feed-content');
+    if(el)el.innerHTML=renderLiveFeed();
+  },4000);
+}
+function stopLiveFeed(){if(liveFeedTimer){clearInterval(liveFeedTimer);liveFeedTimer=null}}
+
+function watchScreen(id){
+  const u=DB.users.find(x=>x.id===id);
+  openModal(`<div class="modal-title">Screen Capture · ${u.name}</div>
+    <div class="screen-view" style="margin-bottom:12px">${u.doing}</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#6a8aa8;letter-spacing:0.1em;margin-bottom:14px">CAPTURE INTERVAL · 60s · RETENTION · 30 DAYS · ENCRYPTED STORAGE</div>
+    <div style="display:flex;gap:8px"><button class="btn btn-sec" onclick="closeModal()">Close</button><button class="btn btn-pri">View Timeline ▸</button></div>`);
+}
+
+function viewUsers(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Personnel</div>
+        <div class="page-title">All Users · Directory</div>
+        <div class="page-sub">Full access · Click any user for detailed profile</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="addUserModal()">+ Add User</button></div>
+    </div>
+    <div class="panel">
+      ${DB.users.map(e=>{const lostPts=7-e.points;return `
+        <div class="row-card" onclick="openUserProfile('${e.id}')">
+          <div style="width:34px;height:34px;border-radius:2px;background:linear-gradient(135deg,#00dcff,#ff0099);display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;color:#050810">${e.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:#fff;display:flex;align-items:center;gap:6px">${e.name} ${e.clockedIn?'<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#00ff88;box-shadow:0 0 6px #00ff88"></span>':''}</div>
+            <div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em">${e.id} · ${e.dept.toUpperCase()} · ${e.location.toUpperCase()}</div>
+          </div>
+          ${bdg(e.role,'cyan')}
+          <div class="points-display" title="Points: ${e.points}/7">
+            ${[1,2,3,4,5,6,7].map(n=>`<div class="point-bar ${n>e.points?'lost':''}"></div>`).join('')}
+          </div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:13px;font-weight:600;color:#ffaa00;letter-spacing:0.04em">$${e.salary.toLocaleString()}</div>
+        </div>`}).join('')}
+    </div>`;
+}
+
+function openUserProfile(id){
+  const e=DB.users.find(x=>x.id===id);
+  openModal(`<div class="modal-title">${e.name} · Profile</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:14px">
+      ${[['ID',e.id],['Role',e.role],['Department',e.dept],['Location',e.location],['Salary','$'+e.salary.toLocaleString()],['Status',e.status],['Points',e.points+'/7'],['Hired',e.hired]].map(([k,v])=>`<div style="background:rgba(0,0,0,0.3);border:1px solid rgba(0,220,255,0.1);padding:8px;border-radius:2px"><div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:#5a7896;letter-spacing:0.2em;text-transform:uppercase">${k}</div><div style="font-size:12px;font-weight:500;color:#fff;margin-top:2px">${v}</div></div>`).join('')}
+    </div>
+    <div style="margin-bottom:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5a7896;letter-spacing:0.2em;margin-bottom:6px">CURRENT ACTIVITY</div><div style="font-size:12px;color:#00dcff">${e.doing}</div></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="closeModal()">Edit Profile</button><button class="btn btn-sec" onclick="closeModal()">Close</button></div>`);
+}
+
+function addUserModal(){
+  openModal(`<div class="modal-title">Add New User</div>
+    <div class="fld"><label>Full Name</label><input type="text" id="nu-name" /></div>
+    <div class="fld"><label>Role</label><select id="nu-role"><option>sales</option><option>cx</option><option>supervisor</option><option>admin</option><option>accountant</option></select></div>
+    <div class="fld"><label>Department</label><input type="text" id="nu-dept" value="Sales"/></div>
+    <div class="fld"><label>Salary ($)</label><input type="number" id="nu-salary" value="2500"/></div>
+    <div class="fld"><label>Location</label><input type="text" id="nu-loc"/></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="saveUser()">Create User</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`);
+}
+function saveUser(){
+  const n={
+    id:'EMP'+(DB.users.length+10).toString().padStart(3,'0'),
+    username:document.getElementById('nu-name').value.toLowerCase().split(' ')[0]||'newuser',
+    password:'demo',
+    name:document.getElementById('nu-name').value||'New User',
+    role:document.getElementById('nu-role').value,
+    dept:document.getElementById('nu-dept').value,
+    salary:+document.getElementById('nu-salary').value,
+    location:document.getElementById('nu-loc').value||'TBD',
+    points:7,score:0,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],
+    hired:new Date().toISOString().split('T')[0],clockedIn:false,doing:'New hire'
+  };
+  DB.users.push(n);
+  closeModal();renderMain();toast('User created · '+n.name);
+}
+
+function viewHR(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Recruitment</div>
+        <div class="page-title">HR Pipeline</div>
+        <div class="page-sub">Auto-scoring · Routing · Hire decisions</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="addAppModal()">+ Add Applicant</button></div>
+    </div>
+    <div class="three-col" style="margin-bottom:12px">
+      <div class="stat-card"><div class="stat-label">High Priority · 90+</div><div class="stat-val green">${DB.applicants.filter(a=>a.score>=90).length}</div></div>
+      <div class="stat-card"><div class="stat-label">Low Chance · 70-89</div><div class="stat-val amber">${DB.applicants.filter(a=>a.score>=70&&a.score<90).length}</div></div>
+      <div class="stat-card"><div class="stat-label">Auto-Trashed · &lt;50</div><div class="stat-val pink">0</div></div>
+    </div>
+    <div class="panel">
+      ${DB.applicants.map(a=>{const sl=a.score>=90?['HIGH PRIORITY','green']:a.score>=70?['LOW CHANCE','amber']:['REJECTED','red'];return `
+        <div class="row-card">
+          <div style="width:38px;height:38px;border-radius:2px;background:rgba(${sl[1]==='green'?'0,255,136':sl[1]==='amber'?'255,170,0':'255,51,102'},0.15);border:1px solid rgba(${sl[1]==='green'?'0,255,136':sl[1]==='amber'?'255,170,0':'255,51,102'},0.4);display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:${sl[1]==='green'?'#00ff88':sl[1]==='amber'?'#ffaa00':'#ff3366'}">${a.score}</div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#fff">${a.name}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">${a.email}</div></div>
+          ${bdg(a.pos,'cyan')} ${bdg(sl[0],sl[1])}
+          <button class="btn-icon" onclick="hireApp('${a.id}')">HIRE</button>
+          <button class="btn-icon" onclick="rejApp('${a.id}')" style="color:#ff3366">×</button>
+        </div>`}).join('')}
+    </div>`;
+}
+function hireApp(id){const a=DB.applicants.find(x=>x.id===id);DB.users.push({id:'EMP'+(DB.users.length+10).toString().padStart(3,'0'),username:a.name.toLowerCase().split(' ')[0],password:'demo',name:a.name,role:a.pos.toLowerCase(),dept:a.pos,salary:2500,score:a.score,points:7,status:'Active',shifts:['Mon','Tue','Wed','Thu','Fri'],location:'TBD',hired:new Date().toISOString().split('T')[0],clockedIn:false,doing:'Onboarding'});DB.applicants=DB.applicants.filter(x=>x.id!==id);renderMain();toast(a.name+' · Hired & added')}
+function rejApp(id){DB.applicants=DB.applicants.filter(x=>x.id!==id);renderMain();toast('Applicant rejected')}
+function addAppModal(){openModal(`<div class="modal-title">Add Applicant</div><div class="fld"><label>Name</label><input id="ap-n" type="text"/></div><div class="fld"><label>Position</label><select id="ap-p"><option>Sales</option><option>CX</option><option>Mgmt</option></select></div><div class="fld"><label>Email</label><input id="ap-e" type="email"/></div><div class="fld"><label>Score (auto-routes)</label><input id="ap-s" type="number" min="0" max="100" value="80"/></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="saveApp()">Save</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveApp(){DB.applicants.push({id:'APP'+Math.floor(Math.random()*9999),name:document.getElementById('ap-n').value||'New',pos:document.getElementById('ap-p').value,email:document.getElementById('ap-e').value||'no@email',score:+document.getElementById('ap-s').value||75});closeModal();renderMain();toast('Applicant added · auto-routed')}
+
+function viewSchedule(){
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Operations</div>
+        <div class="page-title">Schedule Management</div>
+        <div class="page-sub">Approve · Publish · Department views</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="toast('Schedule builder')">+ Create Schedule</button></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Awaiting Approval · ${DB.schedules.filter(s=>s.status==='Pending').length}</span></div>
+      ${DB.schedules.filter(s=>s.status==='Pending').map(s=>`
+        <div class="row-card">
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#fff">${s.team} · ${s.week}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">SUBMITTED · ${s.by.toUpperCase()} · AFFECTS ${s.affects} EMPLOYEES</div></div>
+          ${bdg('PENDING','amber')}
+          <button class="btn-icon" style="color:#00ff88" onclick="approveSched('${s.id}')">✓ APPROVE</button>
+          <button class="btn-icon" style="color:#ff3366" onclick="rejectSched('${s.id}')">× REJECT</button>
+        </div>`).join('')}
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Live Grid · Apr 21–27</span></div>
+      <div style="overflow-x:auto"><div style="display:grid;grid-template-columns:130px repeat(7,1fr);gap:3px;min-width:560px">
+        <div></div>
+        ${days.map(d=>`<div style="font-family:'JetBrains Mono',monospace;font-size:10px;text-align:center;padding:4px;color:#00dcff;letter-spacing:0.15em">${d.toUpperCase()}</div>`).join('')}
+        ${DB.users.filter(u=>u.role==='sales'||u.role==='cx').map(e=>`
+          <div style="font-size:11px;color:#c8d4e6;padding:5px 4px;display:flex;align-items:center">${e.name.split(' ')[0]}</div>
+          ${days.map(d=>{const c=e.role==='sales'?'255,170,0':'0,220,255';return `<div style="height:28px;border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;background:${e.shifts.includes(d)?`rgba(${c},0.2)`:'rgba(0,0,0,0.3)'};border:1px solid ${e.shifts.includes(d)?`rgba(${c},0.4)`:'rgba(0,220,255,0.05)'};color:${e.shifts.includes(d)?(e.role==='sales'?'#ffaa00':'#00dcff'):'#5a7896'};letter-spacing:0.1em">${e.shifts.includes(d)?(e.role==='sales'?'OUT':'IN'):'—'}</div>`}).join('')}`).join('')}
+      </div></div>
+    </div>`;
+}
+function approveSched(id){DB.schedules.find(s=>s.id===id).status='Approved';renderMain();toast('Schedule approved · Published')}
+function rejectSched(id){DB.schedules.find(s=>s.id===id).status='Rejected';renderMain();toast('Schedule rejected')}
+
+function viewTasks(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Workflow</div>
+        <div class="page-title">Task Management</div>
+        <div class="page-sub">Assign · Track · Acknowledge · Auto-escalate</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="addTaskModal()">+ Assign Task</button></div>
+    </div>
+    <div class="panel">
+      ${DB.tasks.map(t=>`
+        <div class="row-card">
+          <div onclick="toggleTask('${t.id}')" style="width:18px;height:18px;border-radius:2px;border:1px solid ${t.done?'#00ff88':'rgba(0,220,255,0.3)'};background:${t.done?'rgba(0,255,136,0.2)':'transparent'};display:flex;align-items:center;justify-content:center;color:#00ff88;font-size:11px;cursor:pointer;flex-shrink:0">${t.done?'✓':''}</div>
+          <div style="flex:1;${t.done?'opacity:0.5;text-decoration:line-through':''}"><div style="font-size:12px;font-weight:600;color:#fff">${t.title}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace;letter-spacing:0.05em">→ ${t.assignedTo.toUpperCase()} · BY ${t.by.toUpperCase()} · ${t.due.toUpperCase()}</div></div>
+          ${t.seen?bdg('SEEN','cyan'):bdg('UNSEEN','amber')}
+          ${bdg(t.priority,t.priority==='High'?'red':'amber')}
+        </div>`).join('')}
+    </div>`;
+}
+function toggleTask(id){const t=DB.tasks.find(x=>x.id===id);t.done=!t.done;renderMain();toast(t.done?'Task completed':'Reopened')}
+function addTaskModal(){openModal(`<div class="modal-title">Assign Task</div><div class="fld"><label>Assign To</label><select id="t-a">${DB.users.map(u=>`<option>${u.name}</option>`).join('')}</select></div><div class="fld"><label>Title</label><input id="t-t" type="text"/></div><div class="fld"><label>Due</label><input id="t-d" type="text" placeholder="Apr 30"/></div><div class="fld"><label>Priority</label><select id="t-p"><option>High</option><option>Medium</option><option>Low</option></select></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="saveTask()">Assign</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveTask(){DB.tasks.push({id:'T'+Math.floor(Math.random()*999),title:document.getElementById('t-t').value||'New task',assignedTo:document.getElementById('t-a').value,by:DB.currentUser.name,due:document.getElementById('t-d').value||'TBD',priority:document.getElementById('t-p').value,done:false,seen:false});closeModal();renderMain();toast('Task assigned')}
+
+function viewReports(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Documentation</div>
+        <div class="page-title">Reports</div>
+        <div class="page-sub">Generate · Sign · Archive · AI-formatted</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="genReportModal()">+ New Report</button></div>
+    </div>
+    <div class="panel">
+      ${[
+        {emp:'Ahmed Hassan',by:'Lena Müller',type:'Performance',status:'Signed',date:'Apr 22'},
+        {emp:'James Okafor',by:'Lena Müller',type:'Corrective',status:'Pending',date:'Apr 24'},
+        {emp:'Maria Santos',by:'Lena Müller',type:'Achievement',status:'Viewed',date:'Apr 23'},
+      ].map(r=>`
+        <div class="row-card">
+          <div style="width:32px;height:32px;border-radius:2px;background:rgba(0,220,255,0.1);border:1px solid rgba(0,220,255,0.3);display:flex;align-items:center;justify-content:center;color:#00dcff">▤</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#fff">${r.emp} · ${r.type}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">FROM · ${r.by.toUpperCase()} · ${r.date.toUpperCase()}</div></div>
+          ${bdg(r.status,r.status==='Signed'?'green':r.status==='Viewed'?'cyan':'amber')}
+          <button class="btn-icon" onclick="toast('Opening '+r.emp+' report')">VIEW</button>
+        </div>`).join('')}
+    </div>`;
+}
+async function genReportModal(){
+  openModal(`<div class="modal-title">Generate Report</div><div class="fld"><label>Employee</label><select id="r-e">${DB.users.map(u=>`<option>${u.name}</option>`).join('')}</select></div><div class="fld"><label>Type</label><select><option>Performance</option><option>Corrective</option><option>Achievement</option></select></div><div class="fld"><label>Notes</label><textarea id="r-n" rows="4"></textarea></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="aiReport()">✦ AI Generate</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div><div id="r-o" style="margin-top:12px;max-height:200px;overflow-y:auto"></div>`)
+}
+async function aiReport(){
+  const emp=document.getElementById('r-e').value;
+  const notes=document.getElementById('r-n').value||'No notes';
+  const out=document.getElementById('r-o');
+  out.innerHTML='<span class="spin"></span><span style="color:#00dcff;font-family:\'JetBrains Mono\',monospace;font-size:11px">PROCESSING · NEURAL FORMAT</span>';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:`Write a 2-paragraph employee performance report for ${emp}. Notes: ${notes}. Be professional and constructive.`}]})});
+    const data=await res.json();
+    out.innerHTML=`<div style="background:rgba(0,0,0,0.5);border:1px solid rgba(0,220,255,0.2);padding:12px;border-radius:2px;font-size:11px;line-height:1.7;color:#c8d4e6;white-space:pre-wrap;font-family:'JetBrains Mono',monospace">${data.content?.[0]?.text||'Failed'}</div>`;
+    toast('Report generated · Saved to system');
+  }catch(e){out.innerHTML='<span style="color:#ff3366;font-size:11px">Connection error</span>'}
+}
+
+function viewContracts(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Legal</div>
+        <div class="page-title">Contracts</div>
+        <div class="page-sub">AI-generated · Branded templates · Multi-country</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="newContractModal()">+ New Contract</button></div>
+    </div>
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Active Contracts</span></div>
+        ${[{emp:'Ahmed Hassan',type:'Sales · Egypt',signed:true,date:'2024-03-12'},{emp:'Maria Santos',type:'CX · Philippines',signed:true,date:'2024-05-20'}].map(c=>`
+          <div class="row-card">
+            <div style="font-size:18px;color:#00dcff">▤</div>
+            <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#fff">${c.emp}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">${c.type.toUpperCase()} · ${c.date}</div></div>
+            ${bdg('SIGNED','green')}
+            <button class="btn-icon" onclick="toast('PDF downloaded')">↓ PDF</button>
+          </div>`).join('')}
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Templates</span></div>
+        ${['Sales · Egypt','CX · Philippines','Supervisor · Mgmt','Sales · UAE'].map(t=>`<div class="row-card"><div style="flex:1;font-size:11px;color:#c8d4e6">${t}</div><button class="btn-icon">USE</button></div>`).join('')}
+      </div>
+    </div>`;
+}
+function newContractModal(){openModal(`<div class="modal-title">New Contract</div><div class="fld"><label>Employee</label><input id="ct-n" type="text"/></div><div class="fld"><label>Role</label><input id="ct-r" type="text"/></div><div class="fld"><label>Salary $</label><input id="ct-s" type="number"/></div><div class="fld"><label>Country</label><select id="ct-c"><option>Egypt</option><option>Philippines</option><option>UAE</option><option>USA</option></select></div><div class="fld"><label>Responsibilities</label><textarea id="ct-resp" rows="3"></textarea></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="aiContract()">✦ AI Generate</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div><div id="ct-o" style="margin-top:12px;max-height:180px;overflow-y:auto"></div>`)}
+async function aiContract(){
+  const n=document.getElementById('ct-n').value||'Employee';
+  const r=document.getElementById('ct-r').value||'TBD';
+  const s=document.getElementById('ct-s').value||'TBD';
+  const c=document.getElementById('ct-c').value;
+  const out=document.getElementById('ct-o');
+  out.innerHTML='<span class="spin"></span><span style="color:#00dcff;font-family:\'JetBrains Mono\',monospace;font-size:11px">GENERATING CONTRACT</span>';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:`Write a 2-paragraph employment contract summary for ${n}, role ${r}, salary $${s}/mo, country ${c}. Be formal.`}]})});
+    const data=await res.json();
+    out.innerHTML=`<div style="background:rgba(0,0,0,0.5);border:1px solid rgba(0,220,255,0.2);padding:12px;border-radius:2px;font-size:11px;line-height:1.7;color:#c8d4e6;white-space:pre-wrap;font-family:'JetBrains Mono',monospace">${data.content?.[0]?.text||'Failed'}</div>`;
+    toast('Contract saved · Following PDF template');
+  }catch(e){out.innerHTML='<span style="color:#ff3366;font-size:11px">Error</span>'}
+}
+
+function viewTickets(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Support</div>
+        <div class="page-title">Ticket System</div>
+        <div class="page-sub">Backend access · Resolve · Track status</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="newTicketModal()">+ New Ticket</button></div>
+    </div>
+    <div class="panel">
+      ${DB.tickets.map(t=>`
+        <div class="row-card" onclick="answerTicket('${t.id}')">
+          <div style="font-size:18px;color:#ff0099">⚠</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#fff">${t.title}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">FROM · ${t.from.toUpperCase()} · ${t.time.toUpperCase()}</div></div>
+          ${bdg(t.priority,t.priority==='High'?'red':t.priority==='Medium'?'amber':'gray')}
+          ${bdg(t.status,t.status==='Open'?'amber':'cyan')}
+        </div>`).join('')}
+    </div>`;
+}
+function answerTicket(id){const t=DB.tickets.find(x=>x.id===id);openModal(`<div class="modal-title">${t.title}</div><div style="background:rgba(0,0,0,0.4);border:1px solid rgba(0,220,255,0.15);padding:12px;border-radius:2px;font-size:11px;color:#c8d4e6;margin-bottom:12px"><div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896;letter-spacing:0.1em;margin-bottom:6px">FROM · ${t.from.toUpperCase()} · ${t.priority.toUpperCase()} · ${t.status.toUpperCase()}</div></div><div class="fld"><label>Response</label><textarea rows="4"></textarea></div><div class="fld"><label>Update Status</label><select><option>Open</option><option>In Progress</option><option>Resolved</option></select></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="closeModal();toast('Response sent')">Send</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function newTicketModal(){openModal(`<div class="modal-title">New Ticket</div><div class="fld"><label>Title</label><input type="text"/></div><div class="fld"><label>Description</label><textarea rows="3"></textarea></div><div class="fld"><label>Priority</label><select><option>High</option><option>Medium</option><option>Low</option></select></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="closeModal();toast('Ticket submitted')">Submit</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+
+function viewCoaching(){
+  const s={confirmed:['Smiling tone','Customer feels special','Showing excitement','Personal experience','Multiple connections','Discount handling','Congratulating'],fail:['Introduction quality','Customer connection','Price without value','Objection rebuttal','Card request trust'],lost:['Over speaking','Building rapport','Offering alternatives','Pain point questions','Negative answers','Product knowledge','Payment method','Payment tools','System usage']};
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Performance</div>
+        <div class="page-title">Coaching + QA Scorecard</div>
+        <div class="page-sub">Sessions · Quality attributes · Auto-attached PDFs</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri">+ New Session</button></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Active Coaching Session</span></div>
+      <div class="two-col">
+        <div>
+          <div class="fld"><label>Agent</label><select>${DB.users.filter(u=>u.role==='sales'||u.role==='cx').map(u=>`<option>${u.name}</option>`).join('')}</select></div>
+          <div class="fld"><label>Session Type</label><select><option>Performance</option><option>Corrective</option><option>Skills training</option></select></div>
+          <div class="fld"><label>Discussion Notes</label><textarea rows="4"></textarea></div>
+        </div>
+        <div>
+          <div class="fld"><label>Action Plan</label><textarea rows="4"></textarea></div>
+          <div class="fld"><label>Next Review Date</label><input type="text" placeholder="May 5"/></div>
+          <button class="btn btn-pri" onclick="toast('Coaching session saved · QA attached')">Save Session ▸</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Quality Attributes Scorecard · Attached</span></div>
+      <div class="three-col">
+        ${[['confirmed','Sale Confirmed','confirmed'],['fail','Critical Fail','fail'],['lost','Sale Lost','lost']].map(([k,l,c])=>`
+          <div class="qa-section ${c}">
+            <div class="qa-head ${c}">${l}</div>
+            ${s[k].map((it,i)=>`<div class="qa-attr"><div class="qa-attr-name">${it}</div><input type="range" min="0" max="10" value="0" oninput="document.getElementById('q-${k}-${i}').textContent=this.value"/><div class="qa-attr-val"><span>0</span><span id="q-${k}-${i}">—</span><span>10</span></div></div>`).join('')}
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function viewPlanning(){
+  const plans=[
+    {name:'Financial Plan',icon:'$',desc:'Budget · Forecast · ROI'},
+    {name:'Marketing Plan',icon:'M',desc:'Campaigns · Channels · KPIs'},
+    {name:'Business Plan',icon:'B',desc:'Strategy · Vision · Goals'},
+    {name:'Hiring Plan',icon:'H',desc:'Roles · Timeline · Budget'},
+    {name:'Website Plan',icon:'W',desc:'Architecture · Content · SEO'},
+  ];
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Strategy</div>
+        <div class="page-title">Planning Workspace</div>
+        <div class="page-sub">Upload plans · AI summarize · Per-document chatbot</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="toast('+ Add custom plan category')">+ New Category</button></div>
+    </div>
+    <div class="three-col">
+      ${plans.map(p=>`
+        <div class="panel" style="cursor:pointer" onclick="openPlan('${p.name}')">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+            <div style="width:48px;height:48px;border-radius:2px;background:linear-gradient(135deg,rgba(0,220,255,0.2),rgba(255,0,153,0.2));border:1px solid rgba(0,220,255,0.3);display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700;color:#00dcff">${p.icon}</div>
+            <div>
+              <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:600;color:#fff">${p.name}</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5a7896;letter-spacing:0.15em;text-transform:uppercase;margin-top:2px">${p.desc}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:14px">
+            <button class="btn btn-sec" style="flex:1" onclick="event.stopPropagation();toast('Upload doc')">↑ Upload</button>
+            <button class="btn btn-pri" style="flex:1" onclick="event.stopPropagation();openChatbot('${p.name}')">⊕ AI Chat</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+function openPlan(name){toast(`Opening ${name} workspace`)}
+function openChatbot(name){openModal(`<div class="modal-title">${name} · AI Assistant</div><div style="background:rgba(0,0,0,0.4);padding:14px;border-radius:2px;border:1px solid rgba(0,220,255,0.15);margin-bottom:12px;font-size:11px;color:#c8d4e6;font-family:'JetBrains Mono',monospace;line-height:1.7"><div style="color:#00dcff;margin-bottom:6px">▸ NEXUS AI</div>Document loaded. I have analyzed your ${name}. What would you like to know?</div><div class="fld"><label>Ask anything about this plan</label><input type="text" placeholder="What is the Q3 budget allocation?"/></div><div style="display:flex;gap:8px"><button class="btn btn-pri">Send Query ▸</button><button class="btn btn-sec" onclick="closeModal()">Close</button></div>`)}
+
+function viewFinance(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Finance</div>
+        <div class="page-title">Financial Dashboard</div>
+        <div class="page-sub">Revenue · Expenses · P&L · AI forecasts</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="toast('Generating P&L')">↓ Export P&L</button></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-val green">$184K</div><div class="stat-sub">↑ 12% MoM</div></div>
+      <div class="stat-card"><div class="stat-label">Expenses</div><div class="stat-val pink">$97K</div><div class="stat-sub">5 categories</div></div>
+      <div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-val amber">$87K</div><div class="stat-sub">47% margin</div></div>
+      <div class="stat-card"><div class="stat-label">Forecast</div><div class="stat-val cyan">$210K</div><div class="stat-sub">Next month</div></div>
+    </div>
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Expense Breakdown</span></div>
+        ${[['Payroll',68000,70],['Operations',12000,12],['Marketing',9000,9],['Software',5000,5],['Misc',3000,4]].map(([l,a,p])=>`
+          <div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:#c8d4e6">${l}</span><span style="font-family:'Orbitron',sans-serif;color:#fff;font-weight:500">$${a.toLocaleString()}</span></div><div class="bar"><div class="bar-fill" style="width:${p}%"></div></div></div>`).join('')}
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Revenue · Department</span></div>
+        ${[['Sales',124000,68],['Customer Care',45000,24],['Other',15000,8]].map(([d,a,p])=>`
+          <div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:#c8d4e6">${d}</span><span style="font-family:'Orbitron',sans-serif;color:#00ff88;font-weight:500">$${a.toLocaleString()}</span></div><div class="bar"><div class="bar-fill" style="width:${p}%;background:linear-gradient(90deg,#00ff88,#00dcff)"></div></div></div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function viewPayroll(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Payroll</div>
+        <div class="page-title">Payroll Processing</div>
+        <div class="page-sub">Auto-deductions · Commission · Branded payslips</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="toast('Bulk processed · Payslips sent')">Process All ▸</button></div>
+    </div>
+    <div class="panel">
+      ${DB.users.map(e=>{const lostPts=7-e.points;const ded=lostPts*20;const net=e.salary-ded;return `
+        <div class="row-card">
+          <div style="width:32px;height:32px;border-radius:2px;background:linear-gradient(135deg,#00dcff,#ff0099);display:flex;align-items:center;justify-content:center;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;color:#050810">${e.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#fff">${e.name}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">${e.id} · ${e.dept.toUpperCase()}</div></div>
+          <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5a7896;letter-spacing:0.15em">BASE</div><div style="font-family:'Orbitron',sans-serif;font-size:12px;color:#c8d4e6">$${e.salary.toLocaleString()}</div></div>
+          ${ded?`<div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5a7896;letter-spacing:0.15em">DEDUCT</div><div style="font-family:'Orbitron',sans-serif;font-size:12px;color:#ff3366">-$${ded}</div></div>`:''}
+          <div style="text-align:right"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#00ff88;letter-spacing:0.15em">NET</div><div style="font-family:'Orbitron',sans-serif;font-size:14px;color:#00ff88;font-weight:600">$${net.toLocaleString()}</div></div>
+          <button class="btn-icon" onclick="toast('Payslip sent · '+e.name)">↓ SLIP</button>
+        </div>`}).join('')}
+    </div>`;
+}
+
+function viewTargets(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Performance</div>
+        <div class="page-title">Target Management</div>
+        <div class="page-sub">Revenue or order count · Per agent or team · Auto-reset</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="newTargetModal()">+ Set Target</button></div>
+    </div>
+    ${Object.entries(DB.targets).map(([dept,t])=>{const pct=Math.round((t.collected/t.monthly)*100);return `
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+          <div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:15px;font-weight:600;color:#fff;letter-spacing:0.05em">${dept.toUpperCase()} TEAM</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896;letter-spacing:0.15em;margin-top:3px">TARGET TYPE · ${t.type.toUpperCase()} · DEADLINE · ${t.deadline.toUpperCase()}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div class="circ-prog">
+              <svg width="100" height="100">
+                <circle cx="50" cy="50" r="40" stroke="rgba(0,220,255,0.1)" stroke-width="6" fill="none"/>
+                <circle cx="50" cy="50" r="40" stroke="${pct>=80?'#00ff88':pct>=50?'#00dcff':'#ffaa00'}" stroke-width="6" fill="none" stroke-dasharray="251" stroke-dashoffset="${251-(251*pct/100)}" stroke-linecap="round" style="filter:drop-shadow(0 0 8px ${pct>=80?'#00ff88':pct>=50?'#00dcff':'#ffaa00'})"/>
+              </svg>
+              <div class="circ-prog-text"><div class="circ-prog-val">${pct}%</div><div class="circ-prog-lbl">Achieved</div></div>
+            </div>
+          </div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#c8d4e6;margin-bottom:6px">${t.type==='revenue'?'$'+t.collected.toLocaleString()+' / $'+t.monthly.toLocaleString():t.collected+' / '+t.monthly+' orders'}</div>
+        <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+        <div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-sec" onclick="editTargetModal('${dept}')">Edit Target</button><button class="btn btn-pri" onclick="toast('Pushed to '+dept)">Push to Agents ▸</button></div>
+      </div>`}).join('')}`;
+}
+function newTargetModal(){openModal(`<div class="modal-title">Set New Target</div><div class="fld"><label>Department</label><select id="tg-d"><option>Sales</option><option>CX</option></select></div><div class="fld"><label>Target Type</label><select id="tg-t"><option value="revenue">Revenue ($)</option><option value="orders">Order Count</option></select></div><div class="fld"><label>Target Value</label><input id="tg-v" type="number"/></div><div class="fld"><label>Deadline</label><input id="tg-dl" type="text" placeholder="May 31"/></div><div class="fld"><label>Reset Mode</label><select><option>Manual</option><option>Auto · Monthly 1st</option></select></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="saveTarget()">Save & Push</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveTarget(){const d=document.getElementById('tg-d').value;DB.targets[d]={type:document.getElementById('tg-t').value,monthly:+document.getElementById('tg-v').value,collected:0,deadline:document.getElementById('tg-dl').value};closeModal();renderMain();toast('Target set · Pushed to '+d)}
+function editTargetModal(d){const t=DB.targets[d];openModal(`<div class="modal-title">Edit ${d}</div><div class="fld"><label>Target Value</label><input id="te-v" type="number" value="${t.monthly}"/></div><div class="fld"><label>Deadline</label><input id="te-dl" type="text" value="${t.deadline}"/></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="saveTargetEdit('${d}')">Save</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function saveTargetEdit(d){DB.targets[d].monthly=+document.getElementById('te-v').value;DB.targets[d].deadline=document.getElementById('te-dl').value;closeModal();renderMain();toast('Updated')}
+
+function viewPermissions(){
+  const cats=['tasks','schedule','reports','tickets','hr','contracts','inbox','attendance','monitoring','policy','targets','coaching','planning'];
+  const roles=Object.keys(DB.permissions);
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Access</div>
+        <div class="page-title">Role Permissions</div>
+        <div class="page-sub">Toggle access · Updates apply live · Per-category control</div>
+      </div>
+    </div>
+    <div class="panel" style="overflow-x:auto">
+      <table class="perm-tbl">
+        <thead><tr><th>Category</th>${roles.map(r=>`<th>${r}</th>`).join('')}</tr></thead>
+        <tbody>${cats.map(c=>`<tr><td>${c}</td>${roles.map(r=>`<td><input type="checkbox" ${DB.permissions[r][c]?'checked':''} onchange="DB.permissions['${r}']['${c}']=this.checked?1:0;toast('${r} · ${c} updated')"/></td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function viewPolicy(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Automation</div>
+        <div class="page-title">Policy Engine</div>
+        <div class="page-sub">Auto-execution rules · Triggers · Consequences</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="newPolicyModal()">+ New Rule</button></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Active Rules · ${DB.policies.filter(p=>p.active).length}</span></div>
+      ${DB.policies.map(p=>`
+        <div class="policy ${p.active?'active':''}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div class="policy-name">${p.name}</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${bdg(p.executed+'× FIRED','cyan')}
+              <label class="chk"><input type="checkbox" ${p.active?'checked':''} onchange="DB.policies.find(x=>x.id==='${p.id}').active=this.checked;toast('Updated')"/> Active</label>
+            </div>
+          </div>
+          <div class="policy-detail"><strong>TRIGGER ▸</strong> ${p.trigger}</div>
+          <div class="policy-detail" style="margin-top:3px"><strong>ACTION ▸</strong> ${p.action}</div>
+        </div>`).join('')}
+    </div>`;
+}
+function newPolicyModal(){openModal(`<div class="modal-title">New Policy Rule</div><div class="fld"><label>Rule Name</label><input id="po-n" type="text"/></div><div class="fld"><label>Trigger Condition</label><textarea id="po-t" rows="2"></textarea></div><div class="fld"><label>Auto-Action</label><textarea id="po-a" rows="2"></textarea></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="savePolicy()">Activate</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+function savePolicy(){DB.policies.push({id:'P'+Math.floor(Math.random()*999),name:document.getElementById('po-n').value||'New rule',trigger:document.getElementById('po-t').value||'TBD',action:document.getElementById('po-a').value||'TBD',active:true,executed:0});closeModal();renderMain();toast('Policy active')}
+
+function viewAttendance(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Tracking</div>
+        <div class="page-title">Attendance · Clock-In</div>
+        <div class="page-sub">Strict enforcement · Screen recording · Idle detection</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="apiSettingsModal()">⚙ API Settings</button></div>
+    </div>
+    <div class="three-col" style="margin-bottom:12px">
+      <div class="stat-card"><div class="stat-label">Clocked In</div><div class="stat-val green">${DB.users.filter(u=>u.clockedIn).length}</div></div>
+      <div class="stat-card"><div class="stat-label">Late Today</div><div class="stat-val amber">1</div></div>
+      <div class="stat-card"><div class="stat-label">No-Shows</div><div class="stat-val pink">0</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">April 2026 · Daily Status</span></div>
+      <div style="display:flex;gap:14px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#5a7896;letter-spacing:0.15em;margin-bottom:14px;flex-wrap:wrap">
+        <span><span class="att-cell present" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> PRESENT</span>
+        <span><span class="att-cell late" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> LATE · -0.5 PT</span>
+        <span><span class="att-cell absent" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> ABSENT · -3 PT</span>
+      </div>
+      ${DB.users.filter(u=>DB.attendance[u.id]).map(u=>{const att=DB.attendance[u.id];const late=att.filter(d=>d===2).length;const abs=att.filter(d=>d===3).length;return `
+        <div style="margin-bottom:18px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px"><span style="color:#fff;font-weight:500">${u.name}</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896;letter-spacing:0.1em">${late} LATE · ${abs} ABSENT</span></div>
+          <div class="att-grid">${att.map((d,i)=>{const cls=d===0?'':d===1?'present':d===2?'late':'absent';const sym=d===0?'':d===1?'·':d===2?'L':'A';return `<div class="att-cell ${cls}" title="Day ${i+1}" onclick="toast('Day ${i+1} · ${u.name}')">${sym}</div>`}).join('')}</div>
+        </div>`}).join('')}
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Live Screen Captures</span></div>
+      <div class="three-col">
+        ${DB.users.filter(u=>u.clockedIn).slice(0,3).map(u=>`
+          <div>
+            <div class="screen-view">${u.doing}</div>
+            <div style="font-size:11px;font-weight:600;color:#fff;margin-top:8px">${u.name}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5a7896;letter-spacing:0.1em">CAPTURE · 60S INTERVAL</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+function apiSettingsModal(){openModal(`<div class="modal-title">Clock-In API Configuration</div><div class="fld"><label>Webhook Endpoint</label><input type="text" value="https://api.nexus-os.com/v1/clockin" readonly/></div><div class="fld"><label>Auth Token</label><input type="text" value="sk_live_••••••••••3f7a" readonly/></div><div class="fld"><label>Recording Provider</label><select><option>Hubstaff API</option><option>Teramind API</option><option>Native Electron Agent</option></select></div><div class="fld"><label>Recording Interval</label><select><option>30s</option><option selected>60s</option><option>2 min</option></select></div><div class="fld"><label>Retention</label><select><option>7 days</option><option selected>30 days</option><option>90 days</option></select></div><div class="fld"><label class="chk"><input type="checkbox" checked/> Block clock-in outside schedule</label></div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="closeModal();toast('Saved')">Save Config</button><button class="btn btn-sec" onclick="closeModal()">Cancel</button></div>`)}
+
+function viewOrg(){
+  const tree=[
+    [{r:'Owner',sub:'Full · Executive',k:'owner'}],
+    [{r:'Admin',sub:'Operations',k:'admin'},{r:'Accountant',sub:'Finance',k:'accountant'}],
+    [{r:'Sales Supervisor',sub:'Sales Team',k:'supervisor'},{r:'CX Supervisor',sub:'CX Team',k:'supervisor'}],
+    [{r:'Sales Agent',sub:'Front-line',k:'sales'},{r:'CX Agent',sub:'Front-line',k:'cx'}],
+  ];
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Hierarchy</div>
+        <div class="page-title">Organizational Tree</div>
+        <div class="page-sub">Click any role to view permissions and reporting chain</div>
+      </div>
+    </div>
+    <div class="panel">
+      ${tree.map((level,li)=>`${li>0?'<div class="org-connect"></div>':''}<div class="org-level">${level.map(n=>`<div class="org-node" onclick="orgClick('${n.k}')"><div class="org-name">${n.r}</div><div class="org-sub">${n.sub}</div></div>`).join('')}</div>`).join('')}
+    </div>`;
+}
+function orgClick(role){const perms=DB.permissions[role]||{};const allowed=Object.entries(perms).filter(([k,v])=>v).map(([k])=>k);openModal(`<div class="modal-title">${role} · Permissions</div><div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896;letter-spacing:0.15em;margin-bottom:10px">ACCESS GRANTED ▸ ${allowed.length} CATEGORIES</div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px">${allowed.length?allowed.map(p=>bdg(p,'cyan')).join(''):'<span style="font-size:11px;color:#5a7896">No access</span>'}</div><div style="display:flex;gap:8px"><button class="btn btn-pri" onclick="closeModal();goNav('permissions')">Edit ▸</button><button class="btn btn-sec" onclick="closeModal()">Close</button></div>`)}
+
+function viewInbox(){
+  const inbox=[
+    {type:'PDF',subject:'Coaching · Ahmed Hassan',from:'Lena Müller',time:'10m',unread:true},
+    {type:'REPORT',subject:'Weekly · James Okafor',from:'Lena Müller',time:'1h',unread:true},
+    {type:'CONTRACT',subject:'Renewal · Maria Santos',from:'Priya Sharma',time:'3h',unread:false},
+    {type:'PDF',subject:'P&L Report · April 2026',from:'David Chen',time:'1d',unread:false},
+    {type:'PAYSLIP',subject:'Payslip · March',from:'Accountant',time:'2d',unread:false},
+  ];
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Communications</div>
+        <div class="page-title">Inbox</div>
+        <div class="page-sub">PDFs · Reports · Contracts · Cross-portal</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="toast('Compose')">+ Compose</button></div>
+    </div>
+    <div class="panel" style="padding:0">
+      ${inbox.map(i=>`
+        <div class="row-card" style="margin:0;border-radius:0;border-bottom:1px solid rgba(0,220,255,0.06);${i.unread?'background:rgba(0,220,255,0.04)':''}" onclick="toast('Opening · '+i.subject)">
+          <div style="width:32px;height:32px;border-radius:2px;background:rgba(0,220,255,0.1);border:1px solid rgba(0,220,255,0.25);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;color:#00dcff;letter-spacing:0.1em">${i.type}</div>
+          <div style="flex:1"><div style="font-size:12px;font-weight:${i.unread?600:400};color:#fff">${i.subject}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">FROM · ${i.from.toUpperCase()}</div></div>
+          ${i.unread?bdg('NEW','pink'):''}
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896">${i.time}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function viewDesign(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Branding</div>
+        <div class="page-title">PDF Template Designer</div>
+        <div class="page-sub">Define corporate identity · Auto-applied to all generated PDFs</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="toast('Template saved')">Save Template</button></div>
+    </div>
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Brand Configuration</span></div>
+        <div class="fld"><label>Company Logo</label><input type="text" placeholder="Upload .png or .svg"/></div>
+        <div class="fld"><label>Primary Color</label><input type="text" value="#00DCFF"/></div>
+        <div class="fld"><label>Secondary Color</label><input type="text" value="#FF0099"/></div>
+        <div class="fld"><label>Header Font</label><select><option>Orbitron</option><option>Helvetica</option><option>Times</option></select></div>
+        <div class="fld"><label>Body Font</label><select><option>Rajdhani</option><option>Arial</option><option>Calibri</option></select></div>
+        <div class="fld"><label>Document Templates Apply To</label>
+          <div style="display:grid;gap:5px">
+            <label class="chk"><input type="checkbox" checked/> Payslips</label>
+            <label class="chk"><input type="checkbox" checked/> Contracts</label>
+            <label class="chk"><input type="checkbox" checked/> Reports</label>
+            <label class="chk"><input type="checkbox" checked/> Coaching Records</label>
+            <label class="chk"><input type="checkbox" checked/> Termination Notices</label>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><span class="title-text">Live Preview</span></div>
+        <div style="background:#fff;color:#000;padding:24px;border-radius:2px;min-height:380px;font-family:'Rajdhani',sans-serif">
+          <div style="border-bottom:2px solid #00dcff;padding-bottom:14px;margin-bottom:16px">
+            <div style="font-family:'Orbitron',sans-serif;font-size:22px;font-weight:800;color:#000;letter-spacing:0.1em">NEXUS</div>
+            <div style="font-size:10px;color:#666;letter-spacing:0.2em;text-transform:uppercase;margin-top:2px">Enterprise Operations</div>
+          </div>
+          <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;margin-bottom:10px">PERFORMANCE REPORT · APRIL 2026</div>
+          <div style="font-size:12px;line-height:1.6;color:#444">This is how all generated PDFs will appear when downloaded from the system. Headers, body text, colors, and corporate identity follow this template automatically — ensuring consistent professional output across payroll, contracts, and all reports.</div>
+          <div style="margin-top:20px;padding-top:14px;border-top:1px solid #ddd;font-size:10px;color:#888;font-family:'JetBrains Mono',monospace;letter-spacing:0.1em">CONFIDENTIAL · NEXUS ENTERPRISE · v2.0</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ============== AGENT VIEWS ==============
+function viewMyDash(){
+  const u=DB.currentUser;
+  const lostPts=7-u.points;
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Personal</div>
+        <div class="page-title">My Dashboard</div>
+        <div class="page-sub">Schedule · Tasks · Targets · Live</div>
+      </div>
+      <div class="action-row">${u.clockedIn?bdg('● CLOCKED IN','green'):bdg('CLOCKED OUT','gray')}<button class="btn btn-pri" onclick="toast(u.clockedIn?'Clocked out':'Clocked in')">${u.clockedIn?'Clock Out':'Clock In'}</button></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Sales · Month</div><div class="stat-val cyan">14</div><div class="stat-sub">Target met ✓</div></div>
+      <div class="stat-card"><div class="stat-label">Revenue Brought</div><div class="stat-val green">$8,400</div></div>
+      <div class="stat-card"><div class="stat-label">Commission</div><div class="stat-val amber">$190</div></div>
+      <div class="stat-card"><div class="stat-label">Points</div><div class="stat-val ${u.points>=6?'green':u.points>=4?'amber':'pink'}">${u.points}/7</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Target Progress</span></div>
+      <div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:#c8d4e6">Monthly Sales Target</span><span style="font-family:'Orbitron',sans-serif;color:#00dcff">14 / 50</span></div><div class="bar"><div class="bar-fill" style="width:28%"></div></div></div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896;letter-spacing:0.1em">DEADLINE · APR 30 · 36 SALES REMAINING</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Discipline Status</span></div>
+      <div style="display:flex;gap:14px;align-items:center">
+        <div class="points-display" style="gap:6px">${[1,2,3,4,5,6,7].map(n=>`<div class="point-bar ${n>u.points?'lost':''}" style="width:14px;height:24px"></div>`).join('')}</div>
+        <div style="flex:1">
+          <div style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:600;color:${u.points>=6?'#00ff88':u.points>=4?'#ffaa00':'#ff3366'}">${u.points} OF 7 POINTS</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896;letter-spacing:0.1em;margin-top:3px">${lostPts*20>0?'$'+(lostPts*20)+' deducted this cycle':'No deductions · clean record'}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function viewMySchedule(){
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const u=DB.currentUser;
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Schedule</div>
+        <div class="page-title">My Schedule</div>
+        <div class="page-sub">Your assigned shifts · Request time off</div>
+      </div>
+      <div class="action-row"><button class="btn btn-pri" onclick="toast('Time-off request submitted')">+ Request Time Off</button></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">This Week · Apr 21–27</span></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+        ${days.map(d=>`<div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#5a7896;letter-spacing:0.15em;margin-bottom:6px">${d.toUpperCase()}</div><div style="height:60px;border-radius:2px;background:${u.shifts.includes(d)?'rgba(255,170,0,0.12)':'rgba(0,0,0,0.3)'};border:1px solid ${u.shifts.includes(d)?'rgba(255,170,0,0.3)':'rgba(0,220,255,0.05)'};color:${u.shifts.includes(d)?'#ffaa00':'#5a7896'};display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.1em">${u.shifts.includes(d)?'OUT<br>8AM-4PM':'OFF'}</div></div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function viewMyTasks(){
+  const u=DB.currentUser;
+  const myTasks=DB.tasks.filter(t=>t.assignedTo===u.name);
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Tasks</div>
+        <div class="page-title">My Tasks</div>
+        <div class="page-sub">Assigned to you · Acknowledge → Complete</div>
+      </div>
+    </div>
+    <div class="panel">
+      ${myTasks.length?myTasks.map(t=>`
+        <div class="row-card">
+          <div onclick="toggleTask('${t.id}')" style="width:18px;height:18px;border-radius:2px;border:1px solid ${t.done?'#00ff88':'rgba(0,220,255,0.3)'};background:${t.done?'rgba(0,255,136,0.2)':'transparent'};display:flex;align-items:center;justify-content:center;color:#00ff88;cursor:pointer;flex-shrink:0">${t.done?'✓':''}</div>
+          <div style="flex:1;${t.done?'opacity:0.5;text-decoration:line-through':''}"><div style="font-size:12px;font-weight:600;color:#fff">${t.title}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">FROM · ${t.by.toUpperCase()} · DUE ${t.due.toUpperCase()}</div></div>
+          ${bdg(t.priority,t.priority==='High'?'red':'amber')}
+        </div>`).join(''):'<div class="empty">NO TASKS ASSIGNED</div>'}
+    </div>`;
+}
+
+function viewRevenue(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Sales</div>
+        <div class="page-title">Revenue Tracker</div>
+        <div class="page-sub">Log sales · Auto-calculated commission</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Log New Entry</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div class="fld"><label>Customer ID</label><input type="text" placeholder="CID-0001"/></div>
+        <div class="fld"><label>Amount $</label><input type="number" placeholder="600"/></div>
+        <div class="fld"><label>Type</label><select><option>New Customer</option><option>Existing</option></select></div>
+      </div>
+      <button class="btn btn-pri" onclick="toast('Entry logged · Commission updated')">+ Log Entry ▸</button>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Recent Entries</span></div>
+      ${[['CID-0091','$1,200','NEW','TODAY 2:14 PM'],['CID-0087','$600','EXISTING','TODAY 11:30 AM']].map(([i,a,t,tm])=>`<div class="row"><div style="flex:1"><div style="font-size:11px;font-weight:600;color:#fff">${i}</div><div style="font-size:10px;color:#5a7896;font-family:'JetBrains Mono',monospace">${tm}</div></div>${bdg(t,t==='NEW'?'green':'cyan')}<div style="font-family:'Orbitron',sans-serif;font-size:13px;color:#00ff88;font-weight:600">${a}</div></div>`).join('')}
+    </div>`;
+}
+
+function viewMyTarget(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Goals</div>
+        <div class="page-title">My Target</div>
+        <div class="page-sub">Set by management · Real-time progress</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Monthly Target Progress</span></div>
+      <div style="margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:#c8d4e6;font-weight:500">Sales Count</span><span style="font-family:'Orbitron',sans-serif;color:#00dcff;font-size:14px">14 / 50</span></div>
+        <div class="bar"><div class="bar-fill" style="width:28%"></div></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5a7896;margin-top:5px;letter-spacing:0.1em">DEADLINE · APR 30 · COMMISSION ACTIVATES AFTER 10 SALES</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Commission Ladder</span></div>
+      ${[[1,'1–10 sales','$10/sale',10],[2,'11–20 sales','$15/sale',20],[3,'21–30 sales','$20/sale',30],[4,'31–40 sales','$25/sale',40],[5,'41+ sales','$40/sale',50]].map(([i,r,v,th])=>`<div class="tier ${14>=th-9?'met':''}"><span class="tier-label">▸ ${r}</span><span class="tier-val">${v}</span></div>`).join('')}
+    </div>`;
+}
+
+function viewCollections(){
+  return `
+    <div class="page-head">
+      <div class="page-title-block">
+        <div class="page-tag">// Customer Care</div>
+        <div class="page-title">Collections</div>
+        <div class="page-sub">Track · Deductions · Commission</div>
+      </div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Collected · Month</div><div class="stat-val green">$7,200</div></div>
+      <div class="stat-card"><div class="stat-label">Commission</div><div class="stat-val amber">$60</div></div>
+      <div class="stat-card"><div class="stat-label">Deductions</div><div class="stat-val pink">2</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="title-text">Log Collection</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fld"><label>Customer ID</label><input type="text"/></div>
+        <div class="fld"><label>Amount $</label><input type="number"/></div>
+      </div>
+      <button class="btn btn-pri" onclick="toast('Collection logged')">+ Log Collection ▸</button>
+    </div>`;
+}
+
+// ============== INIT ==============
+renderLogin();
+</script>
