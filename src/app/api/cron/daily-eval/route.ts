@@ -34,10 +34,19 @@ export async function POST(request: Request) {
       // Policy: No-Show Penalty (-3 points)
       newPoints = Math.max(0, newPoints - 3);
       notes.push('No-show penalty applied (-3 pts)');
-    } else if (userLog.status === 'late') {
-      // Policy: Late Penalty (-0.5 points)
-      newPoints = Math.max(0, newPoints - 0.5);
-      notes.push('Late clock-in penalty applied (-0.5 pts)');
+    } else {
+      if (userLog.status === 'late') {
+        // Policy: Late Penalty (-0.5 points)
+        newPoints = Math.max(0, newPoints - 0.5);
+        notes.push('Late clock-in penalty applied (-0.5 pts)');
+      }
+      
+      // Policy: Low Productive Time Penalty (< 6 hours / 360 mins)
+      const productiveMins = userLog.productive_time_minutes || 0;
+      if (productiveMins < 360) {
+        newPoints = Math.max(0, newPoints - 1);
+        notes.push(`Low productivity penalty: Only ${productiveMins}m tracked (-1 pt)`);
+      }
     }
 
     // If there's a change, update the profile
