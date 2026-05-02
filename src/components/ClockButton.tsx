@@ -10,15 +10,35 @@ export default function ClockButton({ userId, clockedIn }: { userId: string; clo
   const handleClock = async () => {
     setLoading(true);
     const newState = !active;
+
     const { error } = await supabase
       .from('profiles')
-      .update({
-        clocked_in: newState,
-        current_activity: newState ? 'Active' : null,
-      })
+      .update({ clocked_in: newState, current_activity: newState ? 'Active' : null })
       .eq('id', userId);
 
     if (!error) {
+      if (newState) {
+        await supabase.from('attendance_logs').insert([{
+          user_id: userId,
+          status: 'present',
+          clock_in_time: new Date().toISOString(),
+        }]);
+      } else {
+        const today = new Date().toISOString().split('T')[0];
+        const { data } = await supabase
+          .from('attendance_logs')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (data && data.length > 0) {
+          await supabase
+            .from('attendance_logs')
+            .update({ clock_out_time: new Date().toISOString() })
+            .eq('id', data[0].id);
+        }
+      }
       setActive(newState);
     }
     setLoading(false);

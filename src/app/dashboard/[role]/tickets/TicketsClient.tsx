@@ -1,33 +1,40 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { dbOp } from '@/utils/db';
 
 export default function TicketsClient({ initialTickets, isMgmt, currentUserId }: { initialTickets: any[], isMgmt: boolean, currentUserId: string }) {
   const [tickets, setTickets] = useState(initialTickets);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const supabase = createClient();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleResolve = async (id: string) => {
-    await supabase.from('tickets').update({ status: 'Resolved' }).eq('id', id);
-    setTickets(tickets.map(t => t.id === id ? { ...t, status: 'Resolved' } : t));
+    const { error } = await dbOp('tickets', 'update', { status: 'Resolved' }, { id });
+    if (!error) setTickets(tickets.map(t => t.id === id ? { ...t, status: 'Resolved' } : t));
   };
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError('');
     const formData = new FormData(e.currentTarget);
     const newTicket = {
       title: formData.get('title') as string,
       description: formData.get('description') as string,
       priority: formData.get('priority') as string,
       user_id: currentUserId,
-      status: 'Open'
+      status: 'Open',
     };
 
-    const { data } = await supabase.from('tickets').insert([newTicket]).select(`*, profiles(name)`);
-    if (data && data[0]) {
-      setTickets([data[0], ...tickets]);
+    const { data, error } = await dbOp('tickets', 'insert', newTicket, undefined, '*, profiles(name)');
+    if (error) {
+      setSubmitError(error || 'Failed to submit ticket. Please try again.');
+      setIsSubmitting(false);
+      return;
     }
+    if (data && data[0]) setTickets([data[0], ...tickets]);
+    setIsSubmitting(false);
     setIsModalOpen(false);
   };
 
@@ -89,9 +96,16 @@ export default function TicketsClient({ initialTickets, isMgmt, currentUserId }:
                 </select>
               </div>
               <div className="pv-fld"><label>Description</label><textarea name="description" rows={4} required></textarea></div>
+              {submitError && (
+                <div style={{ background: '#fee2e2', color: '#dc2626', padding: '10px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '8px' }}>
+                  {submitError}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="pv-btn pv-btn-pri">Submit</button>
-                <button type="button" className="pv-btn pv-btn-sec" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                <button type="submit" className="pv-btn pv-btn-pri" disabled={isSubmitting}>
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
+                <button type="button" className="pv-btn pv-btn-sec" onClick={() => { setIsModalOpen(false); setSubmitError(''); }}>Cancel</button>
               </div>
             </form>
           </div>

@@ -1,15 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { dbOp } from '@/utils/db';
 
-export default function InboxClient({ initialDocs, allUsers, currentUserId }: { initialDocs: any[], allUsers: any[], currentUserId: string }) {
+export default function InboxClient({
+  initialDocs,
+  allUsers,
+  currentUserId,
+  isMgmt,
+}: {
+  initialDocs: any[];
+  allUsers: any[];
+  currentUserId: string;
+  isMgmt: boolean;
+}) {
   const [filter, setFilter] = useState<'all' | 'unread' | 'signature'>('all');
   const [docs, setDocs] = useState(initialDocs);
-  const [composeModalOpen, setComposeModalOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [viewDoc, setViewDoc] = useState<any>(null);
-  
-  const supabase = createClient();
+  const [sending, setSending] = useState(false);
+  const [signName, setSignName] = useState('');
 
   const filteredDocs = docs.filter(d => {
     if (filter === 'unread') return !d.is_read;
@@ -19,96 +29,137 @@ export default function InboxClient({ initialDocs, allUsers, currentUserId }: { 
 
   const handleOpenDoc = async (doc: any) => {
     setViewDoc(doc);
+    setSignName('');
     if (!doc.is_read) {
-      // Mark as read in DB
-      await supabase.from('inbox_documents').update({ is_read: true }).eq('id', doc.id);
-      setDocs(docs.map(d => d.id === doc.id ? { ...d, is_read: true } : d));
+      await dbOp('inbox_documents', 'update', { is_read: true }, { id: doc.id });
+      setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, is_read: true } : d));
     }
   };
 
-  const handleSignDoc = async (docId: string) => {
-    await supabase.from('inbox_documents').update({ is_signed: true }).eq('id', docId);
-    setDocs(docs.map(d => d.id === docId ? { ...d, is_signed: true } : d));
+  const handleSign = async () => {
+    if (!signName.trim() || !viewDoc) return;
+    await dbOp('inbox_documents', 'update', { is_signed: true, signed_by: signName }, { id: viewDoc.id });
+    setDocs(prev => prev.map(d => d.id === viewDoc.id ? { ...d, is_signed: true } : d));
     setViewDoc(null);
   };
 
   const handleCompose = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const toId = formData.get('to') as string;
-    const subject = formData.get('subject') as string;
-    const type = formData.get('type') as string;
-    const reqSig = formData.get('req_sig') === 'on';
-
-    const sender = allUsers.find(u => u.id === currentUserId)?.name || 'System';
-
-    await supabase.from('inbox_documents').insert({
-      user_id: toId,
-      sender: sender,
-      subject: subject,
-      type: type,
-      requires_signature: reqSig
-    });
-
-    setComposeModalOpen(false);
-    // Show toast ideally here
+    setSending(true);
+    const fd = new FormData(e.currentTarget);
+    const sender = allUsers.find(u => u.id === currentUserId)?.name ?? 'Management';
+    const payload = {
+      user_id: fd.get('to') as string,
+      title: fd.get('subject') as string,
+      content: fd.get('message') as string,
+      type: fd.get('type') as string,
+      sender,
+      requires_signature: fd.get('req_sig') === 'on',
+    };
+    const { data } = await dbOp('inbox_documents', 'insert', payload);
+    if (data?.[0]) setDocs(prev => [data[0], ...prev]);
+    setComposeOpen(false);
+    setSending(false);
+    (e.target as HTMLFormElement).reset();
   };
+
+  const docTitle = (doc: any) => doc.title ?? doc.subject ?? 'Document';
+  const docType = (doc: any) => doc.type ?? 'DOC';
 
   return (
     <>
       <div className="pn-h" style={{ marginBottom: '14px' }}>
-        <div></div>
+        <div className="pn-t">Inbox</div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="pv-btn pv-btn-sec">Filter</button>
-          <button className="pv-btn pv-btn-pri" onClick={() => setComposeModalOpen(true)}>+ Compose</button>
+          {isMgmt && (
+            <button className="pv-btn pv-btn-pri" onClick={() => setComposeOpen(true)}>+ Compose</button>
+          )}
         </div>
       </div>
 
-      <div className="tabs">
-        <button className={`tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All ({docs.length})</button>
-        <button className={`tab ${filter === 'unread' ? 'active' : ''}`} onClick={() => setFilter('unread')}>Unread ({docs.filter(d => !d.is_read).length})</button>
-        <button className={`tab ${filter === 'signature' ? 'active' : ''}`} onClick={() => setFilter('signature')}>Awaiting signature ({docs.filter(d => d.requires_signature && !d.is_signed).length})</button>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+        {(['all', 'unread', 'signature'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            style={{
+              padding: '6px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+              cursor: 'pointer', border: 'none',
+              background: filter === f ? '#4f46e5' : '#f5f6f8',
+              color: filter === f ? '#fff' : '#6b7689',
+            }}
+          >
+            {f === 'all' ? `All (${docs.length})` : f === 'unread' ? `Unread (${docs.filter(d => !d.is_read).length})` : `Needs Signature (${docs.filter(d => d.requires_signature && !d.is_signed).length})`}
+          </button>
+        ))}
       </div>
 
       <div className="pn" style={{ padding: 0 }}>
         {filteredDocs.length === 0 && <div className="empty" style={{ padding: '40px' }}>Inbox is empty.</div>}
-        {filteredDocs.map(i => (
-          <div key={i.id} className="pv-row-card" style={{ margin: 0, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', background: !i.is_read ? '#fafbff' : '#fff', cursor: 'pointer' }} onClick={() => handleOpenDoc(i)}>
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', fontWeight: 700, color: '#4f46e5' }}>{i.type}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '12.5px', fontWeight: !i.is_read ? 700 : 500 }}>{i.subject}</div>
-              <div style={{ fontSize: '10.5px', color: '#6b7689' }}>From {i.sender}</div>
+        {filteredDocs.map(doc => (
+          <div
+            key={doc.id}
+            onClick={() => handleOpenDoc(doc)}
+            style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 16px', cursor: 'pointer', background: !doc.is_read ? '#fafbff' : '#fff', borderBottom: '1px solid #f0f2f5' }}
+          >
+            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: '#4f46e5', textAlign: 'center', lineHeight: 1.2 }}>
+              {docType(doc).slice(0, 4)}
             </div>
-            {i.requires_signature && !i.is_signed && <span className="pv-bdg pv-bdg-amber">Signature required</span>}
-            {!i.is_read && <span className="pv-bdg pv-bdg-indigo">New</span>}
-            <div style={{ fontSize: '10.5px', color: '#9fa8be', fontFamily: "'JetBrains Mono', monospace" }}>{new Date(i.created_at).toLocaleDateString()}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: !doc.is_read ? 700 : 500, color: '#1a1f2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {docTitle(doc)}
+              </div>
+              <div style={{ fontSize: '11px', color: '#6b7689' }}>
+                {doc.sender ? `From ${doc.sender}` : 'System'} · {new Date(doc.created_at).toLocaleDateString()}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+              {doc.requires_signature && !doc.is_signed && <span className="pv-bdg pv-bdg-amber">Sign required</span>}
+              {doc.is_signed && <span className="pv-bdg pv-bdg-green">Signed</span>}
+              {!doc.is_read && <span className="pv-bdg pv-bdg-indigo">New</span>}
+            </div>
           </div>
         ))}
       </div>
 
+      {/* View document modal */}
       {viewDoc && (
-        <div className="mb" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="md" style={{ background: '#fff', padding: '24px', borderRadius: '14px', width: '520px', maxWidth: '100%' }}>
-            <div className="md-t" style={{ fontSize: '17px', fontWeight: 700, marginBottom: '16px' }}>{viewDoc.subject}</div>
-            <div style={{ background: '#f5f6f8', padding: '11px 13px', borderRadius: '8px', marginBottom: '12px', fontSize: '11.5px' }}>
-              <div><strong>From:</strong> {viewDoc.sender}</div>
-              <div><strong>Type:</strong> {viewDoc.type}</div>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '14px', width: '560px', maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '12px' }}>{docTitle(viewDoc)}</div>
+            <div style={{ background: '#f5f6f8', padding: '10px 13px', borderRadius: '7px', marginBottom: '14px', fontSize: '11.5px', color: '#4a5568' }}>
+              <div><strong>From:</strong> {viewDoc.sender ?? 'System'}</div>
+              <div><strong>Type:</strong> {docType(viewDoc)}</div>
               <div><strong>Received:</strong> {new Date(viewDoc.created_at).toLocaleString()}</div>
             </div>
-            <div style={{ background: '#fafbff', padding: '30px', textAlign: 'center', borderRadius: '8px', border: '1px dashed #cbd2e0', color: '#6b7689', fontSize: '11.5px', marginBottom: '14px' }}>
-              📄 PDF preview · Full document loaded
-            </div>
-            
-            {viewDoc.requires_signature && !viewDoc.is_signed && (
-              <div style={{ background: '#fef3c7', padding: '13px', borderRadius: '8px', marginBottom: '14px' }}>
-                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#b45309', marginBottom: '8px' }}>⚠ Signature required</div>
-                <div className="pv-fld"><label>Type your full name to sign</label><input type="text" placeholder="Your full name" /></div>
+
+            {viewDoc.content && (
+              <div style={{ background: '#fafbff', padding: '16px', borderRadius: '8px', border: '1px solid #e4e7eb', fontSize: '13px', lineHeight: 1.8, color: '#1a1f2e', marginBottom: '14px', whiteSpace: 'pre-wrap' }}>
+                {viewDoc.content}
               </div>
             )}
-            
+
+            {viewDoc.requires_signature && !viewDoc.is_signed && (
+              <div style={{ background: '#fef3c7', padding: '14px', borderRadius: '8px', marginBottom: '14px' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#b45309', marginBottom: '10px' }}>Signature Required</div>
+                <div className="pv-fld" style={{ margin: 0 }}>
+                  <label>Type your full name to sign</label>
+                  <input type="text" value={signName} onChange={e => setSignName(e.target.value)} placeholder="Full name..." />
+                </div>
+              </div>
+            )}
+
+            {viewDoc.is_signed && (
+              <div style={{ background: '#ecfdf5', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', color: '#047857', fontWeight: 600, marginBottom: '14px' }}>
+                ✓ Signed by {viewDoc.signed_by}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '8px' }}>
               {viewDoc.requires_signature && !viewDoc.is_signed && (
-                <button className="pv-btn pv-btn-pri" onClick={() => handleSignDoc(viewDoc.id)}>Sign & Return</button>
+                <button className="pv-btn pv-btn-pri" onClick={handleSign} disabled={!signName.trim()}>
+                  Sign & Acknowledge
+                </button>
               )}
               <button className="pv-btn pv-btn-sec" onClick={() => setViewDoc(null)}>Close</button>
             </div>
@@ -116,43 +167,48 @@ export default function InboxClient({ initialDocs, allUsers, currentUserId }: { 
         </div>
       )}
 
-      {composeModalOpen && (
-        <div className="mb" style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="md" style={{ background: '#fff', padding: '24px', borderRadius: '14px', width: '520px', maxWidth: '100%' }}>
-            <div className="md-t" style={{ fontSize: '17px', fontWeight: 700, marginBottom: '16px' }}>Compose message</div>
+      {/* Compose modal */}
+      {composeOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', padding: '24px', borderRadius: '14px', width: '520px', maxWidth: '100%' }}>
+            <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '16px' }}>Compose Document</div>
             <form onSubmit={handleCompose}>
               <div className="pv-fld">
                 <label>To</label>
                 <select name="to" required>
-                  {allUsers.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  <option value="">— Select employee —</option>
+                  {allUsers.filter(u => u.id !== currentUserId).map(u => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
                 </select>
               </div>
               <div className="pv-fld">
-                <label>Subject</label>
-                <input type="text" name="subject" required />
+                <label>Subject / Title</label>
+                <input type="text" name="subject" placeholder="e.g. Performance Notice — April 2026" required />
               </div>
               <div className="pv-fld">
-                <label>Type / Attachment</label>
+                <label>Document Type</label>
                 <select name="type">
-                  <option value="PDF">Standard PDF</option>
-                  <option value="REPORT">Performance Report</option>
-                  <option value="CONTRACT">Contract PDF</option>
-                  <option value="PAYSLIP">Payslip</option>
+                  <option value="Notice">Notice</option>
+                  <option value="Payslip">Payslip</option>
+                  <option value="Contract">Contract</option>
+                  <option value="Report">Report</option>
+                  <option value="Warning">Warning</option>
                 </select>
               </div>
               <div className="pv-fld">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-                  <input type="checkbox" name="req_sig" style={{ width: 'auto' }} />
-                  Recipient must sign and return
+                <label>Message / Content</label>
+                <textarea name="message" rows={5} placeholder="Document body..." required />
+              </div>
+              <div className="pv-fld">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                  <input type="checkbox" name="req_sig" style={{ width: '15px', height: '15px' }} />
+                  Require recipient signature
                 </label>
               </div>
-              <div className="pv-fld">
-                <label>Message</label>
-                <textarea rows={4}></textarea>
-              </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="pv-btn pv-btn-pri">Send</button>
-                <button type="button" className="pv-btn pv-btn-sec" onClick={() => setComposeModalOpen(false)}>Cancel</button>
+                <button type="submit" className="pv-btn pv-btn-pri" disabled={sending}>{sending ? 'Sending...' : 'Send'}</button>
+                <button type="button" className="pv-btn pv-btn-sec" onClick={() => setComposeOpen(false)}>Cancel</button>
               </div>
             </form>
           </div>

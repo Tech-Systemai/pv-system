@@ -1,46 +1,50 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { dbOp } from '@/utils/db';
 
-export default function TimeOffClient({ 
-  initialRequests, 
-  isMgmt, 
+export default function TimeOffClient({
+  initialRequests,
+  isMgmt,
   currentUserId,
   currentUserName
-}: { 
-  initialRequests: any[], 
-  isMgmt: boolean, 
+}: {
+  initialRequests: any[],
+  isMgmt: boolean,
   currentUserId: string,
   currentUserName: string
 }) {
   const [requests, setRequests] = useState(initialRequests);
-  const supabase = createClient();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleAction = async (id: string, newStatus: string) => {
-    await supabase.from('time_off_requests').update({ status: newStatus }).eq('id', id);
-    setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus } : r));
+    const { error } = await dbOp('time_off_requests', 'update', { status: newStatus }, { id });
+    if (!error) setRequests(requests.map(r => r.id === id ? { ...r, status: newStatus } : r));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setSubmitting(true);
+    setSubmitError('');
     const formData = new FormData(e.currentTarget);
     const newReq = {
       user_id: currentUserId,
-      start_date: formData.get('from'),
-      end_date: formData.get('to'),
-      type: formData.get('type'),
-      reason: formData.get('reason'),
-      status: 'Pending'
+      start_date: formData.get('from') as string,
+      end_date: formData.get('to') as string,
+      type: formData.get('type') as string,
+      reason: formData.get('reason') as string,
+      status: 'Pending',
     };
 
-    const { data } = await supabase.from('time_off_requests').insert([newReq]).select(`*, profiles:user_id(name)`);
-    if (data && data[0]) {
-      setRequests([data[0], ...requests]);
+    const { data, error } = await dbOp('time_off_requests', 'insert', newReq);
+    if (error) {
+      setSubmitError(error);
+    } else if (data && data[0]) {
+      setRequests([{ ...data[0], profiles: { name: currentUserName } }, ...requests]);
+      (e.target as HTMLFormElement).reset();
     }
-    
-    // reset form
-    (e.target as HTMLFormElement).reset();
+    setSubmitting(false);
   };
 
   if (isMgmt) {
@@ -111,7 +115,8 @@ export default function TimeOffClient({
             </div>
           </div>
           <div className="pv-fld"><label>Reason</label><textarea name="reason" rows={2} required></textarea></div>
-          <button type="submit" className="pv-btn pv-btn-pri">Submit request →</button>
+          {submitError && <div style={{ background: '#fee2e2', color: '#dc2626', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '8px' }}>{submitError}</div>}
+          <button type="submit" className="pv-btn pv-btn-pri" disabled={submitting}>{submitting ? 'Submitting...' : 'Submit request →'}</button>
         </form>
       </div>
 

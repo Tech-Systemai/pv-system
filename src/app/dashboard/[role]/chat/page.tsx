@@ -1,23 +1,29 @@
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import ChatClient from './ChatClient';
 
 export default async function ChatPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
   if (!user) return null;
 
-  // Fetch users for direct messaging
-  const { data: profiles } = await supabase.from('profiles').select('id, name, role').neq('id', user.id);
-  
-  // Fetch recent messages
-  const { data: messages } = await supabase
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from('profiles').select('name, role').eq('id', user.id).single();
+
+  // Load group messages only (channel-based, no DMs)
+  const { data: messages } = await admin
     .from('messages')
-    .select('*, sender:profiles!messages_sender_id_fkey(name)')
+    .select('*, sender:profiles!messages_sender_id_fkey(name, role)')
+    .not('channel', 'is', null)
     .order('created_at', { ascending: true })
-    .limit(100);
+    .limit(200);
 
   return (
-    <ChatClient initialMessages={messages || []} users={profiles || []} currentUserId={user.id} />
+    <ChatClient
+      initialMessages={messages || []}
+      currentUserId={user.id}
+      currentUserRole={profile?.role || 'sales'}
+      currentUserName={profile?.name || 'User'}
+    />
   );
 }

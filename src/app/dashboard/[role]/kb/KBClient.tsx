@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { dbOp } from '@/utils/db';
 
 const DEFAULT_FOLDERS = [
   { name: 'Sales Playbook', access: 'Sales + Mgmt', icon: '📘' },
@@ -12,30 +12,31 @@ const DEFAULT_FOLDERS = [
   { name: 'Product Documentation', access: 'Everyone', icon: '📚' },
 ];
 
-export default function KBClient({ initialArticles, userRole }: { initialArticles: any[], userRole: string }) {
+export default function KBClient({ initialArticles, userRole }: { initialArticles: any[], userRole: string, currentUserId?: string }) {
   const [articles, setArticles] = useState(initialArticles);
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [newArticleModal, setNewArticleModal] = useState(false);
-  
-  const isMgmt = userRole === 'owner' || userRole === 'admin' || userRole === 'supervisor';
-  const isOwner = userRole === 'owner';
+  const [saving, setSaving] = useState(false);
 
-  const supabase = createClient();
+  const isMgmt = ['owner', 'admin', 'supervisor'].includes(userRole);
+  const isOwner = userRole === 'owner';
 
   const handleCreateArticle = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setSaving(true);
     const formData = new FormData(e.currentTarget);
     const newDoc = {
       folder: formData.get('folder') as string,
       title: formData.get('title') as string,
       content: formData.get('content') as string,
-      access_level: formData.get('access') as string
+      access_level: formData.get('access') as string,
     };
 
-    const { data } = await supabase.from('knowledge_base').insert([newDoc]).select();
+    const { data } = await dbOp('knowledge_base', 'insert', newDoc);
     if (data && data[0]) {
       setArticles([data[0], ...articles]);
     }
+    setSaving(false);
     setNewArticleModal(false);
   };
 
@@ -131,7 +132,7 @@ export default function KBClient({ initialArticles, userRole }: { initialArticle
                 </select>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="pv-btn pv-btn-pri">Publish</button>
+                <button type="submit" className="pv-btn pv-btn-pri" disabled={saving}>{saving ? 'Publishing...' : 'Publish'}</button>
                 <button type="button" className="pv-btn pv-btn-sec" onClick={() => setNewArticleModal(false)}>Cancel</button>
               </div>
             </form>
