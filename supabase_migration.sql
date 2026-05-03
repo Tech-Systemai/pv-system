@@ -4,6 +4,15 @@
 -- Dashboard → SQL Editor → New Query → Paste → Run
 -- ============================================================
 
+-- ── 0. ENUM TYPES ────────────────────────────────────────────
+-- Must exist before any table references it
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'user_role') then
+    create type user_role as enum ('owner', 'admin', 'sales', 'cx', 'supervisor', 'accountant');
+  end if;
+end $$;
+
 -- ── 1. PROFILES ──────────────────────────────────────────────
 create table if not exists profiles (
   id uuid primary key references auth.users on delete cascade
