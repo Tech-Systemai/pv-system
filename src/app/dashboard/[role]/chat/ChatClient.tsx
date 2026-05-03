@@ -12,7 +12,8 @@ const CHANNELS = [
   { id: 'announcements', label: '# Announcements', roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'] },
 ];
 
-const MANAGEMENT_ROLES = ['owner', 'admin', 'supervisor'];
+// Roles that everyone is allowed to DM
+const DM_ROLES = ['owner', 'admin', 'supervisor', 'accountant'];
 const BUCKET = 'chat-files';
 
 const dmId = (uid1: string, uid2: string) => `dm-${[uid1, uid2].sort().join('|')}`;
@@ -43,6 +44,7 @@ export default function ChatClient({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showAccessModal, setShowAccessModal] = useState(false);
+  const [showDMPicker, setShowDMPicker] = useState(false);
   const [dmUnreads, setDmUnreads] = useState<Record<string, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -53,9 +55,14 @@ export default function ChatClient({
     return byRole || byGrant;
   });
 
-  // All management users available to DM (owner/admin/supervisor, excluding self)
-  const managementUsers = allUsers.filter(
-    u => MANAGEMENT_ROLES.includes(u.role) && u.id !== currentUserId,
+  // Users that everyone is allowed to DM (excluding self)
+  const dmableUsers = allUsers.filter(
+    u => DM_ROLES.includes(u.role) && u.id !== currentUserId,
+  );
+
+  // Users that already have a conversation with current user (shown in sidebar)
+  const activeDMUsers = dmableUsers.filter(u =>
+    messages.some(m => m.channel === dmId(currentUserId, u.id)),
   );
 
   const [channel, setChannel] = useState(visibleChannels[0]?.id || 'general');
@@ -79,7 +86,7 @@ export default function ChatClient({
   // Seed DM unreads from localStorage on mount
   useEffect(() => {
     const initial: Record<string, number> = {};
-    managementUsers.forEach(u => {
+    dmableUsers.forEach(u => {
       const dmCh = dmId(currentUserId, u.id);
       const lastRead = localStorage.getItem(`dm-last-read-${dmCh}`) || new Date(0).toISOString();
       const count = messages.filter(
@@ -219,12 +226,13 @@ export default function ChatClient({
           </button>
         ))}
 
-        <div style={{ padding: '12px 16px 6px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '8px', borderTop: '1px solid #2d3748' }}>
-          Direct Messages
+        <div style={{ padding: '12px 16px 6px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '8px', borderTop: '1px solid #2d3748', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Direct Messages</span>
+          <button onClick={() => setShowDMPicker(true)} title="Start a new conversation" style={{ background: '#2d3748', border: '1px solid #4a5568', borderRadius: '4px', color: '#94a3b8', fontSize: '14px', lineHeight: 1, width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
         </div>
-        {managementUsers.length === 0 ? (
-          <div style={{ padding: '6px 16px', fontSize: '11px', color: '#4a5568', fontStyle: 'italic' }}>No management users</div>
-        ) : managementUsers.map(u => {
+        {activeDMUsers.length === 0 ? (
+          <div style={{ padding: '6px 16px 10px', fontSize: '11px', color: '#4a5568', fontStyle: 'italic' }}>Hit + to start a conversation</div>
+        ) : activeDMUsers.map(u => {
           const dmCh = dmId(currentUserId, u.id);
           const unread = dmUnreads[dmCh] || 0;
           return (
@@ -374,6 +382,53 @@ export default function ChatClient({
               <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '8px', padding: '0 16px', textAlign: 'center' }}>Private conversation</div>
             </>
           )}
+        </div>
+      )}
+
+      {/* DM picker modal */}
+      {showDMPicker && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '14px', width: '420px', maxWidth: '100%', maxHeight: '75vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #e4e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: '#1a1f2e' }}>New Direct Message</div>
+                <div style={{ fontSize: '11px', color: '#6b7689', marginTop: '2px' }}>Select a person to start a private conversation</div>
+              </div>
+              <button onClick={() => setShowDMPicker(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#9ca3af', lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '8px 0' }}>
+              {dmableUsers.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>No users available</div>
+              ) : dmableUsers.map(u => {
+                const dmCh = dmId(currentUserId, u.id);
+                const hasHistory = messages.some(m => m.channel === dmCh);
+                return (
+                  <button
+                    key={u.id}
+                    onClick={() => { openDM(dmCh); setShowDMPicker(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'left', padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8f9ff')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                  >
+                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#4f46e5', flexShrink: 0 }}>
+                      {u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#1a1f2e' }}>{u.name}</div>
+                      <div style={{ fontSize: '11px', color: ROLE_COLOR[u.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{u.role}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: u.clocked_in ? '#10b981' : '#9ca3af', flexShrink: 0 }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#d1d5db' }} />
+                      {u.clocked_in ? 'In' : 'Out'}
+                    </div>
+                    {hasHistory && (
+                      <div style={{ fontSize: '10px', color: '#6b7689', flexShrink: 0 }}>existing</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
