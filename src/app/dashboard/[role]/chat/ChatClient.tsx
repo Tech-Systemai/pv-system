@@ -88,6 +88,7 @@ export default function ChatClient({
 
     const payload = {
       user_id: currentUserId,
+      sender_id: currentUserId,
       sender_name: currentUserName,
       sender_role: currentUserRole,
       channel,
