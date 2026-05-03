@@ -8,15 +8,18 @@ export default async function ChatPage() {
   if (!user) return null;
 
   const admin = createAdminClient();
-  const { data: profile } = await admin.from('profiles').select('name, role').eq('id', user.id).single();
 
-  // Load group messages only (channel-based, no DMs)
-  const { data: messages } = await admin
-    .from('messages')
-    .select('*')
-    .not('channel', 'is', null)
-    .order('created_at', { ascending: true })
-    .limit(200);
+  const [
+    { data: profile },
+    { data: messages },
+    { data: allUsers },
+    { data: memberships },
+  ] = await Promise.all([
+    admin.from('profiles').select('name, role').eq('id', user.id).single(),
+    admin.from('messages').select('*').not('channel', 'is', null).order('created_at', { ascending: true }).limit(200),
+    admin.from('profiles').select('id, name, role, clocked_in, status').order('name'),
+    admin.from('channel_memberships').select('*'),
+  ]);
 
   return (
     <ChatClient
@@ -24,6 +27,8 @@ export default async function ChatPage() {
       currentUserId={user.id}
       currentUserRole={profile?.role || 'sales'}
       currentUserName={profile?.name || 'User'}
+      allUsers={allUsers || []}
+      channelMemberships={memberships || []}
     />
   );
 }

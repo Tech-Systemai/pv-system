@@ -361,7 +361,25 @@ alter table time_off_requests add column if not exists status     text default '
 alter table time_off_requests add column if not exists created_at timestamptz default now();
 alter table time_off_requests disable row level security;
 
--- ── 22. NOTES ────────────────────────────────────────────────
+-- ── 22. CHANNEL MEMBERSHIPS ──────────────────────────────────
+create table if not exists channel_memberships (
+  id uuid primary key default gen_random_uuid()
+);
+alter table channel_memberships add column if not exists user_id    uuid references profiles on delete cascade;
+alter table channel_memberships add column if not exists channel_id text;
+alter table channel_memberships add column if not exists created_at timestamptz default now();
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'channel_memberships'::regclass and contype = 'u'
+  ) then
+    alter table channel_memberships add constraint channel_memberships_user_channel_key unique (user_id, channel_id);
+  end if;
+end $$;
+alter table channel_memberships disable row level security;
+
+-- ── 23. NOTES ────────────────────────────────────────────────
 create table if not exists notes (
   id uuid primary key default gen_random_uuid()
 );
