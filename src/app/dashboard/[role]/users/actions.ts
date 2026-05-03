@@ -34,6 +34,7 @@ export async function createEmployeeAccount(formData: FormData) {
         id: authData.user.id,
         email,
         name,
+        username: email.split('@')[0],
         role,
         department: role === 'sales' ? 'Sales' : role === 'cx' ? 'CX' : 'Management',
         salary,

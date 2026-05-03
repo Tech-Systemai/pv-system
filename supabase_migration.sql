@@ -18,15 +18,11 @@ create table if not exists profiles (
   id uuid primary key references auth.users on delete cascade
 );
 alter table profiles add column if not exists username    text;
+-- Direct DROP NOT NULL — safe to run even if column is already nullable
+alter table profiles alter column username drop not null;
 alter table profiles add column if not exists name        text;
 alter table profiles add column if not exists email       text;
 alter table profiles add column if not exists role        user_role not null default 'sales';
--- Drop NOT NULL on username if it exists (Supabase templates sometimes add it)
-do $$
-begin
-  alter table profiles alter column username drop not null;
-exception when others then null;
-end $$;
 alter table profiles add column if not exists department  text;
 alter table profiles add column if not exists location    text;
 alter table profiles add column if not exists salary      numeric default 2500;
@@ -42,16 +38,16 @@ alter table profiles disable row level security;
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
-  insert into profiles (id, email, name)
+  insert into profiles (id, email, name, username)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1))
+    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    split_part(new.email, '@', 1)
   )
   on conflict (id) do nothing;
   return new;
 exception when others then
-  -- Never block user creation even if profile insert fails
   return new;
 end;
 $$;

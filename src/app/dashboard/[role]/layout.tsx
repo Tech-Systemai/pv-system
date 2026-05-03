@@ -32,6 +32,7 @@ export default async function DashboardLayout({
       id: user.id,
       email: user.email,
       name: user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'User',
+      username: user.email?.split('@')[0] ?? 'user',
       role: user.user_metadata?.role ?? 'sales',
     });
   }
