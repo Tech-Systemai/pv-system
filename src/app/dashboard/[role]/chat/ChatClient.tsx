@@ -60,8 +60,9 @@ export default function ChatClient({
     u => DM_ROLES.includes(u.role) && u.id !== currentUserId,
   );
 
-  // Users that already have a conversation with current user (shown in sidebar)
-  const activeDMUsers = dmableUsers.filter(u =>
+  // All users with an existing DM conversation — includes anyone who messaged the current user
+  const activeDMUsers = allUsers.filter(u =>
+    u.id !== currentUserId &&
     messages.some(m => m.channel === dmId(currentUserId, u.id)),
   );
 
