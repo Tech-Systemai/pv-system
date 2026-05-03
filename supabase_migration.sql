@@ -196,6 +196,8 @@ alter table messages add column if not exists channel     text;
 alter table messages add column if not exists content     text;
 alter table messages add column if not exists sender_name text;
 alter table messages add column if not exists sender_role text;
+alter table messages add column if not exists file_url    text;
+alter table messages add column if not exists file_type   text;
 alter table messages add column if not exists created_at  timestamptz default now();
 alter table messages disable row level security;
 
