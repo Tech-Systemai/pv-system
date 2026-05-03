@@ -12,7 +12,10 @@ const CHANNELS = [
   { id: 'announcements', label: '# Announcements', roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'] },
 ];
 
+const MANAGEMENT_ROLES = ['owner', 'admin', 'supervisor'];
 const BUCKET = 'chat-files';
+
+const dmId = (uid1: string, uid2: string) => `dm-${[uid1, uid2].sort().join('|')}`;
 
 export default function ChatClient({
   initialMessages,
@@ -40,26 +43,52 @@ export default function ChatClient({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showAccessModal, setShowAccessModal] = useState(false);
+  const [dmUnreads, setDmUnreads] = useState<Record<string, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Determine which channels this user can see (role-based + explicit grants)
   const visibleChannels = CHANNELS.filter(c => {
     const byRole = c.roles.includes(currentUserRole);
     const byGrant = memberships.some(m => m.user_id === currentUserId && m.channel_id === c.id);
     return byRole || byGrant;
   });
 
+  // All management users available to DM (owner/admin/supervisor, excluding self)
+  const managementUsers = allUsers.filter(
+    u => MANAGEMENT_ROLES.includes(u.role) && u.id !== currentUserId,
+  );
+
   const [channel, setChannel] = useState(visibleChannels[0]?.id || 'general');
+
+  const isDM = channel.startsWith('dm-');
+  const dmRecipient = isDM
+    ? allUsers.find(u => dmId(currentUserId, u.id) === channel) ?? null
+    : null;
+
   const channelMessages = messages.filter(m => m.channel === channel);
 
-  // Members of current channel (role-based + explicit grants)
   const channelConfig = CHANNELS.find(c => c.id === channel);
-  const channelMembers = allUsers.filter(u => {
-    const byRole = channelConfig?.roles.includes(u.role);
-    const byGrant = memberships.some(m => m.user_id === u.id && m.channel_id === channel);
-    return byRole || byGrant;
-  });
+  const channelMembers = isDM
+    ? []
+    : allUsers.filter(u => {
+        const byRole = channelConfig?.roles.includes(u.role);
+        const byGrant = memberships.some(m => m.user_id === u.id && m.channel_id === channel);
+        return byRole || byGrant;
+      });
+
+  // Seed DM unreads from localStorage on mount
+  useEffect(() => {
+    const initial: Record<string, number> = {};
+    managementUsers.forEach(u => {
+      const dmCh = dmId(currentUserId, u.id);
+      const lastRead = localStorage.getItem(`dm-last-read-${dmCh}`) || new Date(0).toISOString();
+      const count = messages.filter(
+        m => m.channel === dmCh && m.user_id !== currentUserId && m.created_at > lastRead,
+      ).length;
+      if (count > 0) initial[dmCh] = count;
+    });
+    setDmUnreads(initial);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -72,13 +101,23 @@ export default function ChatClient({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
         const msg = payload.new as any;
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+        // Track DM unreads for messages received while not viewing that DM
+        if (msg.user_id !== currentUserId && msg.channel?.startsWith('dm-') && msg.channel !== channel) {
+          setDmUnreads(prev => ({ ...prev, [msg.channel]: (prev[msg.channel] || 0) + 1 }));
+        }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
         setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id));
       })
       .subscribe();
     return () => { supabase.removeChannel(sub); };
-  }, []);
+  }, [channel]);
+
+  const openDM = (dmCh: string) => {
+    setChannel(dmCh);
+    localStorage.setItem(`dm-last-read-${dmCh}`, new Date().toISOString());
+    setDmUnreads(prev => { const next = { ...prev }; delete next[dmCh]; return next; });
+  };
 
   const uploadFile = async (file: File): Promise<{ url: string; type: string } | null> => {
     setUploading(true);
@@ -111,7 +150,7 @@ export default function ChatClient({
       fileType = result.type;
     }
 
-    const payload = {
+    const payload: any = {
       user_id: currentUserId,
       sender_id: currentUserId,
       sender_name: currentUserName,
@@ -121,6 +160,10 @@ export default function ChatClient({
       file_url: fileUrl,
       file_type: fileType,
     };
+
+    if (isDM && dmRecipient) {
+      payload.receiver_id = dmRecipient.id;
+    }
 
     const tempId = `temp-${Date.now()}`;
     setMessages(prev => [...prev, { ...payload, id: tempId, created_at: new Date().toISOString() }]);
@@ -142,7 +185,6 @@ export default function ChatClient({
     await supabase.from('messages').delete().eq('id', msgId);
   };
 
-  // Grant / revoke channel access for a user
   const toggleAccess = async (userId: string, channelId: string, currently: boolean) => {
     if (currently) {
       await dbOp('channel_memberships', 'delete', undefined, { user_id: userId, channel_id: channelId });
@@ -154,7 +196,11 @@ export default function ChatClient({
   };
 
   const isAnnouncements = channel === 'announcements';
-  const canPost = !isAnnouncements || ['owner', 'admin'].includes(currentUserRole);
+  const canPost = isDM || !isAnnouncements || ['owner', 'admin'].includes(currentUserRole);
+
+  const activeLabel = isDM
+    ? `@ ${dmRecipient?.name || 'Direct Message'}`
+    : visibleChannels.find(c => c.id === channel)?.label || channel;
 
   const ROLE_COLOR: Record<string, string> = {
     owner: '#7c3aed', admin: '#2563eb', supervisor: '#0891b2',
@@ -164,7 +210,7 @@ export default function ChatClient({
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 160px)', background: '#fff', border: '1px solid #e4e7eb', borderRadius: '12px', overflow: 'hidden' }}>
 
-      {/* Left: channels */}
+      {/* Left: channels + DMs */}
       <div style={{ width: '190px', background: '#1a1f2e', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ padding: '16px 16px 8px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Channels</div>
         {visibleChannels.map(c => (
@@ -172,6 +218,26 @@ export default function ChatClient({
             {c.label}
           </button>
         ))}
+
+        <div style={{ padding: '12px 16px 6px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '8px', borderTop: '1px solid #2d3748' }}>
+          Direct Messages
+        </div>
+        {managementUsers.length === 0 ? (
+          <div style={{ padding: '6px 16px', fontSize: '11px', color: '#4a5568', fontStyle: 'italic' }}>No management users</div>
+        ) : managementUsers.map(u => {
+          const dmCh = dmId(currentUserId, u.id);
+          const unread = dmUnreads[dmCh] || 0;
+          return (
+            <button key={u.id} onClick={() => openDM(dmCh)} style={{ display: 'flex', alignItems: 'center', gap: '7px', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: channel === dmCh ? '#2d3748' : 'transparent', color: channel === dmCh ? '#fff' : '#94a3b8', fontSize: '12px' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#4a5568', flexShrink: 0 }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</span>
+              {unread > 0 && (
+                <span style={{ background: '#ef4444', color: '#fff', borderRadius: '8px', fontSize: '9px', fontWeight: 700, padding: '1px 5px', flexShrink: 0 }}>{unread}</span>
+              )}
+            </button>
+          );
+        })}
+
         {isOwner && (
           <div style={{ marginTop: 'auto', padding: '12px' }}>
             <button onClick={() => setShowAccessModal(true)} style={{ width: '100%', padding: '8px', background: '#2d3748', border: '1px solid #4a5568', borderRadius: '6px', color: '#94a3b8', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
@@ -184,13 +250,24 @@ export default function ChatClient({
       {/* Centre: messages */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <div style={{ padding: '12px 18px', borderBottom: '1px solid #e4e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, fontSize: '14px' }}>{visibleChannels.find(c => c.id === channel)?.label}</span>
-          <span style={{ fontSize: '11px', color: '#6b7689' }}>{channelMembers.length} members</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontWeight: 700, fontSize: '14px' }}>{activeLabel}</span>
+            {isDM && dmRecipient && (
+              <span style={{ fontSize: '11px', color: ROLE_COLOR[dmRecipient.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize', background: '#f5f6f8', padding: '2px 7px', borderRadius: '4px' }}>{dmRecipient.role}</span>
+            )}
+          </div>
+          <span style={{ fontSize: '11px', color: '#6b7689' }}>
+            {isDM
+              ? (dmRecipient?.clocked_in ? '🟢 Clocked in' : '⚫ Clocked out')
+              : `${channelMembers.length} members`}
+          </span>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {channelMessages.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#6b7689', fontSize: '13px', marginTop: '40px' }}>No messages yet in this channel.</div>
+            <div style={{ textAlign: 'center', color: '#6b7689', fontSize: '13px', marginTop: '40px' }}>
+              {isDM ? `Start a private conversation with ${dmRecipient?.name || 'this person'}.` : 'No messages yet in this channel.'}
+            </div>
           )}
           {channelMessages.map((m, i) => {
             const isMe = m.user_id === currentUserId;
@@ -221,7 +298,11 @@ export default function ChatClient({
                     )}
                   </div>
                   {isOwner && (
-                    <button onClick={() => handleDelete(m.id)} title="Delete message" style={{ position: 'absolute', top: 18, [isMe ? 'left' : 'right']: -24, background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '12px', padding: '2px', opacity: 0.6 }}>✕</button>
+                    <button
+                      onClick={() => handleDelete(m.id)}
+                      title="Delete message"
+                      style={{ position: 'absolute', top: 18, ...(isMe ? { left: -24 } : { right: -24 }), background: 'none', border: 'none', cursor: 'pointer', color: '#d1d5db', fontSize: '12px', padding: '2px', opacity: 0.6 }}
+                    >✕</button>
                   )}
                 </div>
               </div>
@@ -247,35 +328,56 @@ export default function ChatClient({
           <form onSubmit={handleSend} style={{ padding: '12px 16px', borderTop: '1px solid #e4e7eb', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setPendingFile(e.target.files[0]); e.target.value = ''; }} />
             <button type="button" onClick={() => fileInputRef.current?.click()} title="Attach image or video" style={{ background: 'none', border: '1px solid #d8dde5', borderRadius: '8px', padding: '9px 12px', cursor: 'pointer', fontSize: '14px', color: '#6b7689', flexShrink: 0 }}>📎</button>
-            <input type="text" value={text} onChange={e => setText(e.target.value)} placeholder={`Message ${visibleChannels.find(c => c.id === channel)?.label}...`} style={{ flex: 1, padding: '10px 14px', border: '1px solid #d8dde5', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
+            <input type="text" value={text} onChange={e => setText(e.target.value)} placeholder={isDM ? `Message ${dmRecipient?.name || ''}…` : `Message ${activeLabel}…`} style={{ flex: 1, padding: '10px 14px', border: '1px solid #d8dde5', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
             <button type="submit" className="pv-btn pv-btn-pri" disabled={sending || uploading || (!text.trim() && !pendingFile)} style={{ flexShrink: 0 }}>
               {uploading ? 'Uploading…' : sending ? '…' : 'Send'}
             </button>
           </form>
         ) : (
-          <div style={{ padding: '12px 16px', borderTop: '1px solid #e4e7eb', textAlign: 'center', fontSize: '12px', color: '#6b7689' }}>Read-only — only management can post here.</div>
+          <div style={{ padding: '12px 16px', borderTop: '1px solid #e4e7eb', textAlign: 'center', fontSize: '12px', color: '#6b7689' }}>
+            Read-only — only management can post in announcements.
+          </div>
         )}
       </div>
 
-      {/* Right: members panel */}
-      <div style={{ width: '210px', borderLeft: '1px solid #e4e7eb', display: 'flex', flexDirection: 'column', flexShrink: 0, background: '#fafafa' }}>
-        <div style={{ padding: '12px 14px 8px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Members · {channelMembers.length}
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {channelMembers.map(u => (
-            <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 14px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#d1d5db', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
-                <div style={{ fontSize: '10px', color: ROLE_COLOR[u.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{u.role}</div>
+      {/* Right: members panel / DM recipient info */}
+      {!isDM ? (
+        <div style={{ width: '210px', borderLeft: '1px solid #e4e7eb', display: 'flex', flexDirection: 'column', flexShrink: 0, background: '#fafafa' }}>
+          <div style={{ padding: '12px 14px 8px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Members · {channelMembers.length}
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {channelMembers.map(u => (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 14px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#d1d5db', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
+                  <div style={{ fontSize: '10px', color: ROLE_COLOR[u.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{u.role}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div style={{ width: '210px', borderLeft: '1px solid #e4e7eb', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, background: '#fafafa', paddingTop: '32px', gap: '8px' }}>
+          {dmRecipient && (
+            <>
+              <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 700, color: '#4f46e5' }}>
+                {dmRecipient.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', textAlign: 'center', padding: '0 12px' }}>{dmRecipient.name}</div>
+              <div style={{ fontSize: '11px', color: ROLE_COLOR[dmRecipient.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{dmRecipient.role}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: dmRecipient.clocked_in ? '#10b981' : '#9ca3af', marginTop: '4px' }}>
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dmRecipient.clocked_in ? '#10b981' : '#d1d5db' }} />
+                {dmRecipient.clocked_in ? 'Clocked In' : 'Clocked Out'}
+              </div>
+              <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '8px', padding: '0 16px', textAlign: 'center' }}>Private conversation</div>
+            </>
+          )}
+        </div>
+      )}
 
-      {/* Access management modal (owner only) */}
+      {/* Access management modal */}
       {showAccessModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '14px', width: '680px', maxWidth: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
@@ -310,13 +412,8 @@ export default function ChatClient({
                           <td key={c.id} style={{ padding: '10px 8px', textAlign: 'center' }}>
                             <button
                               onClick={() => !byRole && toggleAccess(u.id, c.id, byGrant)}
-                              title={byRole ? 'Default access via role (cannot remove)' : hasAccess ? 'Click to revoke' : 'Click to grant'}
-                              style={{
-                                width: '22px', height: '22px', borderRadius: '6px', border: 'none', cursor: byRole ? 'default' : 'pointer',
-                                background: byRole ? '#dbeafe' : byGrant ? '#dcfce7' : '#f5f6f8',
-                                color: byRole ? '#2563eb' : byGrant ? '#16a34a' : '#d1d5db',
-                                fontWeight: 700, fontSize: '13px',
-                              }}
+                              title={byRole ? 'Default access via role' : hasAccess ? 'Click to revoke' : 'Click to grant'}
+                              style={{ width: '22px', height: '22px', borderRadius: '6px', border: 'none', cursor: byRole ? 'default' : 'pointer', background: byRole ? '#dbeafe' : byGrant ? '#dcfce7' : '#f5f6f8', color: byRole ? '#2563eb' : byGrant ? '#16a34a' : '#d1d5db', fontWeight: 700, fontSize: '13px' }}
                             >
                               {hasAccess ? '✓' : '·'}
                             </button>
@@ -329,7 +426,7 @@ export default function ChatClient({
               </table>
             </div>
             <div style={{ padding: '16px 24px', borderTop: '1px solid #e4e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7689' }}>
-              <span>🔵 Blue = default by role · 🟢 Green = manually granted · Click grey to grant, green to revoke</span>
+              <span>🔵 Blue = role default · 🟢 Green = manual grant · Click grey to grant, green to revoke</span>
               <button className="pv-btn pv-btn-sec" onClick={() => setShowAccessModal(false)}>Close</button>
             </div>
           </div>

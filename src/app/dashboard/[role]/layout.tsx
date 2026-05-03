@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin';
 import Sidebar from '@/components/Sidebar';
 import ClockButton from '@/components/ClockButton';
 import PortalSwitcher from '@/components/PortalSwitcher';
+import NotificationBell from '@/components/NotificationBell';
 
 export default async function DashboardLayout({
   children,
@@ -97,9 +98,7 @@ export default async function DashboardLayout({
               {isManagement && <PortalSwitcher currentRole={urlRole} />}
               <ClockButton userId={user.id} clockedIn={profile?.clocked_in ?? false} />
 
-              <div style={{ position: 'relative' }}>
-                <div className="bell">🔔<div className="bell-d"></div></div>
-              </div>
+              <NotificationBell userId={user.id} userRole={effectiveRole} />
             </div>
           </header>
 
