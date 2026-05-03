@@ -192,6 +192,8 @@ create table if not exists messages (
   id uuid primary key default gen_random_uuid()
 );
 alter table messages add column if not exists user_id     uuid references profiles on delete set null;
+alter table messages add column if not exists sender_id   uuid;
+alter table messages add column if not exists receiver_id uuid;
 alter table messages add column if not exists channel     text;
 alter table messages add column if not exists content     text;
 alter table messages add column if not exists sender_name text;
@@ -199,6 +201,18 @@ alter table messages add column if not exists sender_role text;
 alter table messages add column if not exists file_url    text;
 alter table messages add column if not exists file_type   text;
 alter table messages add column if not exists created_at  timestamptz default now();
+-- Drop any stray NOT NULL constraints (except id)
+do $$
+declare col text;
+begin
+  for col in
+    select column_name from information_schema.columns
+    where table_schema = 'public' and table_name = 'messages'
+      and is_nullable = 'NO' and column_name != 'id'
+  loop
+    execute 'alter table messages alter column ' || quote_ident(col) || ' drop not null';
+  end loop;
+end $$;
 alter table messages disable row level security;
 
 -- Enable realtime for chat (safe to run multiple times)
