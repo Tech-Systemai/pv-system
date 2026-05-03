@@ -11,14 +11,23 @@ export default async function TicketsPage() {
   const { data: profile } = await admin.from('profiles').select('name, role').eq('id', user.id).single();
   const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
 
-  const tQuery = admin.from('tickets').select(`*, profiles(name)`).order('created_at', { ascending: false });
+  const tQuery = admin
+    .from('tickets')
+    .select('*, profiles(name)')
+    .order('created_at', { ascending: false });
+
   const { data: tickets } = isMgmt ? await tQuery : await tQuery.eq('user_id', user.id);
+
+  const { data: allUsers } = isMgmt
+    ? await admin.from('profiles').select('id, name, role').order('name')
+    : { data: [] };
 
   return (
     <TicketsClient
       initialTickets={tickets || []}
       isMgmt={isMgmt}
       currentUserId={user.id}
+      allUsers={allUsers || []}
     />
   );
 }

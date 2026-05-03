@@ -191,9 +191,10 @@ export default function InboxClient({
                 <select name="type">
                   <option value="Notice">Notice</option>
                   <option value="Payslip">Payslip</option>
-                  <option value="Contract">Contract</option>
-                  <option value="Report">Report</option>
-                  <option value="Warning">Warning</option>
+                  {isMgmt && <option value="Contract">Contract</option>}
+                  {isMgmt && <option value="Report">Report</option>}
+                  {isMgmt && <option value="Warning">Warning</option>}
+                  {isMgmt && <option value="Action Plan">Action Plan</option>}
                 </select>
               </div>
               <div className="pv-fld">

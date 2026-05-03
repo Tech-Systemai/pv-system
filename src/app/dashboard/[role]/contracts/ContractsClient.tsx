@@ -124,6 +124,14 @@ export default function ContractsClient({
 
     return (
       <div>
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            .sb, .tb, .foot, .no-print, .pv-grid > aside { display: none !important; }
+            .pv-grid { display: block !important; }
+            .main, .cnt { padding: 0 !important; margin: 0 !important; }
+            body { background: white !important; }
+          }
+        ` }} />
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
           <button className="pv-btn pv-btn-sec" onClick={() => setView('list')}>← Back</button>
           <button className="pv-btn pv-btn-pri" onClick={() => window.print()}>🖨️ Print / Download PDF</button>

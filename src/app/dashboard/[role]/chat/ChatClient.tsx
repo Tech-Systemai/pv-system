@@ -55,8 +55,9 @@ export default function ChatClient({
     if (!text.trim()) return;
     setSending(true);
     await dbOp('messages', 'insert', {
-      sender_id: currentUserId,
+      user_id: currentUserId,
       sender_name: currentUserName,
+      sender_role: currentUserRole,
       channel,
       content: text.trim(),
     });

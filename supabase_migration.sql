@@ -316,6 +316,18 @@ alter table time_off_requests add column if not exists status     text default '
 alter table time_off_requests add column if not exists created_at timestamptz default now();
 alter table time_off_requests disable row level security;
 
+-- ── 22. NOTES ────────────────────────────────────────────────
+create table if not exists notes (
+  id uuid primary key default gen_random_uuid()
+);
+alter table notes add column if not exists user_id    uuid references profiles on delete cascade;
+alter table notes add column if not exists title      text;
+alter table notes add column if not exists content    text;
+alter table notes add column if not exists type       text default 'General';
+alter table notes add column if not exists created_at timestamptz default now();
+alter table notes add column if not exists updated_at timestamptz default now();
+alter table notes disable row level security;
+
 -- ── BACKFILL: profile rows for existing auth users ────────────
 insert into profiles (id, email, name, role)
 select

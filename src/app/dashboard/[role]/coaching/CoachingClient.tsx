@@ -15,23 +15,41 @@ const QA_LABELS: Record<string, string> = {
   lst: 'Sale Lost',
 };
 
-export default function CoachingClient({ initialSessions, users, isMgmt, currentUserId }: { initialSessions: any[], users: any[], isMgmt: boolean, currentUserId: string }) {
+export default function CoachingClient({
+  initialSessions,
+  users,
+  isMgmt,
+  currentUserId,
+  currentUserName,
+}: {
+  initialSessions: any[];
+  users: any[];
+  isMgmt: boolean;
+  currentUserId: string;
+  currentUserName?: string;
+}) {
   const [sessions, setSessions] = useState(initialSessions);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [pendingInbox, setPendingInbox] = useState<{ agentId: string; agentName: string; summary: string } | null>(null);
+  const [sendingInbox, setSendingInbox] = useState(false);
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSaving(true);
     const fd = new FormData(e.currentTarget);
     const agentId = fd.get('agent_id') as string;
+    const notes = fd.get('notes') as string;
+    const actionPlan = fd.get('action_plan') as string;
+    const type = fd.get('type') as string;
+
     const newSess = {
       agent_id: agentId,
       supervisor_id: currentUserId,
-      type: fd.get('type') as string,
-      notes: fd.get('notes') as string,
-      action_plan: fd.get('action_plan') as string,
+      type,
+      notes,
+      action_plan: actionPlan,
       next_review: fd.get('next_review') as string || null,
       scores,
     };
@@ -45,16 +63,51 @@ export default function CoachingClient({ initialSessions, users, isMgmt, current
         agent: { name: agent?.name ?? '—' },
         supervisor: { name: supervisor?.name ?? '—' },
       }, ...prev]);
+
+      setPendingInbox({
+        agentId,
+        agentName: agent?.name ?? 'Agent',
+        summary: `Session Type: ${type}\n\nNotes:\n${notes}\n\nAction Plan:\n${actionPlan}`,
+      });
     }
     setSaving(false);
     setScores({});
     (e.target as HTMLFormElement).reset();
   };
 
+  const handleSendToInbox = async () => {
+    if (!pendingInbox) return;
+    setSendingInbox(true);
+    await dbOp('inbox_documents', 'insert', {
+      user_id: pendingInbox.agentId,
+      title: 'Coaching Session Summary',
+      content: pendingInbox.summary,
+      type: 'Coaching',
+      sender: currentUserName ?? 'Supervisor',
+      requires_signature: true,
+    });
+    setPendingInbox(null);
+    setSendingInbox(false);
+  };
+
   const setScore = (key: string, val: number) => setScores(prev => ({ ...prev, [key]: val }));
 
   return (
     <>
+      {pendingInbox && (
+        <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ fontSize: '13px', color: '#047857' }}>
+            ✓ Session saved for <strong>{pendingInbox.agentName}</strong>. Send a summary to their inbox?
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="pv-btn pv-btn-pri" style={{ fontSize: '12px' }} onClick={handleSendToInbox} disabled={sendingInbox}>
+              {sendingInbox ? 'Sending...' : 'Send to Inbox'}
+            </button>
+            <button className="pv-btn pv-btn-sec" style={{ fontSize: '12px' }} onClick={() => setPendingInbox(null)}>Dismiss</button>
+          </div>
+        </div>
+      )}
+
       {isMgmt && (
         <>
           <div className="pn" style={{ marginBottom: '20px' }}>

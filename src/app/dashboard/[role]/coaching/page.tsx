@@ -26,6 +26,7 @@ export default async function CoachingPage() {
       users={users || []}
       isMgmt={isMgmt}
       currentUserId={user.id}
+      currentUserName={profile?.name ?? undefined}
     />
   );
 }

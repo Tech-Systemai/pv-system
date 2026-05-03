@@ -15,13 +15,12 @@ export default function ReportsClient({
   reports,
   employees,
   isMgmt,
-  currentUserId,
   currentUserName,
 }: {
   reports: any[];
   employees: any[];
   isMgmt: boolean;
-  currentUserId: string;
+  currentUserId?: string;
   currentUserName: string;
 }) {
   const [view, setView] = useState<'list' | 'create' | 'preview'>('list');
@@ -50,6 +49,14 @@ export default function ReportsClient({
   if (view === 'preview' && printData) {
     return (
       <div>
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            .sb, .tb, .foot, .no-print, .pv-grid > aside { display: none !important; }
+            .pv-grid { display: block !important; }
+            .main, .cnt { padding: 0 !important; margin: 0 !important; }
+            body { background: white !important; }
+          }
+        ` }} />
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
           <button className="pv-btn pv-btn-sec" onClick={() => setView('create')}>← Back</button>
           <button className="pv-btn pv-btn-pri" onClick={() => window.print()}>🖨️ Print / Download PDF</button>
