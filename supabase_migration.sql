@@ -379,7 +379,17 @@ begin
 end $$;
 alter table channel_memberships disable row level security;
 
--- ── 23. NOTES ────────────────────────────────────────────────
+-- ── 23. CUSTOM CHANNELS ───────────────────────────────────────
+create table if not exists channels (
+  id uuid primary key default gen_random_uuid()
+);
+alter table channels add column if not exists name         text;
+alter table channels add column if not exists created_by   uuid references profiles on delete set null;
+alter table channels add column if not exists access_roles text[] default '{"owner","admin","supervisor","sales","cx","accountant"}';
+alter table channels add column if not exists created_at   timestamptz default now();
+alter table channels disable row level security;
+
+-- ── 24. NOTES ────────────────────────────────────────────────
 create table if not exists notes (
   id uuid primary key default gen_random_uuid()
 );

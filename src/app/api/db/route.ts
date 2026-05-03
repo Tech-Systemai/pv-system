@@ -7,7 +7,7 @@ const ALLOWED_TABLES = [
   'knowledge_base', 'messages', 'inbox_documents', 'schedules',
   'contracts', 'payrolls', 'sales_logs', 'attendance_logs',
   'profiles', 'hr_applicants', 'policies', 'audit_logs',
-  'brand_settings', 'targets', 'finance_entries', 'permissions', 'planning_documents', 'notes', 'channel_memberships',
+  'brand_settings', 'targets', 'finance_entries', 'permissions', 'planning_documents', 'notes', 'channel_memberships', 'channels',
 ];
 
 export async function POST(req: NextRequest) {

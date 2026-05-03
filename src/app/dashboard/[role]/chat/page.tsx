@@ -15,14 +15,14 @@ export default async function ChatPage() {
     { data: dmMsgs },
     { data: allUsers },
     { data: memberships },
+    { data: customChannels },
   ] = await Promise.all([
     admin.from('profiles').select('name, role').eq('id', user.id).single(),
-    // Channel messages (non-DM), capped at 200 per channel history
     admin.from('messages').select('*').not('channel', 'is', null).not('channel', 'like', 'dm-%').order('created_at', { ascending: true }).limit(200),
-    // DMs involving this user — no limit, fetches both sides of every conversation
     admin.from('messages').select('*').like('channel', 'dm-%').or(`user_id.eq.${user.id},receiver_id.eq.${user.id}`).order('created_at', { ascending: true }),
     admin.from('profiles').select('id, name, role, clocked_in, status').order('name'),
     admin.from('channel_memberships').select('*'),
+    admin.from('channels').select('*').order('created_at'),
   ]);
 
   return (
@@ -33,6 +33,7 @@ export default async function ChatPage() {
       currentUserName={profile?.name || 'User'}
       allUsers={allUsers || []}
       channelMemberships={memberships || []}
+      customChannels={customChannels || []}
     />
   );
 }
