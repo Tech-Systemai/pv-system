@@ -18,8 +18,8 @@ create table if not exists profiles (
   id uuid primary key references auth.users on delete cascade
 );
 alter table profiles add column if not exists username    text;
--- Direct DROP NOT NULL — safe to run even if column is already nullable
 alter table profiles alter column username drop not null;
+alter table profiles alter column username set default '';
 alter table profiles add column if not exists name        text;
 alter table profiles add column if not exists email       text;
 alter table profiles add column if not exists role        user_role not null default 'sales';
