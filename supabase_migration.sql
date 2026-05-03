@@ -17,9 +17,16 @@ end $$;
 create table if not exists profiles (
   id uuid primary key references auth.users on delete cascade
 );
+alter table profiles add column if not exists username    text;
 alter table profiles add column if not exists name        text;
 alter table profiles add column if not exists email       text;
 alter table profiles add column if not exists role        user_role not null default 'sales';
+-- Drop NOT NULL on username if it exists (Supabase templates sometimes add it)
+do $$
+begin
+  alter table profiles alter column username drop not null;
+exception when others then null;
+end $$;
 alter table profiles add column if not exists department  text;
 alter table profiles add column if not exists location    text;
 alter table profiles add column if not exists salary      numeric default 2500;
@@ -344,11 +351,12 @@ alter table notes add column if not exists updated_at timestamptz default now();
 alter table notes disable row level security;
 
 -- ── BACKFILL: profile rows for existing auth users ────────────
-insert into profiles (id, email, name, role)
+insert into profiles (id, email, name, username, role)
 select
   u.id,
   u.email,
   coalesce(u.raw_user_meta_data->>'name', split_part(u.email, '@', 1)),
+  split_part(u.email, '@', 1),
   coalesce(u.raw_user_meta_data->>'role', 'sales')::text::user_role
 from auth.users u
 where not exists (select 1 from profiles p where p.id = u.id)
@@ -359,6 +367,11 @@ update profiles p
 set email = u.email
 from auth.users u
 where p.id = u.id and p.email is null;
+
+-- Backfill username for rows where it is still null
+update profiles
+set username = split_part(email, '@', 1)
+where username is null and email is not null;
 
 -- ── SEED: Default policy rules ────────────────────────────────
 insert into policies (name, trigger, trigger_detail, action, action_detail, active)
