@@ -22,18 +22,20 @@ alter table profiles add column if not exists status      text default 'Active';
 alter table profiles add column if not exists created_at  timestamptz default now();
 alter table profiles disable row level security;
 
--- Auto-create profile on signup
+-- Auto-create profile on signup (defensive — never fails user creation)
 create or replace function handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
-  insert into profiles (id, email, name, role)
+  insert into profiles (id, email, name)
   values (
     new.id,
     new.email,
-    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    coalesce(new.raw_user_meta_data->>'role', 'sales')::text::user_role
+    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1))
   )
   on conflict (id) do nothing;
+  return new;
+exception when others then
+  -- Never block user creation even if profile insert fails
   return new;
 end;
 $$;
@@ -124,12 +126,14 @@ alter table finance_entries disable row level security;
 create table if not exists hr_applicants (
   id uuid primary key default gen_random_uuid()
 );
-alter table hr_applicants add column if not exists name       text;
-alter table hr_applicants add column if not exists email      text;
-alter table hr_applicants add column if not exists position   text;
-alter table hr_applicants add column if not exists score      integer default 80;
-alter table hr_applicants add column if not exists status     text default 'Reviewing';
-alter table hr_applicants add column if not exists created_at timestamptz default now();
+alter table hr_applicants add column if not exists name        text;
+alter table hr_applicants add column if not exists email       text;
+alter table hr_applicants add column if not exists position    text;
+alter table hr_applicants add column if not exists score       integer default 80;
+alter table hr_applicants add column if not exists status      text default 'Reviewing';
+alter table hr_applicants add column if not exists notes       text;
+alter table hr_applicants add column if not exists resume_url  text;
+alter table hr_applicants add column if not exists created_at  timestamptz default now();
 alter table hr_applicants disable row level security;
 
 -- ── 9. INBOX DOCUMENTS ────────────────────────────────────────
@@ -233,12 +237,14 @@ alter table policies disable row level security;
 create table if not exists sales_logs (
   id uuid primary key default gen_random_uuid()
 );
-alter table sales_logs add column if not exists user_id     uuid references profiles on delete cascade;
-alter table sales_logs add column if not exists customer_id text;
-alter table sales_logs add column if not exists amount      numeric default 0;
-alter table sales_logs add column if not exists type        text default 'Sale';
-alter table sales_logs add column if not exists status      text default 'Pending';
-alter table sales_logs add column if not exists created_at  timestamptz default now();
+alter table sales_logs add column if not exists user_id        uuid references profiles on delete cascade;
+alter table sales_logs add column if not exists customer_id    text;
+alter table sales_logs add column if not exists customer_name  text;
+alter table sales_logs add column if not exists customer_phone text;
+alter table sales_logs add column if not exists amount         numeric default 0;
+alter table sales_logs add column if not exists type           text default 'Sale';
+alter table sales_logs add column if not exists status         text default 'Pending';
+alter table sales_logs add column if not exists created_at     timestamptz default now();
 alter table sales_logs disable row level security;
 
 -- ── 17. SCHEDULES ─────────────────────────────────────────────

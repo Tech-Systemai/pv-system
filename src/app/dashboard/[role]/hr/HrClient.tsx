@@ -28,6 +28,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
       email: fd.get('email') as string,
       position: fd.get('position') as string,
       score: Number(fd.get('score')),
+      notes: fd.get('notes_field') as string || null,
       status: 'Reviewing',
     };
     const { data } = await dbOp('hr_applicants', 'insert', newApp);

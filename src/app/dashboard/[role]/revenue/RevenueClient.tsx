@@ -16,6 +16,8 @@ export default function RevenueClient({ initialSales, currentUserId }: { initial
     const newSale = {
       user_id: currentUserId,
       customer_id: fd.get('customer_id') as string,
+      customer_name: fd.get('customer_name') as string || null,
+      customer_phone: fd.get('customer_phone') as string || null,
       amount: parseFloat(fd.get('amount') as string),
       type: 'Sale',
       status: 'Pending',
@@ -53,17 +55,27 @@ export default function RevenueClient({ initialSales, currentUserId }: { initial
       <div className="pn" style={{ marginBottom: '20px' }}>
         <div className="pn-t" style={{ marginBottom: '13px' }}>Log New Sale</div>
         {error && <div style={{ background: '#fee2e2', color: '#dc2626', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
-        <form onSubmit={handleLog} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px', alignItems: 'end' }}>
-          <div className="pv-fld" style={{ margin: 0 }}>
-            <label>Customer ID / Name</label>
-            <input type="text" name="customer_id" required placeholder="e.g. CUST-1042" />
-          </div>
-          <div className="pv-fld" style={{ margin: 0 }}>
-            <label>Amount ($)</label>
-            <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" />
+        <form onSubmit={handleLog}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div className="pv-fld" style={{ margin: 0 }}>
+              <label>Customer ID</label>
+              <input type="text" name="customer_id" required placeholder="e.g. CUST-1042" />
+            </div>
+            <div className="pv-fld" style={{ margin: 0 }}>
+              <label>Customer Name</label>
+              <input type="text" name="customer_name" placeholder="Full name" />
+            </div>
+            <div className="pv-fld" style={{ margin: 0 }}>
+              <label>Customer Phone</label>
+              <input type="tel" name="customer_phone" placeholder="+1 555 000 0000" />
+            </div>
+            <div className="pv-fld" style={{ margin: 0 }}>
+              <label>Amount ($)</label>
+              <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" />
+            </div>
           </div>
           <button type="submit" className="pv-btn pv-btn-pri" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging...' : '+ Log →'}
+            {isSubmitting ? 'Logging...' : '+ Log Sale →'}
           </button>
         </form>
       </div>
@@ -77,8 +89,14 @@ export default function RevenueClient({ initialSales, currentUserId }: { initial
           <div key={s.id} className="r-cd">
             <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857', fontWeight: 700, fontSize: '13px' }}>$</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600 }}>Customer: {s.customer_id}</div>
-              <div style={{ fontSize: '11px', color: '#6b7689' }}>{new Date(s.created_at).toLocaleString()}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600 }}>
+                {s.customer_name || s.customer_id}
+                {s.customer_name && s.customer_id && <span style={{ color: '#9ca3af', fontWeight: 400 }}> · {s.customer_id}</span>}
+              </div>
+              {s.customer_phone && (
+                <div style={{ fontSize: '11px', color: '#6b7689' }}>{s.customer_phone}</div>
+              )}
+              <div style={{ fontSize: '11px', color: '#9ca3af' }}>{new Date(s.created_at).toLocaleString()}</div>
             </div>
             <div style={{ fontWeight: 700, color: '#047857' }}>${Number(s.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
             <span className={`pv-bdg ${s.status === 'Verified' ? 'pv-bdg-green' : 'pv-bdg-amber'}`}>{s.status}</span>
