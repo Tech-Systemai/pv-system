@@ -43,7 +43,10 @@ export default function ChatClient({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
         const msg = payload.new as any;
         if (CHANNELS.some(c => c.id === msg.channel)) {
-          setMessages(prev => [...prev, { ...msg, sender: { name: msg.sender_name || 'User', role: '' } }]);
+          setMessages(prev => {
+            if (prev.some(m => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
         }
       })
       .subscribe();
@@ -54,14 +57,23 @@ export default function ChatClient({
     e.preventDefault();
     if (!text.trim()) return;
     setSending(true);
-    await dbOp('messages', 'insert', {
+    const payload = {
       user_id: currentUserId,
       sender_name: currentUserName,
       sender_role: currentUserRole,
       channel,
       content: text.trim(),
-    });
+      created_at: new Date().toISOString(),
+    };
+    // Show immediately without waiting for realtime
+    const tempId = `temp-${Date.now()}`;
+    setMessages(prev => [...prev, { ...payload, id: tempId }]);
     setText('');
+    const { data } = await dbOp('messages', 'insert', payload);
+    // Replace temp row with the real DB row if returned
+    if (data?.[0]) {
+      setMessages(prev => prev.map(m => m.id === tempId ? data[0] : m));
+    }
     setSending(false);
   };
 
