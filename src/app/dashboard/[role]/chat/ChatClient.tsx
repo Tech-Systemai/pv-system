@@ -90,7 +90,7 @@ export default function ChatClient({
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {channelMessages.length === 0 && <div style={{ textAlign: 'center', color: '#6b7689', fontSize: '13px', marginTop: '40px' }}>No messages yet in this channel.</div>}
           {channelMessages.map((m, i) => {
-            const isMe = m.sender_id === currentUserId;
+            const isMe = m.user_id === currentUserId;
             const name = m.sender?.name || m.sender_name || 'User';
             return (
               <div key={m.id || i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', flexDirection: isMe ? 'row-reverse' : 'row' }}>

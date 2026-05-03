@@ -13,7 +13,7 @@ export default async function ChatPage() {
   // Load group messages only (channel-based, no DMs)
   const { data: messages } = await admin
     .from('messages')
-    .select('*, sender:profiles!messages_sender_id_fkey(name, role)')
+    .select('*, sender:profiles!user_id(name, role)')
     .not('channel', 'is', null)
     .order('created_at', { ascending: true })
     .limit(200);
