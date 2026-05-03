@@ -13,6 +13,7 @@ export async function createEmployeeAccount(formData: FormData) {
   const name = formData.get('name') as string;
   const role = formData.get('role') as string;
   const salary = Number(formData.get('salary'));
+  const username = (formData.get('username') as string) || email.split('@')[0];
 
   // Pass metadata so the trigger can populate the profile immediately
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -34,7 +35,7 @@ export async function createEmployeeAccount(formData: FormData) {
         id: authData.user.id,
         email,
         name,
-        username: email.split('@')[0],
+        username,
         role,
         department: role === 'sales' ? 'Sales' : role === 'cx' ? 'CX' : 'Management',
         salary,
@@ -46,5 +47,15 @@ export async function createEmployeeAccount(formData: FormData) {
     }
   }
 
+  return { success: true };
+}
+
+export async function deleteEmployee(userId: string) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (error) return { error: error.message };
   return { success: true };
 }

@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import ClockButton from '@/components/ClockButton';
 import PortalSwitcher from '@/components/PortalSwitcher';
 import NotificationBell from '@/components/NotificationBell';
+import ProfileButton from '@/components/ProfileButton';
 
 export default async function DashboardLayout({
   children,
@@ -23,7 +24,7 @@ export default async function DashboardLayout({
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
     .from('profiles')
-    .select('role, name, clocked_in')
+    .select('role, name, clocked_in, username, email, contract_url, id_document_url')
     .eq('id', user.id)
     .single();
 
@@ -99,6 +100,17 @@ export default async function DashboardLayout({
               <ClockButton userId={user.id} clockedIn={profile?.clocked_in ?? false} />
 
               <NotificationBell userId={user.id} userRole={effectiveRole} />
+              <ProfileButton
+                userId={user.id}
+                initialProfile={{
+                  name: profile?.name ?? user.email?.split('@')[0] ?? 'User',
+                  username: profile?.username ?? null,
+                  role: effectiveRole,
+                  email: profile?.email ?? user.email ?? null,
+                  contract_url: (profile as any)?.contract_url ?? null,
+                  id_document_url: (profile as any)?.id_document_url ?? null,
+                }}
+              />
             </div>
           </header>
 

@@ -41,8 +41,10 @@ alter table profiles add column if not exists points      integer default 7;
 alter table profiles add column if not exists clocked_in  boolean default false;
 alter table profiles add column if not exists clock_in_time  timestamptz;
 alter table profiles add column if not exists clock_out_time timestamptz;
-alter table profiles add column if not exists status      text default 'Active';
-alter table profiles add column if not exists created_at  timestamptz default now();
+alter table profiles add column if not exists status           text default 'Active';
+alter table profiles add column if not exists created_at       timestamptz default now();
+alter table profiles add column if not exists contract_url     text;
+alter table profiles add column if not exists id_document_url  text;
 alter table profiles disable row level security;
 
 -- Auto-create profile on signup (defensive — never fails user creation)
@@ -433,6 +435,29 @@ values
   ('Low Productivity Warning', 'Low productivity (< 6h tracked)', '< 6h productive',      'Auto-notify supervisor', null,          true)
 on conflict do nothing;
 
+-- ── 25. STORAGE: employee-docs bucket ────────────────────────
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('employee-docs', 'employee-docs', true, 52428800)
+on conflict (id) do nothing;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'employee_docs_insert' and schemaname = 'storage' and tablename = 'objects') then
+    execute 'create policy employee_docs_insert on storage.objects for insert to authenticated with check (bucket_id = ''employee-docs'')';
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'employee_docs_select' and schemaname = 'storage' and tablename = 'objects') then
+    execute 'create policy employee_docs_select on storage.objects for select to public using (bucket_id = ''employee-docs'')';
+  end if;
+end $$;
+
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'employee_docs_update' and schemaname = 'storage' and tablename = 'objects') then
+    execute 'create policy employee_docs_update on storage.objects for update to authenticated using (bucket_id = ''employee-docs'')';
+  end if;
+end $$;
+
 -- ============================================================
--- Done! All 21 tables created/updated. Refresh your browser.
+-- Done! All tables created/updated. Refresh your browser.
 -- ============================================================
