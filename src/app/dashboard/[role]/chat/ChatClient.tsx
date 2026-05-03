@@ -5,11 +5,11 @@ import { createClient } from '@/utils/supabase/client';
 import { dbOp } from '@/utils/db';
 
 const DEFAULT_CHANNELS = [
-  { id: 'general',       label: '# General',       roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'] },
-  { id: 'management',    label: '# Management',    roles: ['owner', 'admin', 'supervisor', 'accountant'] },
-  { id: 'sales-team',    label: '# Sales Team',    roles: ['owner', 'admin', 'supervisor', 'sales'] },
-  { id: 'cx-team',       label: '# CX Team',       roles: ['owner', 'admin', 'supervisor', 'cx'] },
-  { id: 'announcements', label: '# Announcements', roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'] },
+  { id: 'general',       label: '# General',       roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'], archived: false },
+  { id: 'management',    label: '# Management',    roles: ['owner', 'admin', 'supervisor', 'accountant'],                archived: false },
+  { id: 'sales-team',    label: '# Sales Team',    roles: ['owner', 'admin', 'supervisor', 'sales'],                    archived: false },
+  { id: 'cx-team',       label: '# CX Team',       roles: ['owner', 'admin', 'supervisor', 'cx'],                       archived: false },
+  { id: 'announcements', label: '# Announcements', roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'], archived: false },
 ];
 
 const ALL_ROLES = ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'];
