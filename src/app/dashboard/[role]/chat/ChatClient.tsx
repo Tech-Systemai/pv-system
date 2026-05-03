@@ -206,6 +206,9 @@ export default function ChatClient({
   const isAnnouncements = channel === 'announcements';
   const canPost = isDM || !isAnnouncements || ['owner', 'admin'].includes(currentUserRole);
 
+  // Sales and CX should not see the members panel at all
+  const showMembersPanel = !['sales', 'cx'].includes(currentUserRole);
+
   const activeLabel = isDM
     ? `@ ${dmRecipient?.name || 'Direct Message'}`
     : visibleChannels.find(c => c.id === channel)?.label || channel;
@@ -349,41 +352,43 @@ export default function ChatClient({
         )}
       </div>
 
-      {/* Right: members panel / DM recipient info */}
-      {!isDM ? (
-        <div style={{ width: '210px', borderLeft: '1px solid #e4e7eb', display: 'flex', flexDirection: 'column', flexShrink: 0, background: '#fafafa' }}>
-          <div style={{ padding: '12px 14px 8px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Members · {channelMembers.length}
-          </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {channelMembers.map(u => (
-              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 14px' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#d1d5db', flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
-                  <div style={{ fontSize: '10px', color: ROLE_COLOR[u.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{u.role}</div>
+      {/* Right: members panel / DM recipient info — hidden for sales & cx */}
+      {showMembersPanel && (
+        isDM ? (
+          <div style={{ width: '210px', borderLeft: '1px solid #e4e7eb', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, background: '#fafafa', paddingTop: '32px', gap: '8px' }}>
+            {dmRecipient && (
+              <>
+                <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 700, color: '#4f46e5' }}>
+                  {dmRecipient.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
-              </div>
-            ))}
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', textAlign: 'center', padding: '0 12px' }}>{dmRecipient.name}</div>
+                <div style={{ fontSize: '11px', color: ROLE_COLOR[dmRecipient.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{dmRecipient.role}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: dmRecipient.clocked_in ? '#10b981' : '#9ca3af', marginTop: '4px' }}>
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dmRecipient.clocked_in ? '#10b981' : '#d1d5db' }} />
+                  {dmRecipient.clocked_in ? 'Clocked In' : 'Clocked Out'}
+                </div>
+                <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '8px', padding: '0 16px', textAlign: 'center' }}>Private conversation</div>
+              </>
+            )}
           </div>
-        </div>
-      ) : (
-        <div style={{ width: '210px', borderLeft: '1px solid #e4e7eb', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, background: '#fafafa', paddingTop: '32px', gap: '8px' }}>
-          {dmRecipient && (
-            <>
-              <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 700, color: '#4f46e5' }}>
-                {dmRecipient.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', textAlign: 'center', padding: '0 12px' }}>{dmRecipient.name}</div>
-              <div style={{ fontSize: '11px', color: ROLE_COLOR[dmRecipient.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{dmRecipient.role}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: dmRecipient.clocked_in ? '#10b981' : '#9ca3af', marginTop: '4px' }}>
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dmRecipient.clocked_in ? '#10b981' : '#d1d5db' }} />
-                {dmRecipient.clocked_in ? 'Clocked In' : 'Clocked Out'}
-              </div>
-              <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '8px', padding: '0 16px', textAlign: 'center' }}>Private conversation</div>
-            </>
-          )}
-        </div>
+        ) : (
+          <div style={{ width: '210px', borderLeft: '1px solid #e4e7eb', display: 'flex', flexDirection: 'column', flexShrink: 0, background: '#fafafa' }}>
+            <div style={{ padding: '12px 14px 8px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Members · {channelMembers.length}
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {channelMembers.map(u => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 14px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#d1d5db', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
+                    <div style={{ fontSize: '10px', color: ROLE_COLOR[u.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{u.role}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       )}
 
       {/* DM picker modal */}
