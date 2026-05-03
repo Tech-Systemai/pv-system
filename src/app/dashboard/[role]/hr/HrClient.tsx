@@ -43,7 +43,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
     setHireError('');
     const fd = new FormData();
     fd.append('email', app.email);
-    fd.append('username', app.email);
+    fd.append('username', app.email.split('@')[0]);
     fd.append('password', 'pioneers2026!');
     fd.append('name', app.name);
     fd.append('role', app.position.toLowerCase().replace(' ', '_'));
@@ -70,6 +70,13 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
   const handleRestore = async (id: string) => {
     await dbOp('hr_applicants', 'update', { status: 'Reviewing' }, { id });
     setApplicants(prev => prev.map(a => a.id === id ? { ...a, status: 'Reviewing' } : a));
+  };
+
+  const handleDelete = async (app: any) => {
+    if (!confirm(`Permanently delete ${app.name} from the pipeline? This cannot be undone.`)) return;
+    await dbOp('hr_applicants', 'delete', {}, { id: app.id });
+    setApplicants(prev => prev.filter(a => a.id !== app.id));
+    setViewApplicant(null);
   };
 
   const ApplicantCard = ({ a }: { a: any }) => {
@@ -140,6 +147,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
                 <div style={{ fontSize: '11px', color: '#6b7689' }}>{a.email} · {a.position}</div>
               </div>
               <button className="pv-btn pv-btn-sec" style={{ fontSize: '11px' }} onClick={() => handleRestore(a.id)}>Restore →</button>
+              <button className="pv-btn" style={{ fontSize: '11px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }} onClick={() => handleDelete(a)}>Delete</button>
             </div>
           ))}
         </div>
@@ -202,18 +210,24 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
               </div>
             )}
 
-            {viewApplicant.status === 'Reviewing' && (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="pv-btn pv-btn-pri" onClick={() => handleHire(viewApplicant)} disabled={isSubmitting}>
-                  {isSubmitting ? 'Hiring...' : 'Hire →'}
-                </button>
-                <button className="pv-btn pv-btn-sec" style={{ color: '#dc2626' }} onClick={() => handleReject(viewApplicant)}>Reject</button>
-                <button className="pv-btn pv-btn-sec" onClick={() => setViewApplicant(null)}>Close</button>
-              </div>
-            )}
-            {viewApplicant.status !== 'Reviewing' && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {viewApplicant.status === 'Reviewing' && (
+                <>
+                  <button className="pv-btn pv-btn-pri" onClick={() => handleHire(viewApplicant)} disabled={isSubmitting}>
+                    {isSubmitting ? 'Hiring...' : 'Hire →'}
+                  </button>
+                  <button className="pv-btn pv-btn-sec" style={{ color: '#dc2626' }} onClick={() => handleReject(viewApplicant)}>Reject</button>
+                </>
+              )}
+              <button
+                className="pv-btn"
+                style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}
+                onClick={() => handleDelete(viewApplicant)}
+              >
+                Delete
+              </button>
               <button className="pv-btn pv-btn-sec" onClick={() => setViewApplicant(null)}>Close</button>
-            )}
+            </div>
           </div>
         </div>
       )}
