@@ -18,10 +18,13 @@ const BUCKET    = 'chat-files';
 
 const dmId = (uid1: string, uid2: string) => `dm-${[uid1, uid2].sort().join('|')}`;
 
+const isCustom = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(id);
+
 const toChannelShape = (c: any) => ({
-  id:    c.id,
-  label: `# ${c.name}`,
-  roles: c.access_roles ?? ALL_ROLES,
+  id:       c.id,
+  label:    `# ${c.name}`,
+  roles:    c.access_roles ?? ALL_ROLES,
+  archived: c.archived ?? false,
 });
 
 export default function ChatClient({
@@ -62,20 +65,25 @@ export default function ChatClient({
   const [dmUnreads, setDmUnreads]             = useState<Record<string, number>>({});
 
   // Create-channel form state (owner only)
-  const [showCreateChannel, setShowCreateChannel] = useState(false);
-  const [newChName,  setNewChName]  = useState('');
-  const [newChRoles, setNewChRoles] = useState<string[]>(ALL_ROLES);
-  const [creating,   setCreating]   = useState(false);
+  const [showCreateChannel,  setShowCreateChannel]  = useState(false);
+  const [newChName,           setNewChName]          = useState('');
+  const [newChRoles,          setNewChRoles]         = useState<string[]>(ALL_ROLES);
+  const [creating,            setCreating]           = useState(false);
+  const [hoveredChannel,      setHoveredChannel]     = useState<string | null>(null);
+  const [showArchived,        setShowArchived]       = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef    = useRef<HTMLDivElement>(null);
 
-  // Channels visible to this user
+  // Channels visible to this user (archived ones hidden for everyone)
   const visibleChannels = channelList.filter(c => {
+    if (c.archived) return false;
     const byRole  = c.roles.includes(currentUserRole);
     const byGrant = memberships.some(m => m.user_id === currentUserId && m.channel_id === c.id);
     return byRole || byGrant;
   });
+
+  const archivedChannels = isOwner ? channelList.filter(c => c.archived) : [];
 
   const dmableUsers  = allUsers.filter(u => DM_ROLES.includes(u.role) && u.id !== currentUserId);
   const activeDMUsers = allUsers.filter(u =>
@@ -127,10 +135,13 @@ export default function ChatClient({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'channels' }, payload => {
         const ch = payload.new as any;
         const shaped = toChannelShape(ch);
-        // Only add if user has role-based access
         if (shaped.roles.includes(currentUserRole)) {
           setChannelList(prev => prev.some(c => c.id === shaped.id) ? prev : [...prev, shaped]);
         }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'channels' }, payload => {
+        const ch = payload.new as any;
+        setChannelList(prev => prev.map(c => c.id === ch.id ? toChannelShape(ch) : c));
       })
       .subscribe();
     return () => { supabase.removeChannel(sub); };
@@ -140,6 +151,20 @@ export default function ChatClient({
     setChannel(dmCh);
     localStorage.setItem(`dm-last-read-${dmCh}`, new Date().toISOString());
     setDmUnreads(prev => { const next = { ...prev }; delete next[dmCh]; return next; });
+  };
+
+  const archiveChannel = async (channelId: string) => {
+    await dbOp('channels', 'update', { archived: true }, { id: channelId });
+    setChannelList(prev => prev.map(c => c.id === channelId ? { ...c, archived: true } : c));
+    if (channel === channelId) {
+      const next = channelList.find(c => !c.archived && c.id !== channelId && c.roles.includes(currentUserRole));
+      setChannel(next?.id || 'general');
+    }
+  };
+
+  const restoreChannel = async (channelId: string) => {
+    await dbOp('channels', 'update', { archived: false }, { id: channelId });
+    setChannelList(prev => prev.map(c => c.id === channelId ? { ...c, archived: false } : c));
   };
 
   const createChannel = async () => {
@@ -262,10 +287,35 @@ export default function ChatClient({
         </div>
 
         {visibleChannels.map(c => (
-          <button key={c.id} onClick={() => setChannel(c.id)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', cursor: 'pointer', background: channel === c.id ? '#2d3748' : 'transparent', color: channel === c.id ? '#fff' : '#94a3b8', fontSize: '13px', fontWeight: channel === c.id ? 600 : 400 }}>
-            {c.label}
-          </button>
+          <div key={c.id} style={{ position: 'relative' }}
+            onMouseEnter={() => setHoveredChannel(c.id)}
+            onMouseLeave={() => setHoveredChannel(null)}>
+            <button onClick={() => setChannel(c.id)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 16px', border: 'none', cursor: 'pointer', background: channel === c.id ? '#2d3748' : 'transparent', color: channel === c.id ? '#fff' : '#94a3b8', fontSize: '13px', fontWeight: channel === c.id ? 600 : 400 }}>
+              {c.label}
+            </button>
+            {isOwner && isCustom(c.id) && hoveredChannel === c.id && (
+              <button onClick={() => archiveChannel(c.id)} title="Archive channel" style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#6b7689', fontSize: '11px', padding: '2px 4px', lineHeight: 1 }}>
+                🗃
+              </button>
+            )}
+          </div>
         ))}
+
+        {/* Archived channels (owner only) */}
+        {isOwner && archivedChannels.length > 0 && (
+          <>
+            <button onClick={() => setShowArchived(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: '5px', width: '100%', textAlign: 'left', padding: '6px 16px', border: 'none', background: 'transparent', color: '#4a5568', fontSize: '11px', cursor: 'pointer', fontStyle: 'italic' }}>
+              <span style={{ fontSize: '9px' }}>{showArchived ? '▾' : '▸'}</span>
+              Archived ({archivedChannels.length})
+            </button>
+            {showArchived && archivedChannels.map(c => (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', padding: '5px 16px 5px 24px', gap: '6px' }}>
+                <span style={{ flex: 1, fontSize: '12px', color: '#4a5568', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
+                <button onClick={() => restoreChannel(c.id)} title="Restore channel" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7689', fontSize: '10px', flexShrink: 0 }}>↩ restore</button>
+              </div>
+            ))}
+          </>
+        )}
 
         {/* Direct Messages */}
         <div style={{ padding: '12px 16px 6px', fontSize: '11px', fontWeight: 700, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '8px', borderTop: '1px solid #2d3748', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

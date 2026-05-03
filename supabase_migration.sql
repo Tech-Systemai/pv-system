@@ -387,6 +387,7 @@ alter table channels add column if not exists name         text;
 alter table channels add column if not exists created_by   uuid references profiles on delete set null;
 alter table channels add column if not exists access_roles text[] default '{"owner","admin","supervisor","sales","cx","accountant"}';
 alter table channels add column if not exists created_at   timestamptz default now();
+alter table channels add column if not exists archived     boolean default false;
 alter table channels disable row level security;
 
 -- ── 24. NOTES ────────────────────────────────────────────────
