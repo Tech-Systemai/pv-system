@@ -18,7 +18,18 @@ create table if not exists profiles (
   id uuid primary key references auth.users on delete cascade
 );
 alter table profiles add column if not exists username    text;
-alter table profiles alter column username drop not null;
+-- Drop NOT NULL from every profiles column except id and role (handles any manually-added constraints)
+do $$
+declare col text;
+begin
+  for col in
+    select column_name from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles'
+      and is_nullable = 'NO' and column_name not in ('id', 'role')
+  loop
+    execute 'alter table profiles alter column ' || quote_ident(col) || ' drop not null';
+  end loop;
+end $$;
 alter table profiles alter column username set default '';
 alter table profiles add column if not exists name        text;
 alter table profiles add column if not exists email       text;
