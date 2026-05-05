@@ -13,7 +13,6 @@ const CHANNEL_ROLES: Record<string, string[]> = {
   announcements: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'],
 };
 
-// Items that display a live count badge — keyed by sidebar item id
 const COUNT_ITEMS = new Set(['chat', 'inbox', 'tickets', 'hr', 'timeoff', 'approvals']);
 
 const PORTALS: any = {
@@ -140,24 +139,57 @@ export default function Sidebar({ role }: { role: string }) {
   const supabase = createClient();
   const [profile, setProfile] = useState<any>(null);
   const [isClockedIn, setIsClockedIn] = useState(false);
+  const [clockInTime, setClockInTime] = useState<Date | null>(null);
+  const [timerStr, setTimerStr] = useState('00:00:00');
   const [clocking, setClocking] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     async function loadProfile() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        if (data) {
-          setProfile(data);
-          setIsClockedIn(data.clocked_in);
+      if (!user) return;
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      if (data) {
+        setProfile(data);
+        setIsClockedIn(data.clocked_in);
+        if (data.clocked_in) {
+          const today = new Date().toISOString().split('T')[0];
+          const { data: log } = await supabase
+            .from('attendance_logs')
+            .select('clock_in_time')
+            .eq('user_id', user.id)
+            .eq('date', today)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (log?.clock_in_time) setClockInTime(new Date(log.clock_in_time));
         }
       }
     }
     loadProfile();
   }, []);
 
-  // Fetch counts once profile is ready, then keep chat count live via realtime
+  // Live shift timer
+  useEffect(() => {
+    if (!isClockedIn || !clockInTime) {
+      setTimerStr('00:00:00');
+      return;
+    }
+    const tick = () => {
+      const diff = Math.max(0, Math.floor((Date.now() - clockInTime.getTime()) / 1000));
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      setTimerStr(
+        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      );
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [isClockedIn, clockInTime]);
+
+  // Realtime counts
   useEffect(() => {
     if (!profile?.id) return;
     fetchCounts(profile.id, profile.role);
@@ -170,9 +202,7 @@ export default function Sidebar({ role }: { role: string }) {
         const accessible = Object.entries(CHANNEL_ROLES)
           .filter(([, roles]) => roles.includes(profile.role))
           .map(([id]) => id);
-        const inMyChannel = accessible.includes(msg.channel);
-        const isDMToMe = msg.receiver_id === profile.id;
-        if (inMyChannel || isDMToMe) {
+        if (accessible.includes(msg.channel) || msg.receiver_id === profile.id) {
           setCounts(prev => ({ ...prev, chat: (prev.chat || 0) + 1 }));
         }
       })
@@ -184,7 +214,6 @@ export default function Sidebar({ role }: { role: string }) {
     return () => { supabase.removeChannel(sub); };
   }, [profile?.id]);
 
-  // Clear section badge when user navigates to it
   const currentNav = pathname.split('/').pop();
   useEffect(() => {
     if (!profile?.id || !currentNav) return;
@@ -201,7 +230,6 @@ export default function Sidebar({ role }: { role: string }) {
   const fetchCounts = async (userId: string, userRole: string) => {
     const next: Record<string, number> = {};
 
-    // Chat: unread messages since last notification clear
     try {
       const lastSeen = localStorage.getItem(`notif-last-seen-${userId}`) || new Date(0).toISOString();
       const accessible = Object.entries(CHANNEL_ROLES)
@@ -218,7 +246,6 @@ export default function Sidebar({ role }: { role: string }) {
       }
     } catch { /* ignore */ }
 
-    // Inbox: documents since last visit
     try {
       const lastSeen = localStorage.getItem(`inbox-last-seen-${userId}`) || new Date(0).toISOString();
       const { count } = await supabase
@@ -228,7 +255,6 @@ export default function Sidebar({ role }: { role: string }) {
       if (count) next.inbox = count;
     } catch { /* ignore */ }
 
-    // Tickets: open / pending
     try {
       const { count } = await supabase
         .from('tickets')
@@ -237,7 +263,6 @@ export default function Sidebar({ role }: { role: string }) {
       if (count) next.tickets = count;
     } catch { /* ignore */ }
 
-    // HR: active pipeline (management only)
     try {
       if (['owner', 'admin'].includes(userRole)) {
         const { count } = await supabase
@@ -248,7 +273,6 @@ export default function Sidebar({ role }: { role: string }) {
       }
     } catch { /* ignore */ }
 
-    // Time-off: pending requests
     try {
       const { count } = await supabase
         .from('time_off_requests')
@@ -257,7 +281,6 @@ export default function Sidebar({ role }: { role: string }) {
       if (count) next.timeoff = count;
     } catch { /* ignore */ }
 
-    // Approvals: pending
     try {
       const { count } = await supabase
         .from('time_off_requests')
@@ -268,8 +291,6 @@ export default function Sidebar({ role }: { role: string }) {
 
     setCounts(next);
   };
-
-  const p = PORTALS[role] || PORTALS.sales;
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -282,12 +303,29 @@ export default function Sidebar({ role }: { role: string }) {
     const newStatus = !isClockedIn;
     await supabase.from('profiles').update({ clocked_in: newStatus }).eq('id', profile.id);
     if (newStatus) {
-      await supabase.from('attendance_logs').insert([{ user_id: profile.id, status: 'present', clock_in_time: new Date().toISOString() }]);
+      const start = new Date();
+      await supabase.from('attendance_logs').insert([{
+        user_id: profile.id,
+        status: 'present',
+        clock_in_time: start.toISOString(),
+      }]);
+      setClockInTime(start);
     } else {
-      const { data } = await supabase.from('attendance_logs').select('id').eq('user_id', profile.id).eq('date', new Date().toISOString().split('T')[0]).order('created_at', { ascending: false }).limit(1);
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('attendance_logs')
+        .select('id')
+        .eq('user_id', profile.id)
+        .eq('date', today)
+        .order('created_at', { ascending: false })
+        .limit(1);
       if (data && data.length > 0) {
-        await supabase.from('attendance_logs').update({ clock_out_time: new Date().toISOString() }).eq('id', data[0].id);
+        await supabase
+          .from('attendance_logs')
+          .update({ clock_out_time: new Date().toISOString() })
+          .eq('id', data[0].id);
       }
+      setClockInTime(null);
     }
     setIsClockedIn(newStatus);
     setClocking(false);
@@ -302,8 +340,11 @@ export default function Sidebar({ role }: { role: string }) {
     ? profile.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toLowerCase()
     : 'u';
 
+  const p = PORTALS[role] || PORTALS.sales;
+
   return (
     <aside className="sb">
+      {/* Brand header */}
       <div className="sb-brd">
         <div className="sb-i">PV</div>
         <div>
@@ -312,45 +353,59 @@ export default function Sidebar({ role }: { role: string }) {
         </div>
       </div>
 
-      <div className="sb-sec" style={{ background: isClockedIn ? '#ecfdf5' : '#f5f6f8', padding: '12px', borderRadius: '8px', margin: '0 16px 16px 16px', border: `1px solid ${isClockedIn ? '#10b981' : '#e4e7eb'}` }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: isClockedIn ? '#047857' : '#6b7689', textTransform: 'uppercase', marginBottom: '8px', textAlign: 'center' }}>
-          {isClockedIn ? '● Active Shift' : 'Off Clock'}
+      {/* Shift card */}
+      <div className={`sb-shift-card${isClockedIn ? ' on' : ''}`}>
+        <div className="sb-shift-row">
+          <span className="sb-shift-status">
+            {isClockedIn ? '● Active Shift' : 'Off Clock'}
+          </span>
+          {isClockedIn && (
+            <span className="sb-shift-time">{timerStr}</span>
+          )}
         </div>
         <button
+          className="sb-shift-btn"
           onClick={handleClockToggle}
           disabled={clocking}
-          style={{ width: '100%', padding: '10px', borderRadius: '6px', border: 'none', cursor: 'pointer', background: isClockedIn ? '#ef4444' : '#4f46e5', color: '#fff', fontWeight: 600, fontSize: '13px', transition: 'all 0.2s' }}
         >
-          {clocking ? 'Wait...' : isClockedIn ? 'Clock Out' : 'Clock In'}
+          {clocking ? 'Wait…' : isClockedIn ? 'Clock Out' : 'Clock In'}
         </button>
       </div>
 
-      {p.sections.map((sec: any) => (
-        <div key={sec.head} className="sb-sec">
-          <div className="sb-h">{sec.head}</div>
-          {sec.items.map((it: any) => {
-            const isActive = currentNav === it.id || (currentNav === role && it.id === 'dashboard');
-            const liveCount = COUNT_ITEMS.has(it.id) ? (counts[it.id] || 0) : 0;
-            return (
-              <Link key={it.id} href={`/dashboard/${role}/${it.id === 'dashboard' ? '' : it.id}`} style={{ textDecoration: 'none' }}>
-                <button className={`sb-it ${isActive ? 'active' : ''}`}>
-                  <span className="sb-ico">{it.icon}</span>
-                  {it.label}
-                  {/* Static string badge (e.g. LIVE) */}
-                  {it.badge && <span className={`sb-bdg ${it.badgeType || ''}`}>{it.badge}</span>}
-                  {/* Dynamic numeric count — only when not active (you're already on that page) */}
-                  {!it.badge && liveCount > 0 && !isActive && (
-                    <span className={`sb-bdg ${it.badgeType || ''}`}>{liveCount}</span>
-                  )}
-                </button>
-              </Link>
-            );
-          })}
-        </div>
-      ))}
+      {/* Scrollable nav */}
+      <div className="sb-scroll">
+        {p.sections.map((sec: any) => (
+          <div key={sec.head} className="sb-sec">
+            <div className="sb-h">{sec.head}</div>
+            {sec.items.map((it: any) => {
+              const isActive = currentNav === it.id || (currentNav === role && it.id === 'dashboard');
+              const liveCount = COUNT_ITEMS.has(it.id) ? (counts[it.id] || 0) : 0;
+              return (
+                <Link key={it.id} href={`/dashboard/${role}/${it.id === 'dashboard' ? '' : it.id}`}>
+                  <button className={`sb-it${isActive ? ' active' : ''}`}>
+                    <span className="sb-ico">{it.icon}</span>
+                    {it.label}
+                    {it.badge && (
+                      <span className={`sb-bdg${it.badgeType ? ' ' + it.badgeType : ''}`}>
+                        {it.badge}
+                      </span>
+                    )}
+                    {!it.badge && liveCount > 0 && !isActive && (
+                      <span className={`sb-bdg${it.badgeType ? ' ' + it.badgeType : ''}`}>
+                        {liveCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+      </div>
 
-      <div className="sb-u" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* User footer */}
+      <div className="sb-u">
+        <div className="sb-user-row">
           <div className="sb-av">{nameInitial}</div>
           <div style={{ flex: 1 }}>
             <div className="sb-un">{profile?.name?.toLowerCase() || 'user'}</div>
@@ -358,13 +413,12 @@ export default function Sidebar({ role }: { role: string }) {
           </div>
           <div className="sb-out" onClick={handleSignOut} title="Sign out">⏻</div>
         </div>
-
-        <div style={{ borderTop: '1px solid #e4e7eb', paddingTop: '12px' }}>
-          <div style={{ fontSize: '10px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px' }}>Switch Portal View</div>
+        <div>
+          <div className="sb-portal-label">Switch Portal View</div>
           <select
+            className="sb-portal-select"
             onChange={handlePortalSwitch}
             value={role}
-            style={{ width: '100%', padding: '6px', fontSize: '12px', borderRadius: '4px', border: '1px solid #cbd2e0', background: '#fff' }}
           >
             <option value="owner">Owner View</option>
             <option value="admin">Admin View</option>

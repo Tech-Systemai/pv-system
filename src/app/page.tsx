@@ -1,116 +1,197 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [tab, setTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [msg, setMsg] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [utcTime, setUtcTime] = useState('');
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const hh = String(now.getUTCHours()).padStart(2, '0');
+      const mm = String(now.getUTCMinutes()).padStart(2, '0');
+      const ss = String(now.getUTCSeconds()).padStart(2, '0');
+      setUtcTime(`${hh}:${mm}:${ss} UTC`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMsg('');
+    setMsg(null);
 
-    if (isRegistering) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) setErrorMsg(error.message);
-      else setErrorMsg('Registration successful! Check your email or wait for owner approval.');
+    if (tab === 'register') {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) setMsg({ text: error.message, type: 'error' });
+      else setMsg({ text: 'Request submitted. An admin will review your account.', type: 'success' });
     } else {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setErrorMsg(error.message);
+        setMsg({ text: error.message, type: 'error' });
       } else if (data.user) {
-        // Fetch profile to know their role for routing
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
-        if (profile) {
-          router.push(`/dashboard/${profile.role}`);
-        } else {
-          // Fallback if profile trigger delayed
-          router.push(`/dashboard/sales`);
-        }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+        router.push(`/dashboard/${profile?.role ?? 'sales'}`);
       }
     }
     setLoading(false);
   };
 
+  const switchTab = (next: 'login' | 'register') => {
+    setTab(next);
+    setMsg(null);
+  };
+
   return (
     <div className="pv-login">
-      <div className="pv-login-card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px' }}>
+      {/* ── Left atmospheric panel ── */}
+      <aside className="pv-login-aside">
+        <div className="pv-login-brand">
           <div className="pv-sb-icon">PV</div>
           <div>
-            <div style={{ fontSize: '19px', fontWeight: 700, color: '#1a1f2e', letterSpacing: '-0.01em' }}>
-              Pioneers Veneers
+            <div className="pv-login-brand-name">Pioneers Veneers</div>
+            <div className="pv-login-brand-sub">Enterprise Platform</div>
+          </div>
+        </div>
+
+        <div className="pv-login-pitch">
+          <h1>
+            Run your<br />
+            <em>entire operation</em><br />
+            from one place.
+          </h1>
+          <p>
+            HR, scheduling, payroll, messaging, and analytics —
+            unified in a single workspace built for high-performance teams.
+          </p>
+
+          <div className="pv-login-stats">
+            <div>
+              <div className="v">120+</div>
+              <div className="l">Employees</div>
             </div>
-            <div style={{ fontSize: '11px', color: '#6b7689', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.12em', marginTop: '2px' }}>
-              Enterprise Platform
+            <div>
+              <div className="v">6</div>
+              <div className="l">Departments</div>
+            </div>
+            <div>
+              <div className="v">99.9%</div>
+              <div className="l">Uptime</div>
             </div>
           </div>
         </div>
 
-        <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#1a1f2e', marginBottom: '6px' }}>
-          {isRegistering ? 'Request Access' : 'System Login'}
-        </h2>
-        <p style={{ fontSize: '13px', color: '#6b7689', marginBottom: '26px' }}>
-          {isRegistering ? 'Submit your details for owner approval.' : 'Authenticate to access your workspace.'}
-        </p>
+        <div className="pv-login-status">
+          <span className="dot" />
+          SYSTEM OPERATIONAL
+        </div>
+      </aside>
 
-        {errorMsg && (
-          <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', marginBottom: '16px', border: '1px solid #fecaca' }}>
-            {errorMsg}
+      {/* ── Right form panel ── */}
+      <main className="pv-login-main">
+        {utcTime && (
+          <div className="pv-login-ticker">
+            <span className="dot" style={{ background: 'var(--ok)', boxShadow: 'none', animation: 'none' }} />
+            {utcTime}
           </div>
         )}
 
-        <form onSubmit={handleAuth}>
-          <div className="pv-fld">
-            <label>Email Address</label>
-            <input 
-              type="email" 
-              placeholder="Enter your email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+        <div className="pv-login-form-wrap">
+          <div className="pv-login-eyebrow">Secure Access</div>
+          <div className="pv-login-form-head">
+            <h2>
+              {tab === 'login' ? 'Sign in to your workspace' : 'Request system access'}
+            </h2>
+            <p>
+              {tab === 'login'
+                ? 'Enter your credentials to continue.'
+                : 'Submit your details for owner review.'}
+            </p>
           </div>
 
-          <div className="pv-fld">
-            <label>Access Key (Password)</label>
-            <input 
-              type="password" 
-              placeholder="Enter password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+          <div className="pv-login-mode-toggle">
+            <button
+              type="button"
+              className={tab === 'login' ? 'active' : ''}
+              onClick={() => switchTab('login')}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className={tab === 'register' ? 'active' : ''}
+              onClick={() => switchTab('register')}
+            >
+              Request Access
+            </button>
           </div>
 
-          <button type="submit" disabled={loading} className="pv-btn pv-btn-pri" style={{ width: '100%', padding: '11px', marginTop: '8px', opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Processing...' : (isRegistering ? 'Submit Request' : 'Initialize Session')}
-          </button>
-        </form>
+          {msg && (
+            <div className={msg.type === 'error' ? 'pv-login-error' : 'pv-login-success'}>
+              {msg.text}
+            </div>
+          )}
 
-        <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #f0f2f5', textAlign: 'center' }}>
-          <button 
-            onClick={() => { setIsRegistering(!isRegistering); setErrorMsg(''); }}
-            className="pv-btn pv-btn-sec"
-          >
-            {isRegistering ? 'Back to Login' : 'Register New Account'}
-          </button>
+          <form onSubmit={handleAuth}>
+            <div className="pv-fld">
+              <label>Email Address</label>
+              <input
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div className="pv-fld">
+              <label>Password</label>
+              <input
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+              />
+            </div>
+            <button type="submit" className="pv-login-btn" disabled={loading}>
+              {loading
+                ? 'Processing…'
+                : tab === 'login'
+                ? 'Initialize Session →'
+                : 'Submit Request →'}
+            </button>
+          </form>
+
+          <div className="pv-login-footer">
+            {tab === 'login' ? (
+              <>No account?{' '}
+                <a role="button" onClick={() => switchTab('register')}>Request access</a>
+              </>
+            ) : (
+              <>Already have access?{' '}
+                <a role="button" onClick={() => switchTab('login')}>Sign in</a>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
