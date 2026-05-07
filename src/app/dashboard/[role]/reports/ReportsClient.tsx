@@ -1,27 +1,44 @@
 'use client';
 
 import { useState } from 'react';
+import { dbOp } from '@/utils/db';
 
 type ReportType = 'qa-evaluation' | 'warning' | 'collective-action' | 'performance-summary';
 
 const REPORT_TYPES: { id: ReportType; label: string; desc: string }[] = [
-  { id: 'qa-evaluation', label: 'QA Evaluation', desc: 'Quality Attributes score report from a coaching session' },
-  { id: 'warning', label: 'Written Warning', desc: 'Formal disciplinary warning sent to employee inbox' },
-  { id: 'collective-action', label: 'Collective Action', desc: 'Team-wide notice or policy enforcement memo' },
-  { id: 'performance-summary', label: 'Performance Summary', desc: 'Monthly performance overview with attendance & sales data' },
+  { id: 'qa-evaluation',      label: 'QA Evaluation',       desc: 'Quality Attributes score report from a coaching session' },
+  { id: 'warning',            label: 'Written Warning',     desc: 'Formal disciplinary warning sent to employee inbox' },
+  { id: 'collective-action',  label: 'Collective Action',   desc: 'Team-wide notice or policy enforcement memo' },
+  { id: 'performance-summary',label: 'Performance Summary', desc: 'Monthly performance overview with attendance & sales data' },
 ];
 
+const TYPE_BADGE: Record<string, string> = {
+  'qa-evaluation': 'bdg bdg-acc', 'warning': 'bdg bdg-err',
+  'collective-action': 'bdg bdg-warn', 'performance-summary': 'bdg bdg-ok',
+  'Performance': 'bdg bdg-ok', 'QA Evaluation': 'bdg bdg-acc',
+};
+
+function SendConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="mb">
+      <div className="md" style={{ width: 360 }}>
+        <div className="md-t">Send to Inbox</div>
+        <p style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 20 }}>
+          This will send the report to the employee's inbox. Are you sure?
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-acc" onClick={onConfirm}>Send</button>
+          <button className="btn btn-sec" onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ReportsClient({
-  reports,
-  employees,
-  isMgmt,
-  currentUserName,
+  reports, employees, isMgmt, currentUserName,
 }: {
-  reports: any[];
-  employees: any[];
-  isMgmt: boolean;
-  currentUserId?: string;
-  currentUserName: string;
+  reports: any[]; employees: any[]; isMgmt: boolean; currentUserId?: string; currentUserName: string;
 }) {
   const [view, setView] = useState<'list' | 'create' | 'preview'>('list');
   const [reportType, setReportType] = useState<ReportType>('qa-evaluation');
@@ -30,20 +47,33 @@ export default function ReportsClient({
   const [selectedSession, setSelectedSession] = useState('');
   const [notes, setNotes] = useState('');
   const [printData, setPrintData] = useState<any>(null);
+  const [sendTarget, setSendTarget] = useState<any>(null);
+  const [sending, setSending] = useState(false);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
   const handleGenerate = () => {
     const emp = employees.find(e => e.id === selectedEmployee);
     const session = reports.find(r => r.id === selectedSession);
-    setPrintData({
-      type: reportType,
-      targetType,
-      employee: emp,
-      session,
-      notes,
-      generatedBy: currentUserName,
-      generatedAt: new Date().toLocaleDateString(),
-    });
+    setPrintData({ type: reportType, targetType, employee: emp, session, notes, generatedBy: currentUserName, generatedAt: new Date().toLocaleDateString() });
     setView('preview');
+  };
+
+  const sendReportToInbox = async (r: any) => {
+    setSending(true);
+    const emp = r.agent ?? employees.find(e => e.id === r.agent_id);
+    if (emp?.id) {
+      await dbOp('inbox_documents', 'insert', {
+        user_id: emp.id,
+        title: `${r.type ?? 'QA Evaluation'} Report — ${new Date(r.created_at).toLocaleDateString()}`,
+        content: r.notes ?? 'See attached report.',
+        type: 'Report',
+        sender: r.supervisor?.name ?? currentUserName,
+        requires_signature: false,
+      });
+      setSentIds(prev => new Set([...prev, r.id]));
+    }
+    setSendTarget(null);
+    setSending(false);
   };
 
   if (view === 'preview' && printData) {
@@ -57,49 +87,49 @@ export default function ReportsClient({
             body { background: white !important; }
           }
         ` }} />
-        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <button className="pv-btn pv-btn-sec" onClick={() => setView('create')}>← Back</button>
-          <button className="pv-btn pv-btn-pri" onClick={() => window.print()}>🖨️ Print / Download PDF</button>
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+          <button className="btn btn-sec btn-sm" onClick={() => setView('create')}>← Back</button>
+          <button className="btn btn-acc btn-sm" onClick={() => window.print()}>🖨 Print / Download PDF</button>
         </div>
 
-        <div style={{ background: '#fff', padding: '48px', maxWidth: '800px', margin: '0 auto', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1a1f2e', paddingBottom: '20px', marginBottom: '32px' }}>
+        <div style={{ background: '#fff', padding: '48px', maxWidth: '800px', margin: '0 auto', boxShadow: 'var(--sh-2)', borderRadius: 8, border: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--ink)', paddingBottom: 20, marginBottom: 32 }}>
             <div>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: '#1a1f2e', letterSpacing: '1px' }}>PIONEERS VENEERS</div>
-              <div style={{ fontSize: '11px', color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', letterSpacing: 1 }}>PIONEERS VENEERS</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>
                 {REPORT_TYPES.find(r => r.id === printData.type)?.label} · Official Document
               </div>
             </div>
-            <div style={{ textAlign: 'right', fontSize: '12px', color: '#6b7689' }}>
+            <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--ink-3)' }}>
               <div>Date: {printData.generatedAt}</div>
               <div>Ref: RPT-{Date.now().toString().slice(-6)}</div>
             </div>
           </div>
 
-          <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '24px', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 24, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             {REPORT_TYPES.find(r => r.id === printData.type)?.label}
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '28px', background: '#f8fafc', padding: '18px', borderRadius: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28, background: 'var(--surface-2)', padding: 18, borderRadius: 8 }}>
             {printData.targetType === 'individual' ? (
               <>
-                <div><div style={{ fontSize: '10px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Employee</div><div style={{ fontWeight: 600 }}>{printData.employee?.name ?? 'All Employees'}</div></div>
-                <div><div style={{ fontSize: '10px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Role</div><div style={{ fontWeight: 600 }}>{printData.employee?.role ?? '—'}</div></div>
-                <div><div style={{ fontSize: '10px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Department</div><div style={{ fontWeight: 600 }}>{printData.employee?.department ?? '—'}</div></div>
-                <div><div style={{ fontSize: '10px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Reliability Points</div><div style={{ fontWeight: 600 }}>{printData.employee?.points ?? '—'}/7</div></div>
+                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Employee</div><div style={{ fontWeight: 600 }}>{printData.employee?.name ?? 'All Employees'}</div></div>
+                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Role</div><div style={{ fontWeight: 600 }}>{printData.employee?.role ?? '—'}</div></div>
+                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Department</div><div style={{ fontWeight: 600 }}>{printData.employee?.department ?? '—'}</div></div>
+                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Reliability Points</div><div style={{ fontWeight: 600 }}>{printData.employee?.points ?? '—'}/7</div></div>
               </>
             ) : (
               <>
-                <div><div style={{ fontSize: '10px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Scope</div><div style={{ fontWeight: 600 }}>All Team Members</div></div>
-                <div><div style={{ fontSize: '10px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Issued By</div><div style={{ fontWeight: 600 }}>{printData.generatedBy}</div></div>
+                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Scope</div><div style={{ fontWeight: 600 }}>All Team Members</div></div>
+                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Issued By</div><div style={{ fontWeight: 600 }}>{printData.generatedBy}</div></div>
               </>
             )}
           </div>
 
           {printData.type === 'qa-evaluation' && printData.session && (
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '13px', fontWeight: 700, borderBottom: '1px solid #e4e7eb', paddingBottom: '8px', marginBottom: '12px' }}>QA Session Details</h3>
-              <div style={{ fontSize: '13px', color: '#4a5568', lineHeight: 1.8 }}>
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, borderBottom: '1px solid var(--line)', paddingBottom: 8, marginBottom: 12 }}>QA Session Details</h3>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.8 }}>
                 <div><strong>Session Type:</strong> {printData.session.type}</div>
                 <div><strong>Notes:</strong> {printData.session.notes}</div>
                 <div><strong>Action Plan:</strong> {printData.session.action_plan}</div>
@@ -107,29 +137,29 @@ export default function ReportsClient({
             </div>
           )}
 
-          <div style={{ marginBottom: '40px' }}>
-            <h3 style={{ fontSize: '13px', fontWeight: 700, borderBottom: '1px solid #e4e7eb', paddingBottom: '8px', marginBottom: '12px' }}>
+          <div style={{ marginBottom: 40 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, borderBottom: '1px solid var(--line)', paddingBottom: 8, marginBottom: 12 }}>
               {printData.type === 'warning' ? 'Warning Details' : printData.type === 'collective-action' ? 'Notice' : 'Notes & Observations'}
             </h3>
-            <div style={{ fontSize: '13px', color: '#1a1f2e', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
               {printData.notes || 'No additional notes provided.'}
             </div>
           </div>
 
-          <div style={{ marginTop: '60px', display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ width: '40%', borderTop: '1px solid #1a1f2e', paddingTop: '10px' }}>
-              <strong style={{ fontSize: '12px' }}>Issued By: {printData.generatedBy}</strong><br />
-              <span style={{ fontSize: '11px', color: '#6b7689' }}>Authorized Management Signature</span>
+          <div style={{ marginTop: 60, display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ width: '40%', borderTop: '1px solid var(--ink)', paddingTop: 10 }}>
+              <strong style={{ fontSize: 12 }}>Issued By: {printData.generatedBy}</strong><br />
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>Authorized Management Signature</span>
             </div>
             {printData.targetType === 'individual' && (
-              <div style={{ width: '40%', borderTop: '1px solid #1a1f2e', paddingTop: '10px' }}>
-                <strong style={{ fontSize: '12px' }}>Employee Acknowledgement</strong><br />
-                <span style={{ fontSize: '11px', color: '#6b7689' }}>{printData.employee?.name} · Signature</span>
+              <div style={{ width: '40%', borderTop: '1px solid var(--ink)', paddingTop: 10 }}>
+                <strong style={{ fontSize: 12 }}>Employee Acknowledgement</strong><br />
+                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{printData.employee?.name} · Signature</span>
               </div>
             )}
           </div>
 
-          <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '10px', color: '#94a3b8', borderTop: '1px solid #f0f2f5', paddingTop: '16px' }}>
+          <div style={{ marginTop: 32, textAlign: 'center', fontSize: 10, color: 'var(--ink-4)', borderTop: '1px solid var(--line-2)', paddingTop: 16 }}>
             This document was auto-generated by the Pioneers Veneers Enterprise Platform. It is legally binding upon physical signature.
           </div>
         </div>
@@ -140,127 +170,195 @@ export default function ReportsClient({
   if (view === 'create' && isMgmt) {
     const selectedTypeInfo = REPORT_TYPES.find(r => r.id === reportType);
     return (
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <button className="pv-btn pv-btn-sec" onClick={() => setView('list')}>← Back</button>
+      <div className="page-fade">
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+          <button className="btn btn-sec btn-sm" onClick={() => setView('list')}>← Back to Library</button>
         </div>
 
-        <div className="pn" style={{ maxWidth: '620px' }}>
-          <div className="pn-t" style={{ marginBottom: '18px' }}>Generate New Report</div>
-
-          <div className="pv-fld">
-            <label>Report Type</label>
-            <select value={reportType} onChange={e => setReportType(e.target.value as ReportType)}>
-              {REPORT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-            <div style={{ fontSize: '11px', color: '#6b7689', marginTop: '4px' }}>{selectedTypeInfo?.desc}</div>
+        <div className="card" style={{ maxWidth: 620 }}>
+          <div className="card-hdr">
+            <div className="card-title">Generate New Report</div>
           </div>
-
-          <div className="pv-fld">
-            <label>Target</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="button" className={`pv-btn ${targetType === 'individual' ? 'pv-btn-pri' : 'pv-btn-sec'}`} onClick={() => setTargetType('individual')}>Individual Employee</button>
-              <button type="button" className={`pv-btn ${targetType === 'team' ? 'pv-btn-pri' : 'pv-btn-sec'}`} onClick={() => setTargetType('team')}>Whole Team</button>
-            </div>
-          </div>
-
-          {targetType === 'individual' && (
+          <div className="card-body">
             <div className="pv-fld">
-              <label>Select Employee</label>
-              <select value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} required>
-                <option value="">— Choose employee —</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.role})</option>)}
+              <label>Report Type</label>
+              <select value={reportType} onChange={e => setReportType(e.target.value as ReportType)}>
+                {REPORT_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>{selectedTypeInfo?.desc}</div>
             </div>
-          )}
 
-          {reportType === 'qa-evaluation' && (
             <div className="pv-fld">
-              <label>Coaching Session</label>
-              <select value={selectedSession} onChange={e => setSelectedSession(e.target.value)}>
-                <option value="">— Link to a session (optional) —</option>
-                {reports
-                  .filter(r => !selectedEmployee || r.agent_id === selectedEmployee)
-                  .map(r => (
-                    <option key={r.id} value={r.id}>
-                      {r.agent?.name} · {r.type} · {new Date(r.created_at).toLocaleDateString()}
-                    </option>
+              <label>Target</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className={`btn btn-sm ${targetType === 'individual' ? 'btn-acc' : 'btn-sec'}`} onClick={() => setTargetType('individual')}>Individual Employee</button>
+                <button type="button" className={`btn btn-sm ${targetType === 'team' ? 'btn-acc' : 'btn-sec'}`} onClick={() => setTargetType('team')}>Whole Team</button>
+              </div>
+            </div>
+
+            {targetType === 'individual' && (
+              <div className="pv-fld">
+                <label>Select Employee</label>
+                <select value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} required>
+                  <option value="">— Choose employee —</option>
+                  {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.role})</option>)}
+                </select>
+              </div>
+            )}
+
+            {reportType === 'qa-evaluation' && (
+              <div className="pv-fld">
+                <label>Coaching Session</label>
+                <select value={selectedSession} onChange={e => setSelectedSession(e.target.value)}>
+                  <option value="">— Link to a session (optional) —</option>
+                  {reports.filter(r => !selectedEmployee || r.agent_id === selectedEmployee).map(r => (
+                    <option key={r.id} value={r.id}>{r.agent?.name} · {r.type} · {new Date(r.created_at).toLocaleDateString()}</option>
                   ))}
-              </select>
-            </div>
-          )}
+                </select>
+              </div>
+            )}
 
-          <div className="pv-fld">
-            <label>
-              {reportType === 'warning' ? 'Warning Details & Reason' :
-               reportType === 'collective-action' ? 'Notice Content' :
-               reportType === 'performance-summary' ? 'Summary Notes' : 'Additional Notes'}
-            </label>
-            <textarea
-              rows={6}
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder={
+            <div className="pv-fld">
+              <label>
+                {reportType === 'warning' ? 'Warning Details & Reason' :
+                 reportType === 'collective-action' ? 'Notice Content' :
+                 reportType === 'performance-summary' ? 'Summary Notes' : 'Additional Notes'}
+              </label>
+              <textarea rows={5} value={notes} onChange={e => setNotes(e.target.value)} placeholder={
                 reportType === 'warning' ? 'Describe the policy violation, incident details, and expected corrective action...' :
                 reportType === 'collective-action' ? 'Write the team-wide notice or collective policy memo...' :
                 'Add observations, context, or manager commentary...'
-              }
-            />
-          </div>
+              } style={{ resize: 'vertical' }} />
+            </div>
 
-          <button
-            className="pv-btn pv-btn-pri"
-            onClick={handleGenerate}
-            disabled={targetType === 'individual' && !selectedEmployee}
-          >
-            Generate PDF Report →
-          </button>
+            <button className="btn btn-acc" onClick={handleGenerate} disabled={targetType === 'individual' && !selectedEmployee}>
+              Generate PDF Report →
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // List view
+  // List / Library view
   return (
-    <div>
-      <div className="pn-h" style={{ marginBottom: '16px' }}>
-        <div className="pn-t">{isMgmt ? 'All Reports' : 'My Reports'}</div>
-        {isMgmt && (
-          <button className="pv-btn pv-btn-pri" onClick={() => setView('create')}>+ Generate Report</button>
+    <div className="page-fade">
+      {/* Stat strip */}
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">📊</div></div>
+          <div className="stat-l">TOTAL REPORTS</div>
+          <div className="stat-v">{reports.length}</div>
+          <div className="stat-foot">In library</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico wn">⚠</div></div>
+          <div className="stat-l">WARNINGS</div>
+          <div className="stat-v">{reports.filter(r => r.type === 'warning' || r.type === 'Warning').length}</div>
+          <div className="stat-foot">Formal notices issued</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">✓</div></div>
+          <div className="stat-l">QA EVALS</div>
+          <div className="stat-v">{reports.filter(r => r.type === 'qa-evaluation' || r.type === 'QA' || r.type === 'Performance').length}</div>
+          <div className="stat-foot">Coaching & quality sessions</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">📤</div></div>
+          <div className="stat-l">SENT TO INBOX</div>
+          <div className="stat-v">{sentIds.size}</div>
+          <div className="stat-foot">This session</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card-hdr">
+          <div>
+            <div className="card-title">Report Library</div>
+            <div className="card-sub">{isMgmt ? 'All reports across all employees' : 'Your performance reports'}</div>
+          </div>
+          {isMgmt && (
+            <button className="btn btn-acc btn-sm" onClick={() => { setView('create'); setNotes(''); setSelectedEmployee(''); setSelectedSession(''); }}>
+              + Generate Report
+            </button>
+          )}
+        </div>
+
+        {reports.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+            No reports found. {isMgmt && 'Use "Generate Report" to create your first one.'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Report</th>
+                  <th>Type</th>
+                  <th>Employee</th>
+                  <th>Last Updated</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map(r => (
+                  <tr key={r.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>📊</div>
+                        <div>
+                          <div style={{ fontWeight: 500, fontSize: 13 }}>{r.agent?.name || 'Team'} — {r.type ?? 'QA Evaluation'}</div>
+                          {isMgmt && r.supervisor?.name && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>By {r.supervisor.name}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td><span className={TYPE_BADGE[r.type] ?? 'bdg bdg-gy'}>{r.type ?? 'QA'}</span></td>
+                    <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.agent?.name ?? '—'}</td>
+                    <td style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td>
+                      {sentIds.has(r.id)
+                        ? <span className="bdg bdg-ok">Sent to inbox</span>
+                        : <span className="bdg bdg-gy">In library</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button
+                          className="btn btn-sec btn-sm"
+                          onClick={() => {
+                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: r.agent, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
+                            setView('preview');
+                          }}
+                        >Open</button>
+                        {isMgmt && !sentIds.has(r.id) && (
+                          <button className="btn btn-sec btn-sm" onClick={() => setSendTarget(r)}>
+                            Send to inbox
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-sec btn-sm"
+                          onClick={() => {
+                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: r.agent, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
+                            setView('preview');
+                            setTimeout(() => window.print(), 500);
+                          }}
+                        >Download PDF</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
-      <div className="pn">
-        {reports.length === 0 && <div className="empty">No reports found. {isMgmt && 'Use "Generate Report" to create your first one.'}</div>}
-        {reports.map(r => (
-          <div key={r.id} className="r-cd">
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', fontSize: '16px' }}>📊</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600 }}>{r.agent?.name || 'You'} · {r.type ?? 'QA Evaluation'}</div>
-              <div style={{ fontSize: '11px', color: '#6b7689' }}>
-                {isMgmt && r.supervisor?.name && `By ${r.supervisor.name} · `}
-                {new Date(r.created_at).toLocaleDateString()}
-              </div>
-            </div>
-            <span className={`pv-bdg ${r.type === 'Performance' ? 'pv-bdg-green' : 'pv-bdg-amber'}`}>{r.type}</span>
-            <button
-              className="pv-btn pv-btn-sec"
-              onClick={() => {
-                setPrintData({
-                  type: 'qa-evaluation',
-                  targetType: 'individual',
-                  employee: r.agent,
-                  session: r,
-                  notes: r.notes,
-                  generatedBy: r.supervisor?.name ?? currentUserName,
-                  generatedAt: new Date(r.created_at).toLocaleDateString(),
-                });
-                setView('preview');
-              }}
-            >View / Print PDF</button>
-          </div>
-        ))}
-      </div>
+      {sendTarget && (
+        <SendConfirm
+          onConfirm={() => sendReportToInbox(sendTarget)}
+          onCancel={() => setSendTarget(null)}
+        />
+      )}
     </div>
   );
 }

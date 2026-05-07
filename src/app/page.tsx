@@ -20,7 +20,7 @@ export default function LoginPage() {
       const hh = String(now.getUTCHours()).padStart(2, '0');
       const mm = String(now.getUTCMinutes()).padStart(2, '0');
       const ss = String(now.getUTCSeconds()).padStart(2, '0');
-      setUtcTime(`${hh}:${mm}:${ss} UTC`);
+      setUtcTime(`${hh}:${mm}:${ss}`);
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -65,62 +65,61 @@ export default function LoginPage() {
           <div className="pv-sb-icon">PV</div>
           <div>
             <div className="pv-login-brand-name">Pioneers Veneers</div>
-            <div className="pv-login-brand-sub">Enterprise Platform</div>
+            <div className="pv-login-brand-sub">Enterprise Platform · v4.12</div>
           </div>
         </div>
 
         <div className="pv-login-pitch">
           <h1>
-            Run your<br />
-            <em>entire operation</em><br />
-            from one place.
+            One operating layer for{' '}
+            <em>every team you run.</em>
           </h1>
           <p>
-            HR, scheduling, payroll, messaging, and analytics —
-            unified in a single workspace built for high-performance teams.
+            Sales, finance, HR, support and supervision — connected through a live
+            policy engine, with audit-grade trails on every action.
           </p>
 
           <div className="pv-login-stats">
             <div>
-              <div className="v">120+</div>
-              <div className="l">Employees</div>
+              <div className="v">142</div>
+              <div className="l">Employees online</div>
             </div>
             <div>
-              <div className="v">6</div>
-              <div className="l">Departments</div>
+              <div className="v">99.98%</div>
+              <div className="l">Platform uptime</div>
             </div>
             <div>
-              <div className="v">99.9%</div>
-              <div className="l">Uptime</div>
+              <div className="v">$1.42M</div>
+              <div className="l">MTD revenue</div>
             </div>
           </div>
         </div>
 
         <div className="pv-login-status">
           <span className="dot" />
-          SYSTEM OPERATIONAL
+          {utcTime ? `ALL SYSTEMS NOMINAL · ${utcTime} UTC` : 'ALL SYSTEMS NOMINAL'}
         </div>
       </aside>
 
       {/* ── Right form panel ── */}
       <main className="pv-login-main">
-        {utcTime && (
-          <div className="pv-login-ticker">
-            <span className="dot" style={{ background: 'var(--ok)', boxShadow: 'none', animation: 'none' }} />
-            {utcTime}
-          </div>
-        )}
+        <div className="pv-login-ticker">
+          <span className="pulse" style={{ flexShrink: 0 }} />
+          SECURE · TLS 1.3 · SAML/SSO ENABLED
+        </div>
 
         <div className="pv-login-form-wrap">
-          <div className="pv-login-eyebrow">Secure Access</div>
+          <div className="pv-login-eyebrow">
+            {tab === 'login' ? 'Welcome back' : 'Request access'}
+          </div>
           <div className="pv-login-form-head">
             <h2>
-              {tab === 'login' ? 'Sign in to your workspace' : 'Request system access'}
+              {tab === 'login' ? 'Sign in to your portal' : 'Create your account'}
             </h2>
             <p>
               {tab === 'login'
-                ? 'Enter your credentials to continue.'
-                : 'Submit your details for owner review.'}
+                ? 'Continue where you left off — your shift, queues, and approvals are waiting.'
+                : 'Submit your details for owner approval. Most are reviewed within a business day.'}
             </p>
           </div>
 
@@ -130,29 +129,31 @@ export default function LoginPage() {
               className={tab === 'login' ? 'active' : ''}
               onClick={() => switchTab('login')}
             >
-              Sign In
+              Sign in
             </button>
             <button
               type="button"
               className={tab === 'register' ? 'active' : ''}
               onClick={() => switchTab('register')}
             >
-              Request Access
+              Request access
             </button>
           </div>
 
           {msg && (
             <div className={msg.type === 'error' ? 'pv-login-error' : 'pv-login-success'}>
-              {msg.text}
+              {msg.type === 'error' ? '⚠ ' : ''}{msg.text}
             </div>
           )}
 
           <form onSubmit={handleAuth}>
             <div className="pv-fld">
-              <label>Email Address</label>
+              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Work email</span>
+              </label>
               <input
                 type="email"
-                placeholder="you@company.com"
+                placeholder="you@pioneersveneers.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
@@ -160,10 +161,15 @@ export default function LoginPage() {
               />
             </div>
             <div className="pv-fld">
-              <label>Password</label>
+              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Password</span>
+                {tab === 'login' && (
+                  <a style={{ color: 'var(--accent-ink)', fontSize: '11.5px', fontWeight: 500 }} href="#">Forgot?</a>
+                )}
+              </label>
               <input
                 type="password"
-                placeholder="Enter your password"
+                placeholder="••••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
@@ -171,21 +177,23 @@ export default function LoginPage() {
               />
             </div>
             <button type="submit" className="pv-login-btn" disabled={loading}>
-              {loading
-                ? 'Processing…'
-                : tab === 'login'
-                ? 'Initialize Session →'
-                : 'Submit Request →'}
+              {loading ? (
+                <><span className="spin" style={{ width: 12, height: 12, marginRight: 4 }} /> Authenticating…</>
+              ) : tab === 'login' ? (
+                'Sign in to portal →'
+              ) : (
+                'Submit request'
+              )}
             </button>
           </form>
 
           <div className="pv-login-footer">
             {tab === 'login' ? (
-              <>No account?{' '}
+              <>Need an account?{' '}
                 <a role="button" onClick={() => switchTab('register')}>Request access</a>
               </>
             ) : (
-              <>Already have access?{' '}
+              <>Already have one?{' '}
                 <a role="button" onClick={() => switchTab('login')}>Sign in</a>
               </>
             )}

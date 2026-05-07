@@ -38,6 +38,10 @@
   --mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
   --ease: cubic-bezier(.22,.61,.36,1);
   --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --density: 1;
+  --pad-card: calc(18px * var(--density));
+  --pad-row: calc(12px * var(--density));
+  --gap: calc(14px * var(--density));
   --sh-1: 0 1px 0 rgba(15,23,42,.04), 0 1px 2px rgba(15,23,42,.04);
   --sh-2: 0 1px 0 rgba(15,23,42,.03), 0 4px 14px rgba(15,23,42,.06);
   --sh-3: 0 2px 0 rgba(15,23,42,.04), 0 16px 40px rgba(15,23,42,.10);
@@ -550,7 +554,7 @@ a { color: inherit; text-decoration: none; }
 .pv-login-stats { display:flex; gap:24px; margin-top:28px; padding-top:22px; border-top:1px solid oklch(1 0 0/.1); position:relative; z-index:1; }
 .pv-login-stats .v { font-family:var(--mono); font-size:20px; font-weight:600; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
 .pv-login-stats .l { font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:oklch(0.60 0.012 265); margin-top:2px; }
-.pv-login-status { position:absolute; bottom:32px; left:56px; display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:10.5px; color:oklch(0.78 0.04 155); letter-spacing:.08em; z-index:1; }
+.pv-login-status { position:absolute; bottom:32px; right:56px; display:inline-flex; align-items:center; gap:8px; font-family:var(--mono); font-size:10.5px; color:oklch(0.78 0.04 155); letter-spacing:.08em; z-index:1; }
 .pv-login-status .dot { width:6px; height:6px; border-radius:50%; background:oklch(0.7 0.16 155); box-shadow:0 0 0 4px oklch(0.7 0.16 155/.15); animation:pulse-dot 1.8s infinite; }
 .pv-login-main { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:56px 48px; position:relative; }
 .pv-login-ticker { position:absolute; top:28px; right:40px; display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:10.5px; color:var(--ink-3); letter-spacing:.08em; }
@@ -580,3 +584,154 @@ a { color: inherit; text-decoration: none; }
   .pv-login-aside { display: none; }
   .pv-login-main { padding: 40px 24px; }
 }
+
+/* ── BRIEFING CARD (dashboard AI summary) ── */
+.briefing {
+  background:
+    radial-gradient(900px 200px at 100% 0%, oklch(0.95 0.04 268 / .6), transparent 70%),
+    linear-gradient(135deg, white, oklch(0.99 0.01 268));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--sh-1);
+}
+.briefing::before {
+  content: "";
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 240px; height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(0.85 0.08 268 / .35), transparent 70%);
+  pointer-events: none;
+  animation: drift2 12s ease-in-out infinite;
+}
+@keyframes drift2 { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-20px, 14px); } }
+.briefing-eyebrow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent-ink); margin-bottom: 10px;
+}
+.briefing-eyebrow .sparkle {
+  width: 14px; height: 14px; display: inline-block;
+  background: conic-gradient(from 0deg, oklch(0.55 0.16 268), oklch(0.7 0.18 268), oklch(0.55 0.16 268));
+  mask: radial-gradient(circle, black 30%, transparent 60%);
+  border-radius: 50%;
+  animation: spin 4s linear infinite;
+}
+.briefing-text {
+  font-size: 15px; line-height: 1.55; color: var(--ink);
+  letter-spacing: -0.01em; text-wrap: pretty; max-width: 720px;
+}
+.briefing-text strong { color: var(--accent-ink); font-weight: 600; }
+.briefing-actions { display: flex; gap: 8px; margin-top: 16px; }
+
+/* ── SPARKLINE SVG ── */
+.spark { width: 100%; height: 100%; display: block; }
+.stat-spark { margin-top: 10px; height: 28px; position: relative; }
+.stat-trend {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 999px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+}
+.stat-trend.up   { background: var(--ok-soft); color: oklch(0.42 0.12 155); }
+.stat-trend.down { background: var(--err-soft); color: oklch(0.45 0.16 25); }
+.stat-trend.flat { background: var(--surface-3); color: var(--ink-3); }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 18px; position: relative;
+  overflow: hidden; cursor: pointer;
+  transition: all .25s var(--ease); box-shadow: var(--sh-1);
+}
+.stat-card:hover {
+  border-color: var(--accent-line); box-shadow: var(--sh-2); transform: translateY(-2px);
+}
+.stat-card::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 80px;
+  background: radial-gradient(circle at 100% 0, var(--accent-soft), transparent 70%);
+  opacity: 0; transition: opacity .3s var(--ease); pointer-events: none;
+}
+.stat-card:hover::after { opacity: 1; }
+.stat-card .stat-h { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.stat-card .stat-ico { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; font-size: 15px; }
+.stat-card .stat-ico.ind { background: var(--accent-soft); color: var(--accent-ink); }
+.stat-card .stat-ico.ok  { background: var(--ok-soft); color: oklch(0.45 0.12 155); }
+.stat-card .stat-ico.wn  { background: var(--warn-soft); color: oklch(0.45 0.12 75); }
+.stat-card .stat-ico.er  { background: var(--err-soft); color: oklch(0.45 0.16 25); }
+.stat-card .stat-l { font-size: 11.5px; font-weight: 500; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.stat-card .stat-v { font-size: 26px; font-weight: 600; letter-spacing: -0.022em; font-feature-settings: "tnum"; color: var(--ink); line-height: 1.1; }
+.stat-card .stat-foot { margin-top: 10px; font-size: 11.5px; color: var(--ink-3); }
+
+/* ── TOPBAR CLOCK (read-only display) ── */
+.tb-clock { text-align: right; display: flex; flex-direction: column; padding: 0 4px; }
+.tb-clock-time { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.tb-clock-date { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 1px; }
+
+/* ── TOPBAR ⌘K search button ── */
+.tb-cmd { flex: 1; max-width: 440px; position: relative; margin: 0 auto; }
+.tb-cmd-btn {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px 8px 36px; background: var(--surface-3);
+  border: 1px solid var(--line); border-radius: 8px;
+  font-size: 13px; color: var(--ink-3); text-align: left;
+  position: relative; transition: all .15s var(--ease);
+}
+.tb-cmd-btn:hover { background: white; border-color: var(--accent-line); box-shadow: 0 0 0 4px oklch(0.96 0.02 268); }
+.tb-cmd-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--ink-4); }
+.tb-cmd-kbd {
+  margin-left: auto; font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-3); padding: 2px 6px; border: 1px solid var(--line);
+  border-radius: 5px; background: white;
+}
+
+/* ── PAGE FADE IN ── */
+.page-fade { animation: pageIn .25s var(--ease); }
+@keyframes pageIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── TWO-COLUMN LAYOUT (design variant) ── */
+.two-col { display: grid; grid-template-columns: 2fr 1fr; gap: 18px; }
+@media (max-width: 1100px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ── ACTIVITY FEED ROW (design variant) ── */
+.feed-row {
+  display: grid; grid-template-columns: 60px 14px 1fr auto;
+  gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line-2);
+  align-items: center; font-size: 13px;
+}
+.feed-row:last-child { border-bottom: none; }
+.feed-time { font-family: var(--mono); font-size: 11px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+.feed-dot { width: 8px; height: 8px; border-radius: 50%; }
+.feed-text { color: var(--ink-2); }
+.feed-text strong { color: var(--ink); font-weight: 600; }
+.feed-meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-4); }
+
+/* ── TOPBAR TITLE BLOCK ── */
+.tb-title-block { min-width: 0; }
+.tb-title { font-size: 17px; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
+.tb-sub { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+
+/* ── AVATAR CIRCLE ── */
+.av-circle { border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; letter-spacing: -0.02em; flex-shrink: 0; }
+
+/* ── DATA TABLE ── */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl thead tr { border-bottom: 1px solid var(--line); }
+.tbl th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--mono); white-space: nowrap; }
+.tbl td { padding: 11px 14px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+.tbl tbody tr:last-child td { border-bottom: none; }
+.tbl tbody tr:hover td { background: var(--surface-2); }
+
+/* ── FIELD INPUT (standalone) ── */
+.fld-input { height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); font-size: 13px; color: var(--ink); outline: none; transition: border-color .14s, box-shadow .14s; }
+.fld-input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px oklch(0.96 0.02 268); }
+.fld-input::placeholder { color: var(--ink-4); }
+
+/* ── KANBAN BOARD ── */
+.kanban { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+.kanban-col { flex: 0 0 220px; background: var(--surface-2); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--line); }
+.kanban-col-head { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--line-2); }
+.kanban-card { background: white; border-radius: 9px; padding: 12px; border: 1px solid var(--line); box-shadow: var(--sh-1); cursor: pointer; transition: box-shadow .15s; }
+.kanban-card:hover { box-shadow: var(--sh-2); }

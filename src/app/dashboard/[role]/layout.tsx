@@ -6,6 +6,8 @@ import ClockButton from '@/components/ClockButton';
 import PortalSwitcher from '@/components/PortalSwitcher';
 import NotificationBell from '@/components/NotificationBell';
 import ProfileButton from '@/components/ProfileButton';
+import TopBarTitle from '@/components/TopBarTitle';
+import TopBarClock from '@/components/TopBarClock';
 
 export default async function DashboardLayout({
   children,
@@ -79,26 +81,24 @@ export default async function DashboardLayout({
 
         <main className="main">
           <header className="tb">
-            <div className="pt-block">
-              <div className="pt" style={{ textTransform: 'capitalize' }}>
-                {urlRole} Portal
-              </div>
-              <div className="ps">Welcome back, {profile?.name ?? user.email?.split('@')[0] ?? 'User'}</div>
-            </div>
+            <TopBarTitle role={urlRole} />
 
             <div className="sys-pill">
               <span className="pulse"></span> System Live
             </div>
 
-            <div className="sw">
-              <span className="sw-i">⌕</span>
-              <input type="text" placeholder="Search resources, employees, reports..." />
+            <div className="tb-cmd">
+              <button className="tb-cmd-btn" type="button">
+                <span className="tb-cmd-icon">⌕</span>
+                <span>Search resources, employees, reports…</span>
+                <span className="tb-cmd-kbd">⌘K</span>
+              </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <TopBarClock />
               {isManagement && <PortalSwitcher currentRole={urlRole} />}
               <ClockButton userId={user.id} clockedIn={profile?.clocked_in ?? false} />
-
               <NotificationBell userId={user.id} userRole={effectiveRole} />
               <ProfileButton
                 userId={user.id}
