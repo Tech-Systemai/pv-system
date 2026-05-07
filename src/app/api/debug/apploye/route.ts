@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
 
-// Temporary diagnostic endpoint — shows raw Apploye API responses.
-// Only accessible to management; remove after confirming the integration works.
 export async function GET() {
   const apployeKey = process.env.APPLOYE_API_KEY;
   if (!apployeKey) {
@@ -9,43 +7,49 @@ export async function GET() {
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const results: Record<string, any> = { today, keyLength: apployeKey.length };
+  const startDate = `${today}T00:00:00Z`;
+  const endDate   = `${today}T23:59:59Z`;
+  const results: Record<string, any> = {
+    today,
+    keyLength: apployeKey.length,
+    keyPreview: apployeKey.slice(0, 6) + '...' + apployeKey.slice(-4),
+  };
 
-  // Test 1 — correct header + start_date/end_date params
+  // Test A — /members/ (exact URL used by main sync)
+  try {
+    const r = await fetch('https://public-api.apploye.com/members/', {
+      headers: { 'X-APPLOYE-API-KEY': apployeKey },
+      cache: 'no-store',
+    });
+    results.testA_members = { status: r.status, body: await r.json().catch(() => r.text()) };
+  } catch (e: any) { results.testA_members = { error: e.message }; }
+
+  // Test B — /timesheets/ with datetime params (exact URL used by main sync)
   try {
     const r = await fetch(
-      `https://public-api.apploye.com/v1/timesheets?start_date=${today}&end_date=${today}`,
-      { headers: { 'X-APPLOYE-API-KEY': apployeKey }, cache: 'no-store' }
+      `https://public-api.apploye.com/timesheets/?start_date=${startDate}&end_date=${endDate}`,
+      { headers: { 'X-APPLOYE-API-KEY': apployeKey }, cache: 'no-store' },
     );
-    results.test1 = { status: r.status, body: await r.json().catch(() => r.text()) };
-  } catch (e: any) { results.test1 = { error: e.message }; }
+    results.testB_timesheets = { status: r.status, body: await r.json().catch(() => r.text()) };
+  } catch (e: any) { results.testB_timesheets = { error: e.message }; }
 
-  // Test 2 — same header + legacy date param
+  // Test C — /members/ with Authorization: Bearer (alternative auth style)
   try {
-    const r = await fetch(
-      `https://public-api.apploye.com/v1/timesheets?date=${today}`,
-      { headers: { 'X-APPLOYE-API-KEY': apployeKey }, cache: 'no-store' }
-    );
-    results.test2 = { status: r.status, body: await r.json().catch(() => r.text()) };
-  } catch (e: any) { results.test2 = { error: e.message }; }
+    const r = await fetch('https://public-api.apploye.com/members/', {
+      headers: { 'Authorization': `Bearer ${apployeKey}` },
+      cache: 'no-store',
+    });
+    results.testC_members_bearer = { status: r.status, body: await r.json().catch(() => r.text()) };
+  } catch (e: any) { results.testC_members_bearer = { error: e.message }; }
 
-  // Test 3 — members endpoint
+  // Test D — /members/ without trailing slash
   try {
-    const r = await fetch(
-      'https://public-api.apploye.com/v1/members',
-      { headers: { 'X-APPLOYE-API-KEY': apployeKey }, cache: 'no-store' }
-    );
-    results.test3_members = { status: r.status, body: await r.json().catch(() => r.text()) };
-  } catch (e: any) { results.test3_members = { error: e.message }; }
-
-  // Test 4 — organisation endpoint (basic connectivity check)
-  try {
-    const r = await fetch(
-      'https://public-api.apploye.com/v1/organization',
-      { headers: { 'X-APPLOYE-API-KEY': apployeKey }, cache: 'no-store' }
-    );
-    results.test4_org = { status: r.status, body: await r.json().catch(() => r.text()) };
-  } catch (e: any) { results.test4_org = { error: e.message }; }
+    const r = await fetch('https://public-api.apploye.com/members', {
+      headers: { 'X-APPLOYE-API-KEY': apployeKey },
+      cache: 'no-store',
+    });
+    results.testD_members_noslash = { status: r.status, body: await r.json().catch(() => r.text()) };
+  } catch (e: any) { results.testD_members_noslash = { error: e.message }; }
 
   return NextResponse.json(results, { status: 200 });
 }
