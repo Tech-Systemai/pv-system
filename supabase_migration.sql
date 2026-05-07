@@ -458,6 +458,21 @@ do $$ begin
   end if;
 end $$;
 
+-- ── 26. VIOLATIONS LOG ───────────────────────────────────────
+create table if not exists violations (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid references profiles(id) on delete cascade,
+  policy_id        uuid references policies(id) on delete set null,
+  rule_name        text not null,
+  explanation      text not null,
+  points_deducted  numeric default 0,
+  salary_deducted  numeric default 0,
+  triggered_at     timestamptz default now(),
+  acknowledged     boolean default false,
+  acknowledged_at  timestamptz
+);
+alter table violations disable row level security;
+
 -- ============================================================
 -- Done! All tables created/updated. Refresh your browser.
 -- ============================================================

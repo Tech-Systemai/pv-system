@@ -26,7 +26,35 @@ export default function PolicyClient({ initialPolicies }: { initialPolicies: any
   const [policies, setPolicies] = useState(initialPolicies);
   const [isAdding, setIsAdding] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [runResult, setRunResult] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  const handleRunNow = async () => {
+    setRunning(true);
+    setRunResult(null);
+    try {
+      const res = await fetch('/api/cron/policies', {
+        method: 'POST',
+        headers: { authorization: 'Bearer dev-secret' },
+      });
+      const json = await res.json();
+      if (json.success) {
+        setRunResult(`✓ Policies evaluated for ${json.date}: ${json.violations_created} violation${json.violations_created !== 1 ? 's' : ''} created, ${json.employees_affected} employee${json.employees_affected !== 1 ? 's' : ''} affected, ${json.inbox_notices_sent} inbox notice${json.inbox_notices_sent !== 1 ? 's' : ''} sent.`);
+        // Refresh executed counts
+        const updated = policies.map((p: any) => ({
+          ...p,
+          executed: (p.executed ?? 0) + (json.violations_created > 0 ? 1 : 0),
+        }));
+        setPolicies(updated);
+      } else {
+        setRunResult(`✗ Error: ${json.error ?? 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      setRunResult(`✗ Network error: ${e.message}`);
+    }
+    setRunning(false);
+  };
 
   const handleToggle = async (id: string, currentActive: boolean) => {
     const { error } = await dbOp('policies', 'update', { active: !currentActive }, { id });
@@ -73,8 +101,24 @@ export default function PolicyClient({ initialPolicies }: { initialPolicies: any
             Rules are evaluated nightly by the automated cron job
           </div>
         </div>
-        <button className="pv-btn pv-btn-pri" onClick={() => setIsAdding(true)}>+ New Rule</button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="pv-btn pv-btn-sec" onClick={handleRunNow} disabled={running} style={{ fontSize: '12px' }}>
+            {running ? '⏳ Running…' : '▶ Run Policies Now'}
+          </button>
+          <button className="pv-btn pv-btn-pri" onClick={() => setIsAdding(true)}>+ New Rule</button>
+        </div>
       </div>
+
+      {runResult && (
+        <div style={{
+          padding: '10px 14px', borderRadius: '8px', fontSize: '12.5px', marginBottom: '16px',
+          background: runResult.startsWith('✓') ? '#ecfdf5' : '#fef2f2',
+          color: runResult.startsWith('✓') ? '#047857' : '#dc2626',
+          border: `1px solid ${runResult.startsWith('✓') ? '#6ee7b7' : '#fecaca'}`,
+        }}>
+          {runResult}
+        </div>
+      )}
 
       <div className="pn" style={{ marginBottom: '20px' }}>
         {policies.length === 0 && <div className="empty">No rules configured yet.</div>}
