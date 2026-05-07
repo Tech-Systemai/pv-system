@@ -117,6 +117,7 @@ export default function UsersClient({
       role: fd.get('role') as string,
       salary: Number(fd.get('salary')),
       points: Number(fd.get('points')),
+      status: fd.get('status') as string,
     };
     const { error } = await dbOp('profiles', 'update', updates, { id: editUser.id });
     if (!error) {
@@ -209,7 +210,13 @@ export default function UsersClient({
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className={`bdg ${isMgmtRole ? 'bdg-acc' : 'bdg-gy'}`}>{emp.role}</span>
-                    {emp.clocked_in
+                    {emp.status === 'Terminated'
+                      ? <span className="bdg bdg-err">Terminated</span>
+                      : emp.status === 'Inactive'
+                      ? <span className="bdg bdg-gy">Inactive</span>
+                      : emp.status === 'On Leave'
+                      ? <span className="bdg bdg-warn">On Leave</span>
+                      : emp.clocked_in
                       ? <span className="bdg bdg-ok">● Active</span>
                       : <span className="bdg bdg-gy">Offline</span>}
                   </div>
@@ -255,9 +262,17 @@ export default function UsersClient({
                         {emp.created_at ? new Date(emp.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' }) : '—'}
                       </td>
                       <td>
-                        {emp.clocked_in
-                          ? <span className="bdg bdg-ok">● Active</span>
-                          : <span className="bdg bdg-gy">Offline</span>}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {emp.status === 'Terminated'
+                            ? <span className="bdg bdg-err">Terminated</span>
+                            : emp.status === 'Inactive'
+                            ? <span className="bdg bdg-gy">Inactive</span>
+                            : emp.status === 'On Leave'
+                            ? <span className="bdg bdg-warn">On Leave</span>
+                            : emp.clocked_in
+                            ? <span className="bdg bdg-ok">● Active</span>
+                            : <span className="bdg bdg-gy">Offline</span>}
+                        </div>
                       </td>
                       {isMgmt && <td style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>${(emp.salary || 0).toLocaleString()}</td>}
                     </tr>
@@ -313,9 +328,20 @@ export default function UsersClient({
                   <div style={{ fontSize: 17, fontWeight: 700 }}>{viewUser.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{viewUser.email || '—'}</div>
                 </div>
-                <span className={`bdg ${viewUser.clocked_in ? 'bdg-ok' : 'bdg-gy'}`} style={{ marginLeft: 'auto' }}>
-                  {viewUser.clocked_in ? '● Active' : 'Offline'}
-                </span>
+                <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                  {viewUser.status === 'Terminated'
+                    ? <span className="bdg bdg-err">Terminated</span>
+                    : viewUser.status === 'Inactive'
+                    ? <span className="bdg bdg-gy">Inactive</span>
+                    : viewUser.status === 'On Leave'
+                    ? <span className="bdg bdg-warn">On Leave</span>
+                    : <span className="bdg bdg-ok">Employed</span>}
+                  {(!viewUser.status || viewUser.status === 'Active') && (
+                    <span className={`bdg ${viewUser.clocked_in ? 'bdg-ok' : 'bdg-gy'}`} style={{ fontSize: 10 }}>
+                      {viewUser.clocked_in ? '● On shift' : '○ Off shift'}
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7, marginBottom: 16 }}>
                 {([
@@ -323,9 +349,10 @@ export default function UsersClient({
                   ['Username', viewUser.username ? `@${viewUser.username}` : '—'],
                   ['Role', viewUser.role],
                   ['Department', viewUser.department || '—'],
+                  ['Employment', viewUser.status || 'Active'],
                   ['Location', viewUser.location || 'Remote'],
                   ['Salary', `$${(viewUser.salary || 0).toLocaleString()}`],
-                  ['Points', `${viewUser.points ?? 0}/7`],
+                  ['Points', `${viewUser.points ?? 7}/7`],
                   ['Hours Worked', viewHours === null ? '…' : `${viewHours} hrs`],
                 ] as [string, string][]).map(([k, v]) => (
                   <div key={k} style={{ background: 'var(--surface-2)', padding: '9px 11px', borderRadius: 7 }}>
@@ -416,6 +443,15 @@ export default function UsersClient({
               <div className="pv-fld">
                 <label>Reliability Points (0–7)</label>
                 <input type="number" name="points" defaultValue={editUser.points ?? 7} min={0} max={7} required />
+              </div>
+              <div className="pv-fld">
+                <label>Employment Status</label>
+                <select name="status" defaultValue={editUser.status ?? 'Active'}>
+                  <option value="Active">Active</option>
+                  <option value="On Leave">On Leave</option>
+                  <option value="Inactive">Inactive</option>
+                  <option value="Terminated">Terminated</option>
+                </select>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" className="btn btn-acc" disabled={editSaving}>{editSaving ? 'Saving…' : 'Save Changes'}</button>

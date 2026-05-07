@@ -74,11 +74,11 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
   const actionCount = scores.filter(s => s < 4).length;
   const watchCount = scores.filter(s => s >= 4 && s < 6).length;
   const excellentCount = scores.filter(s => s >= 6).length;
+  const totalSalaryDeducted = vList.reduce((s, v) => s + (v.salary_deducted ?? 0), 0);
 
   const getViolations = (id: string) => vList.filter(v => v.user_id === id);
   const getDeductions = (emp: Employee) => {
-    const sal = getViolations(emp.id).reduce((s, v) => s + (v.salary_deducted ?? 0), 0);
-    return sal || Math.max(0, (7 - (emp.points ?? 7))) * 20;
+    return getViolations(emp.id).reduce((s, v) => s + (v.salary_deducted ?? 0), 0);
   };
 
   const handleAddDeduction = async (empId: string, rule: string, pts: number, salary: number, explanation: string) => {
@@ -183,6 +183,15 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
           <div className="stat-l">EXCELLENT</div>
           <div className="stat-v">{excellentCount}</div>
           <div className="stat-foot">6.0 +</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-h">
+            <div className="stat-ico er">$</div>
+            {totalSalaryDeducted > 0 && <span className="stat-trend down">This period</span>}
+          </div>
+          <div className="stat-l">TOTAL DEDUCTED</div>
+          <div className="stat-v">${totalSalaryDeducted.toLocaleString()}</div>
+          <div className="stat-foot">{vList.filter(v => !v.acknowledged).length} unacknowledged</div>
         </div>
       </div>
 

@@ -26,7 +26,8 @@ export default function PerformanceClient({
 
   const points = typeof profile?.points === 'number' ? profile.points : 7;
   const salary = typeof profile?.salary === 'number' ? profile.salary : 2500;
-  const deduction = vList.reduce((s: number, v: any) => s + (v.salary_deducted ?? 0), 0) || Math.max(0, (7 - points)) * 20;
+  // Sum actual salary_deducted from violations — no fallback formula
+  const deduction = vList.reduce((s: number, v: any) => s + (v.salary_deducted ?? 0), 0);
   const netPay = salary - deduction;
   const unacknowledged = vList.filter((v: any) => !v.acknowledged).length;
 
