@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/apploye-pull",
-      "schedule": "45 23 * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/daily-eval",

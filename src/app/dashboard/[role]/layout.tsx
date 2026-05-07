@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import Sidebar from '@/components/Sidebar';
-import ClockButton from '@/components/ClockButton';
 import PortalSwitcher from '@/components/PortalSwitcher';
 import NotificationBell from '@/components/NotificationBell';
 import ProfileButton from '@/components/ProfileButton';
@@ -26,7 +25,7 @@ export default async function DashboardLayout({
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin
     .from('profiles')
-    .select('role, name, clocked_in, username, email, contract_url, id_document_url')
+    .select('role, name, username, email, contract_url, id_document_url')
     .eq('id', user.id)
     .single();
 
@@ -98,8 +97,7 @@ export default async function DashboardLayout({
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <TopBarClock />
               {isManagement && <PortalSwitcher currentRole={urlRole} />}
-              <ClockButton userId={user.id} clockedIn={profile?.clocked_in ?? false} />
-              <NotificationBell userId={user.id} userRole={effectiveRole} />
+<NotificationBell userId={user.id} userRole={effectiveRole} />
               <ProfileButton
                 userId={user.id}
                 initialProfile={{

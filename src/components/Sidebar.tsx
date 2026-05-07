@@ -147,8 +147,21 @@ export default function Sidebar({ role }: { role: string }) {
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [clockInTime, setClockInTime] = useState<Date | null>(null);
   const [timerStr, setTimerStr] = useState('00:00:00');
-  const [clocking, setClocking] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
+
+  const loadClockInTime = async (userId: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: log } = await supabase
+      .from('attendance_logs')
+      .select('clock_in_time')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (log?.clock_in_time) setClockInTime(new Date(log.clock_in_time));
+    else setClockInTime(null);
+  };
 
   useEffect(() => {
     async function loadProfile() {
@@ -158,22 +171,35 @@ export default function Sidebar({ role }: { role: string }) {
       if (data) {
         setProfile(data);
         setIsClockedIn(data.clocked_in);
-        if (data.clocked_in) {
-          const today = new Date().toISOString().split('T')[0];
-          const { data: log } = await supabase
-            .from('attendance_logs')
-            .select('clock_in_time')
-            .eq('user_id', user.id)
-            .eq('date', today)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          if (log?.clock_in_time) setClockInTime(new Date(log.clock_in_time));
-        }
+        if (data.clocked_in) await loadClockInTime(user.id);
       }
     }
     loadProfile();
   }, []);
+
+  // Realtime: reflect Apploye-driven clocked_in changes instantly
+  useEffect(() => {
+    if (!profile?.id) return;
+    const sub = supabase
+      .channel('sidebar-clocked-in')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `id=eq.${profile.id}`,
+      }, async payload => {
+        const updated = payload.new as any;
+        const nowClockedIn = updated.clocked_in ?? false;
+        setIsClockedIn(nowClockedIn);
+        if (nowClockedIn) {
+          await loadClockInTime(profile.id);
+        } else {
+          setClockInTime(null);
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [profile?.id]);
 
   // Live shift timer
   useEffect(() => {
@@ -303,39 +329,6 @@ export default function Sidebar({ role }: { role: string }) {
     router.push('/');
   };
 
-  const handleClockToggle = async () => {
-    if (!profile) return;
-    setClocking(true);
-    const newStatus = !isClockedIn;
-    await supabase.from('profiles').update({ clocked_in: newStatus }).eq('id', profile.id);
-    if (newStatus) {
-      const start = new Date();
-      await supabase.from('attendance_logs').insert([{
-        user_id: profile.id,
-        status: 'present',
-        clock_in_time: start.toISOString(),
-      }]);
-      setClockInTime(start);
-    } else {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
-        .from('attendance_logs')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('date', today)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      if (data && data.length > 0) {
-        await supabase
-          .from('attendance_logs')
-          .update({ clock_out_time: new Date().toISOString() })
-          .eq('id', data[0].id);
-      }
-      setClockInTime(null);
-    }
-    setIsClockedIn(newStatus);
-    setClocking(false);
-  };
 
   const handlePortalSwitch = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value;
@@ -359,7 +352,7 @@ export default function Sidebar({ role }: { role: string }) {
         </div>
       </div>
 
-      {/* Shift card */}
+      {/* Shift card — read-only, driven by Apploye */}
       <div className={`sb-shift-card${isClockedIn ? ' on' : ''}`}>
         <div className="sb-shift-row">
           <span className="sb-shift-status">
@@ -369,13 +362,9 @@ export default function Sidebar({ role }: { role: string }) {
             <span className="sb-shift-time">{timerStr}</span>
           )}
         </div>
-        <button
-          className="sb-shift-btn"
-          onClick={handleClockToggle}
-          disabled={clocking}
-        >
-          {clocking ? 'Wait…' : isClockedIn ? 'Clock Out' : 'Clock In'}
-        </button>
+        <div style={{ fontSize: 10, color: isClockedIn ? 'oklch(0.75 0.12 145)' : 'var(--ink-4)', textAlign: 'center', paddingTop: 2 }}>
+          {isClockedIn ? 'Synced via Apploye' : 'Clock in via Apploye to start'}
+        </div>
       </div>
 
       {/* Scrollable nav */}
