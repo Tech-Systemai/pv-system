@@ -13,6 +13,10 @@ type PlanDoc = {
 
 const DOC_TYPES = ['Strategy', 'Roadmap', 'Hiring Plan', 'Budget', 'OKRs', 'Policy Draft', 'Other'];
 
+const DOC_HUES: Record<string, number> = {
+  Strategy: 268, Roadmap: 220, 'Hiring Plan': 145, Budget: 75, OKRs: 25, 'Policy Draft': 200, Other: 155,
+};
+
 export default function PlanningClient({ initialDocuments }: { initialDocuments: PlanDoc[] }) {
   const [docs, setDocs] = useState<PlanDoc[]>(initialDocuments);
   const [selected, setSelected] = useState<PlanDoc | null>(initialDocuments[0] ?? null);
@@ -20,7 +24,6 @@ export default function PlanningClient({ initialDocuments }: { initialDocuments:
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-
   const [form, setForm] = useState({ title: '', content: '', doc_type: 'Strategy' });
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -73,76 +76,101 @@ export default function PlanningClient({ initialDocuments }: { initialDocuments:
     ).join('');
   };
 
+  const totalDocs = docs.length;
+  const strategies = docs.filter(d => d.doc_type === 'Strategy').length;
+  const roadmaps = docs.filter(d => d.doc_type === 'Roadmap').length;
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const recent = docs.filter(d => d.created_at && d.created_at > sevenDaysAgo).length;
+
   return (
-    <div>
-      <div className="pn-h" style={{ marginBottom: '20px' }}>
-        <div className="pn-t">Strategic Planning Workspace</div>
-        <button className="pv-btn pv-btn-pri" onClick={() => setShowUpload(true)}>+ Upload Document</button>
+    <div className="page-fade">
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">📋</div></div>
+          <div className="stat-l">TOTAL DOCUMENTS</div>
+          <div className="stat-v">{totalDocs}</div>
+          <div className="stat-foot">Planning workspace</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico" style={{ background: 'oklch(0.93 0.05 268)', color: 'oklch(0.40 0.14 268)' }}>◈</div></div>
+          <div className="stat-l">STRATEGIES</div>
+          <div className="stat-v">{strategies}</div>
+          <div className="stat-foot">Strategic plans</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico" style={{ background: 'oklch(0.93 0.05 220)', color: 'oklch(0.40 0.14 220)' }}>◈</div></div>
+          <div className="stat-l">ROADMAPS</div>
+          <div className="stat-v">{roadmaps}</div>
+          <div className="stat-foot">Project roadmaps</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">↑</div></div>
+          <div className="stat-l">RECENT</div>
+          <div className="stat-v">{recent}</div>
+          <div className="stat-foot">Added this week</div>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+      <div className="briefing" style={{ marginBottom: 20 }}>
+        <div>
+          <div className="card-title">Strategic Planning Workspace</div>
+          <div className="card-sub">{totalDocs} document{totalDocs !== 1 ? 's' : ''} in your workspace</div>
+        </div>
+        <div className="briefing-actions">
+          <button className="btn btn-acc" onClick={() => setShowUpload(true)}>+ Upload Document</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
         {/* Document list */}
-        <div style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {docs.length === 0 && (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '12px', border: '1.5px dashed #e4e7eb', borderRadius: '8px' }}>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 12, border: '1.5px dashed var(--line)', borderRadius: 8 }}>
               No documents yet.<br />Upload your first plan above.
             </div>
           )}
-          {docs.map(doc => (
-            <div
-              key={doc.id}
-              onClick={() => setSelected(doc)}
-              style={{
-                padding: '12px 14px', borderRadius: '8px', cursor: 'pointer',
-                background: selected?.id === doc.id ? '#eef2ff' : '#fff',
-                border: `1.5px solid ${selected?.id === doc.id ? '#c7d2fe' : '#e4e7eb'}`,
+          {docs.map(doc => {
+            const hue = DOC_HUES[doc.doc_type] ?? 268;
+            return (
+              <div key={doc.id} onClick={() => setSelected(doc)} style={{
+                padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+                background: selected?.id === doc.id ? `oklch(0.94 0.04 ${hue})` : 'var(--surface)',
+                border: `1.5px solid ${selected?.id === doc.id ? `oklch(0.85 0.08 ${hue})` : 'var(--line)'}`,
                 transition: 'all 0.12s',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: selected?.id === doc.id ? '#4338ca' : '#1a1f2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {doc.title}
+                boxShadow: selected?.id === doc.id ? 'var(--sh-1)' : 'none',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: selected?.id === doc.id ? `oklch(0.35 0.14 ${hue})` : 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {doc.title}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 3 }}>
+                      {doc.doc_type} · {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Just now'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '3px' }}>
-                    {doc.doc_type} · {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'Just now'}
-                  </div>
+                  <button onClick={e => { e.stopPropagation(); handleDelete(doc); }} disabled={deleting === doc.id} style={{ background: 'none', border: 'none', color: 'var(--ink-4)', cursor: 'pointer', fontSize: 13, padding: 0, flexShrink: 0, opacity: 0.5 }} title="Delete">✕</button>
                 </div>
-                <button
-                  onClick={e => { e.stopPropagation(); handleDelete(doc); }}
-                  disabled={deleting === doc.id}
-                  style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: '13px', padding: '0', flexShrink: 0 }}
-                  title="Delete"
-                >✕</button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Document viewer */}
-        <div style={{ flex: 1, background: '#fff', border: '1px solid #e4e7eb', borderRadius: '10px', display: 'flex', flexDirection: 'column', minHeight: '500px' }}>
+        <div className="card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 500 }}>
           {selected ? (
             <>
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid #f0f2f5', background: '#f8fafc', borderRadius: '10px 10px 0 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+              <div className="card-hdr">
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#1a1f2e' }}>{selected.title}</div>
-                  <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '1px' }}>{selected.doc_type}</div>
+                  <div className="card-title">{selected.title}</div>
+                  <div className="card-sub">{selected.doc_type}</div>
                 </div>
-                <input
-                  type="search"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search in document..."
-                  style={{ fontSize: '12px', padding: '6px 10px', border: '1px solid #e4e7eb', borderRadius: '6px', width: '200px' }}
-                />
+                <input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search in document…" style={{ fontSize: 12, padding: '6px 10px', border: '1px solid var(--line)', borderRadius: 6, width: 200, background: 'var(--surface-2)', color: 'var(--ink)' }} />
               </div>
-              <div
-                style={{ flex: 1, padding: '24px', fontSize: '13px', lineHeight: 1.85, color: '#1a1f2e', whiteSpace: 'pre-wrap', overflowY: 'auto' }}
-                dangerouslySetInnerHTML={{ __html: highlighted(selected.content) }}
-              />
+              <div style={{ flex: 1, padding: '24px', fontSize: 13, lineHeight: 1.85, color: 'var(--ink)', whiteSpace: 'pre-wrap', overflowY: 'auto' }}
+                dangerouslySetInnerHTML={{ __html: highlighted(selected.content) }} />
             </>
           ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: '13px' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
               Select a document to read it here
             </div>
           )}
@@ -151,9 +179,9 @@ export default function PlanningClient({ initialDocuments }: { initialDocuments:
 
       {/* Upload modal */}
       {showUpload && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: '#fff', padding: '28px', borderRadius: '14px', width: '560px', maxWidth: '100%' }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '18px' }}>Upload Plan Document</div>
+        <div className="mb" onClick={() => setShowUpload(false)}>
+          <div className="md" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="md-t">Upload Plan Document</div>
             <form onSubmit={handleSave}>
               <div className="pv-fld">
                 <label>Document Type</label>
@@ -163,42 +191,27 @@ export default function PlanningClient({ initialDocuments }: { initialDocuments:
               </div>
               <div className="pv-fld">
                 <label>Title</label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g. Q3 Marketing Strategy"
-                  required
-                />
+                <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Q3 Marketing Strategy" required />
               </div>
-
               <div className="pv-fld">
-                <label>Upload a text file <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional — .txt, .md, .csv)</span></label>
+                <label>Upload a text file <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(optional — .txt, .md, .csv)</span></label>
                 <input ref={fileRef} type="file" accept=".txt,.md,.csv,.json" style={{ display: 'none' }} onChange={handleFileRead} />
-                <button type="button" className="pv-btn pv-btn-sec" onClick={() => fileRef.current?.click()} style={{ width: '100%' }}>
+                <button type="button" className="btn btn-sec" onClick={() => fileRef.current?.click()} style={{ width: '100%' }}>
                   📁 Choose file to import
                 </button>
-                {form.content && !showUpload && (
-                  <div style={{ fontSize: '11px', color: '#047857', marginTop: '4px' }}>File loaded · {form.content.length} characters</div>
+                {form.content && (
+                  <div style={{ fontSize: 11, color: 'var(--ok)', marginTop: 4 }}>File loaded · {form.content.length} characters</div>
                 )}
               </div>
-
               <div className="pv-fld">
-                <label>Content <span style={{ color: '#9ca3af', fontWeight: 400 }}>(paste or type directly)</span></label>
-                <textarea
-                  rows={8}
-                  value={form.content}
-                  onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-                  placeholder="Paste document content here, or upload a file above..."
-                  required
-                />
+                <label>Content <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(paste or type directly)</span></label>
+                <textarea rows={8} value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} placeholder="Paste document content here, or upload a file above…" required />
               </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="pv-btn pv-btn-pri" disabled={saving || !form.title.trim() || !form.content.trim()}>
-                  {saving ? 'Saving...' : 'Save Document'}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="btn btn-acc" disabled={saving || !form.title.trim() || !form.content.trim()}>
+                  {saving ? 'Saving…' : 'Save Document'}
                 </button>
-                <button type="button" className="pv-btn pv-btn-sec" onClick={() => { setShowUpload(false); setForm({ title: '', content: '', doc_type: 'Strategy' }); }}>
+                <button type="button" className="btn btn-sec" onClick={() => { setShowUpload(false); setForm({ title: '', content: '', doc_type: 'Strategy' }); }}>
                   Cancel
                 </button>
               </div>

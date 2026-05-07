@@ -66,7 +66,6 @@ export default function ContractsClient({
   const [view, setView] = useState<'list' | 'create' | 'preview'>('list');
   const [viewingContract, setViewingContract] = useState<Contract | null>(null);
 
-  // Create form state
   const [selectedUser, setSelectedUser] = useState('');
   const [contractType, setContractType] = useState('Sales Associate');
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
@@ -132,55 +131,55 @@ export default function ContractsClient({
             body { background: white !important; }
           }
         ` }} />
-        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <button className="pv-btn pv-btn-sec" onClick={() => setView('list')}>← Back</button>
-          <button className="pv-btn pv-btn-pri" onClick={() => window.print()}>🖨️ Print / Download PDF</button>
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+          <button className="btn btn-sec" onClick={() => setView('list')}>← Back</button>
+          <button className="btn btn-acc" onClick={() => window.print()}>🖨️ Print / Download PDF</button>
         </div>
 
-        <div style={{ background: '#fff', padding: '48px', maxWidth: '800px', margin: '0 auto', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '8px', fontFamily: 'Inter, sans-serif' }}>
-          <div style={{ textAlign: 'center', borderBottom: '2px solid #1a1f2e', paddingBottom: '20px', marginBottom: '30px' }}>
-            <div style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '1px', color: '#0f172a' }}>PIONEERS VENEERS</div>
-            <div style={{ fontSize: '11px', color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '4px' }}>Employment Agreement · Official Document</div>
+        <div style={{ background: '#fff', padding: '48px', maxWidth: 800, margin: '0 auto', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: 8, fontFamily: 'Inter, sans-serif' }}>
+          <div style={{ textAlign: 'center', borderBottom: '2px solid #1a1f2e', paddingBottom: 20, marginBottom: 30 }}>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '1px', color: '#0f172a' }}>PIONEERS VENEERS</div>
+            <div style={{ fontSize: 11, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>Employment Agreement · Official Document</div>
           </div>
 
-          <h2 style={{ fontSize: '15px', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '28px', color: '#1a1f2e' }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 28, color: '#1a1f2e' }}>
             {viewingContract.type} Agreement
           </h2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: '#f8fafc', padding: '16px', borderRadius: '8px', marginBottom: '28px', fontSize: '12px' }}>
-            <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '10px', fontWeight: 700 }}>Employee</span><br /><strong>{viewingContract.profiles?.name ?? '—'}</strong></div>
-            <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '10px', fontWeight: 700 }}>Role</span><br /><strong>{viewingContract.profiles?.role ?? viewingContract.type}</strong></div>
-            <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '10px', fontWeight: 700 }}>Effective Date</span><br /><strong>{viewingContract.effective_date}</strong></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, background: '#f8fafc', padding: 16, borderRadius: 8, marginBottom: 28, fontSize: 12 }}>
+            <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: 10, fontWeight: 700 }}>Employee</span><br /><strong>{viewingContract.profiles?.name ?? '—'}</strong></div>
+            <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: 10, fontWeight: 700 }}>Role</span><br /><strong>{viewingContract.profiles?.role ?? viewingContract.type}</strong></div>
+            <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: 10, fontWeight: 700 }}>Effective Date</span><br /><strong>{viewingContract.effective_date}</strong></div>
             {viewingContract.end_date && (
-              <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: '10px', fontWeight: 700 }}>End Date</span><br /><strong>{viewingContract.end_date}</strong></div>
+              <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: 10, fontWeight: 700 }}>End Date</span><br /><strong>{viewingContract.end_date}</strong></div>
             )}
           </div>
 
-          <p style={{ lineHeight: 1.8, color: '#1a1f2e', fontSize: '13px', marginBottom: '24px' }}>
+          <p style={{ lineHeight: 1.8, color: '#1a1f2e', fontSize: 13, marginBottom: 24 }}>
             This Employment Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Employer") and <strong>{viewingContract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.
           </p>
 
           {resolvedSections.map((sec, i) => (
-            <div key={i} style={{ marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '13px', fontWeight: 700, borderBottom: '1px solid #e4e7eb', paddingBottom: '6px', marginBottom: '10px', color: '#1a1f2e' }}>{sec.title}</h3>
-              <p style={{ fontSize: '13px', lineHeight: 1.8, color: '#4a5568', whiteSpace: 'pre-wrap' }}>{sec.content}</p>
+            <div key={i} style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, borderBottom: '1px solid #e4e7eb', paddingBottom: 6, marginBottom: 10, color: '#1a1f2e' }}>{sec.title}</h3>
+              <p style={{ fontSize: 13, lineHeight: 1.8, color: '#4a5568', whiteSpace: 'pre-wrap' }}>{sec.content}</p>
             </div>
           ))}
 
-          <div style={{ marginTop: '60px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #1a1f2e', paddingTop: '16px' }}>
+          <div style={{ marginTop: 60, display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #1a1f2e', paddingTop: 16 }}>
             <div style={{ width: '42%' }}>
-              <strong style={{ fontSize: '12px' }}>Employer Signature</strong><br />
-              <span style={{ fontSize: '11px', color: '#6b7689' }}>Pioneers Veneers — Authorized Management</span><br />
-              <div style={{ marginTop: '28px', borderTop: '1px solid #94a3b8', fontSize: '10px', color: '#94a3b8', paddingTop: '4px' }}>Signature &amp; Date</div>
+              <strong style={{ fontSize: 12 }}>Employer Signature</strong><br />
+              <span style={{ fontSize: 11, color: '#6b7689' }}>Pioneers Veneers — Authorized Management</span><br />
+              <div style={{ marginTop: 28, borderTop: '1px solid #94a3b8', fontSize: 10, color: '#94a3b8', paddingTop: 4 }}>Signature &amp; Date</div>
             </div>
             <div style={{ width: '42%', textAlign: 'right' }}>
-              <strong style={{ fontSize: '12px' }}>Employee Signature</strong><br />
-              <span style={{ fontSize: '11px', color: '#6b7689' }}>{viewingContract.profiles?.name}</span><br />
-              <div style={{ marginTop: '28px', borderTop: '1px solid #94a3b8', fontSize: '10px', color: '#94a3b8', paddingTop: '4px' }}>Signature &amp; Date</div>
+              <strong style={{ fontSize: 12 }}>Employee Signature</strong><br />
+              <span style={{ fontSize: 11, color: '#6b7689' }}>{viewingContract.profiles?.name}</span><br />
+              <div style={{ marginTop: 28, borderTop: '1px solid #94a3b8', fontSize: 10, color: '#94a3b8', paddingTop: 4 }}>Signature &amp; Date</div>
             </div>
           </div>
 
-          <div style={{ marginTop: '24px', fontSize: '9px', color: '#94a3b8', textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+          <div style={{ marginTop: 24, fontSize: 9, color: '#94a3b8', textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
             Generated by Pioneers Veneers Enterprise Platform · Ref: CTR-{viewingContract.id?.slice(0, 8).toUpperCase() ?? Date.now().toString().slice(-8)} · {new Date().toLocaleDateString()}
           </div>
         </div>
@@ -191,23 +190,24 @@ export default function ContractsClient({
   // ---- CREATE ----
   if (view === 'create' && isMgmt) {
     return (
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
-          <button className="pv-btn pv-btn-sec" onClick={() => setView('list')}>← Back</button>
-          <button
-            className="pv-btn pv-btn-pri"
-            onClick={handleGenerate}
-            disabled={isGenerating || !selectedUser}
-          >
-            {isGenerating ? 'Generating...' : 'Generate Contract →'}
-          </button>
+      <div className="page-fade">
+        <div className="briefing" style={{ marginBottom: 20 }}>
+          <div>
+            <div className="card-title">New Contract</div>
+            <div className="card-sub">Fill in details and generate the contract document</div>
+          </div>
+          <div className="briefing-actions">
+            <button className="btn btn-sec" onClick={() => setView('list')}>← Back</button>
+            <button className="btn btn-acc" onClick={handleGenerate} disabled={isGenerating || !selectedUser}>
+              {isGenerating ? 'Generating…' : 'Generate Contract →'}
+            </button>
+          </div>
         </div>
 
-        <div className="two" style={{ gap: '20px', alignItems: 'flex-start' }}>
-          {/* Left: settings */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="pn">
-              <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '14px' }}>Contract Details</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="card" style={{ padding: '20px 18px' }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Contract Details</div>
               <div className="pv-fld">
                 <label>Employee</label>
                 <select value={selectedUser} onChange={e => setSelectedUser(e.target.value)} required>
@@ -226,73 +226,56 @@ export default function ContractsClient({
                 <input type="date" value={effectiveDate} onChange={e => setEffectiveDate(e.target.value)} />
               </div>
               <div className="pv-fld">
-                <label>End Date <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+                <label>End Date <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(optional)</span></label>
                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
               </div>
             </div>
 
-            <div className="pn">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700 }}>Contract Sections</div>
-                <button className="pv-btn pv-btn-sec" style={{ fontSize: '11px' }} onClick={addSection}>+ Add Clause</button>
+            <div className="card" style={{ overflow: 'hidden' }}>
+              <div className="card-hdr">
+                <div className="card-title">Contract Sections</div>
+                <button className="btn btn-sec btn-sm" onClick={addSection}>+ Add Clause</button>
               </div>
-              {sections.map((sec, i) => (
-                <div key={i} style={{ marginBottom: '16px', border: '1px solid #e4e7eb', borderRadius: '8px', padding: '12px' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-                    <input
-                      type="text"
-                      value={sec.title}
-                      onChange={e => updateSection(i, 'title', e.target.value)}
-                      style={{ flex: 1, fontWeight: 600, fontSize: '13px' }}
-                    />
-                    <button
-                      onClick={() => removeSection(i)}
-                      style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '14px', padding: '2px 6px', flexShrink: 0 }}
-                      title="Remove clause"
-                    >✕</button>
+              <div style={{ padding: '0 18px 18px' }}>
+                {sections.map((sec, i) => (
+                  <div key={i} style={{ marginBottom: 16, border: '1px solid var(--line)', borderRadius: 8, padding: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                      <input type="text" value={sec.title} onChange={e => updateSection(i, 'title', e.target.value)} style={{ flex: 1, fontWeight: 600, fontSize: 13, padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--surface)', color: 'var(--ink)' }} />
+                      <button onClick={() => removeSection(i)} style={{ background: 'none', border: 'none', color: 'var(--err)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', flexShrink: 0 }} title="Remove clause">✕</button>
+                    </div>
+                    <textarea rows={4} value={sec.content} onChange={e => updateSection(i, 'content', e.target.value)} placeholder="Clause content…" style={{ width: '100%', fontSize: 12.5, lineHeight: 1.7, padding: '8px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--surface)', color: 'var(--ink)', resize: 'vertical', boxSizing: 'border-box' }} />
                   </div>
-                  <textarea
-                    rows={4}
-                    value={sec.content}
-                    onChange={e => updateSection(i, 'content', e.target.value)}
-                    placeholder="Clause content..."
-                    style={{ width: '100%', fontSize: '12.5px', lineHeight: 1.7 }}
-                  />
-                </div>
-              ))}
-              <button className="pv-btn pv-btn-sec" style={{ width: '100%', fontSize: '12px' }} onClick={addSection}>
-                + Add Custom Clause
-              </button>
+                ))}
+                <button className="btn btn-sec" style={{ width: '100%', fontSize: 12 }} onClick={addSection}>
+                  + Add Custom Clause
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Right: mini preview */}
-          <div className="pn" style={{ position: 'sticky', top: '20px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '14px' }}>Live Preview</div>
-            <div style={{ background: '#fff', border: '1px solid #e4e7eb', borderRadius: '8px', padding: '20px', fontFamily: 'Inter, sans-serif', fontSize: '11px' }}>
-              <div style={{ textAlign: 'center', borderBottom: '1.5px solid #1a1f2e', paddingBottom: '12px', marginBottom: '16px' }}>
-                <div style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '0.5px' }}>PIONEERS VENEERS</div>
-                <div style={{ fontSize: '9px', color: '#6b7689', marginTop: '2px', textTransform: 'uppercase' }}>Employment Agreement</div>
+          {/* Mini preview */}
+          <div className="card" style={{ padding: '20px 18px', position: 'sticky', top: 20 }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Live Preview</div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: 20, fontFamily: 'Inter, sans-serif', fontSize: 11 }}>
+              <div style={{ textAlign: 'center', borderBottom: '1.5px solid #1a1f2e', paddingBottom: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.5px' }}>PIONEERS VENEERS</div>
+                <div style={{ fontSize: 9, color: '#6b7689', marginTop: 2, textTransform: 'uppercase' }}>Employment Agreement</div>
               </div>
-              <div style={{ fontWeight: 700, textAlign: 'center', marginBottom: '12px', fontSize: '11px', textTransform: 'uppercase' }}>
-                {contractType} Agreement
-              </div>
-              <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', marginBottom: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                <div><span style={{ color: '#6b7689', fontSize: '9px' }}>Employee</span><br /><strong>{users.find(u => u.id === selectedUser)?.name ?? '—'}</strong></div>
-                <div><span style={{ color: '#6b7689', fontSize: '9px' }}>Effective</span><br /><strong>{effectiveDate}</strong></div>
+              <div style={{ fontWeight: 700, textAlign: 'center', marginBottom: 12, fontSize: 11, textTransform: 'uppercase' }}>{contractType} Agreement</div>
+              <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: 6, marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <div><span style={{ color: '#6b7689', fontSize: 9 }}>Employee</span><br /><strong>{users.find(u => u.id === selectedUser)?.name ?? '—'}</strong></div>
+                <div><span style={{ color: '#6b7689', fontSize: 9 }}>Effective</span><br /><strong>{effectiveDate}</strong></div>
               </div>
               {sections.slice(0, 3).map((s, i) => (
-                <div key={i} style={{ marginBottom: '8px' }}>
-                  <div style={{ fontWeight: 700, borderBottom: '1px solid #f0f2f5', paddingBottom: '3px', marginBottom: '4px' }}>{s.title}</div>
+                <div key={i} style={{ marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700, borderBottom: '1px solid #f0f2f5', paddingBottom: 3, marginBottom: 4 }}>{s.title}</div>
                   <div style={{ color: '#4a5568', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {s.content || <span style={{ color: '#9ca3af' }}>— empty —</span>}
                   </div>
                 </div>
               ))}
               {sections.length > 3 && (
-                <div style={{ color: '#9ca3af', textAlign: 'center', marginTop: '6px' }}>
-                  +{sections.length - 3} more clause{sections.length - 3 !== 1 ? 's' : ''}
-                </div>
+                <div style={{ color: '#9ca3af', textAlign: 'center', marginTop: 6 }}>+{sections.length - 3} more clause{sections.length - 3 !== 1 ? 's' : ''}</div>
               )}
             </div>
           </div>
@@ -302,27 +285,97 @@ export default function ContractsClient({
   }
 
   // ---- LIST ----
+  const pending = contracts.filter(c => c.status === 'Pending').length;
+  const signed = contracts.filter(c => c.status === 'Signed').length;
+  const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
+  const thisMonth = contracts.filter(c => c.effective_date >= startOfMonth.toISOString().split('T')[0]).length;
+
   return (
-    <div>
-      <div className="pn-h" style={{ marginBottom: '16px' }}>
-        <div className="pn-t">Contracts</div>
+    <div className="page-fade">
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">📄</div></div>
+          <div className="stat-l">TOTAL CONTRACTS</div>
+          <div className="stat-v">{contracts.length}</div>
+          <div className="stat-foot">All contracts</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico wn">⏳</div></div>
+          <div className="stat-l">PENDING SIGNATURE</div>
+          <div className="stat-v" style={{ color: pending > 0 ? 'var(--warn)' : 'var(--ok)' }}>{pending}</div>
+          <div className="stat-foot">Awaiting signing</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">✓</div></div>
+          <div className="stat-l">SIGNED</div>
+          <div className="stat-v" style={{ color: 'var(--ok)' }}>{signed}</div>
+          <div className="stat-foot">Active contracts</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico acc">↑</div></div>
+          <div className="stat-l">THIS MONTH</div>
+          <div className="stat-v">{thisMonth}</div>
+          <div className="stat-foot">Effective this month</div>
+        </div>
+      </div>
+
+      <div className="briefing" style={{ marginBottom: 20 }}>
+        <div>
+          <div className="card-title">Contracts</div>
+          <div className="card-sub">{contracts.length} contract{contracts.length !== 1 ? 's' : ''} on file</div>
+        </div>
         {isMgmt && (
-          <button className="pv-btn pv-btn-pri" onClick={() => setView('create')}>+ New Contract</button>
+          <div className="briefing-actions">
+            <button className="btn btn-acc" onClick={() => setView('create')}>+ New Contract</button>
+          </div>
         )}
       </div>
-      <div className="pn">
-        {contracts.length === 0 && <div className="empty">No contracts found. {isMgmt && 'Generate your first contract above.'}</div>}
-        {contracts.map(c => (
-          <div key={c.id} className="r-cd">
-            <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', fontSize: '16px' }}>📄</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600 }}>{c.profiles?.name ?? 'You'}</div>
-              <div style={{ fontSize: '11px', color: '#6b7689' }}>{c.type} · Effective: {c.effective_date}</div>
-            </div>
-            <span className={`pv-bdg ${c.status === 'Signed' ? 'pv-bdg-green' : 'pv-bdg-amber'}`}>{c.status}</span>
-            <button className="pv-btn pv-btn-sec" onClick={() => openView(c)}>View / Print</button>
+
+      <div className="card" style={{ overflow: 'hidden' }}>
+        {contracts.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+            No contracts found.{isMgmt && ' Generate your first contract above.'}
           </div>
-        ))}
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Type</th>
+                  <th>Effective Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contracts.map(c => {
+                  const hue = ((c.profiles?.name ?? 'U').charCodeAt(0) * 13) % 360;
+                  return (
+                    <tr key={c.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div className="av-circle" style={{ width: 30, height: 30, fontSize: 10, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                            {(c.profiles?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                          </div>
+                          <span style={{ fontWeight: 600 }}>{c.profiles?.name ?? 'You'}</span>
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.type}</td>
+                      <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>{c.effective_date}</td>
+                      <td>
+                        <span className={c.status === 'Signed' ? 'bdg bdg-ok' : 'bdg bdg-warn'}>{c.status}</span>
+                      </td>
+                      <td>
+                        <button className="btn btn-sec btn-sm" onClick={() => openView(c)}>View / Print</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

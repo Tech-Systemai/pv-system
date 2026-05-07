@@ -12,21 +12,18 @@ export default async function WisePage() {
   const canView = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
   if (!canView) redirect(`/dashboard/${profile?.role || 'sales'}`);
 
-  // All employees for team overview
   const { data: employees } = await admin
     .from('profiles')
     .select('id, name, role, points, score, salary, department')
     .in('role', ['sales', 'cx', 'supervisor'])
     .order('score', { ascending: false });
 
-  // Coaching sessions for QA trend
   const { data: sessions } = await admin
     .from('coaching_sessions')
     .select('*, agent:profiles!coaching_sessions_agent_id_fkey(name, role)')
     .order('created_at', { ascending: false })
     .limit(50);
 
-  // Sales logs for revenue insights
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
@@ -37,7 +34,6 @@ export default async function WisePage() {
     .eq('type', 'Sale')
     .gte('created_at', startOfMonth.toISOString());
 
-  // Aggregate per-agent sales
   const salesByAgent: Record<string, { name: string; count: number; revenue: number }> = {};
   for (const s of salesLogs ?? []) {
     if (!salesByAgent[s.user_id]) {
@@ -58,102 +54,126 @@ export default async function WisePage() {
   const totalSessions = sessions?.length ?? 0;
 
   return (
-    <div>
-      <div className="pn-h" style={{ marginBottom: '20px' }}>
-        <div>
-          <div className="pn-t">WISE · Workforce Intelligence & Score Engine</div>
-          <div style={{ fontSize: '12px', color: '#6b7689', marginTop: '2px' }}>Live performance intelligence across all teams</div>
+    <div className="page-fade">
+      {/* Stat cards */}
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">💡</div></div>
+          <div className="stat-l">AVG POINTS</div>
+          <div className="stat-v">{avgPoints}<span style={{ fontSize: 13, color: 'var(--ink-3)', fontWeight: 400 }}>/7</span></div>
+          <div className="stat-foot">Team reliability score</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico er">⚠</div></div>
+          <div className="stat-l">AT RISK</div>
+          <div className="stat-v" style={{ color: 'var(--err)' }}>{atRisk}</div>
+          <div className="stat-foot">Below 5 points</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">$</div></div>
+          <div className="stat-l">MONTH REVENUE</div>
+          <div className="stat-v">${totalRevenue.toLocaleString()}</div>
+          <div className="stat-foot">Sales this month</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico acc">🎯</div></div>
+          <div className="stat-l">QA SESSIONS</div>
+          <div className="stat-v">{totalSessions}</div>
+          <div className="stat-foot">Coaching sessions logged</div>
         </div>
       </div>
 
-      {/* KPI row */}
-      <div className="stat-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico ind">💡</div></div>
-          <div className="s-l">Avg Points</div>
-          <div className="s-v">{avgPoints}<span style={{ fontSize: '13px', color: '#6b7689' }}>/7</span></div>
-          <div className="s-s">Team reliability score</div>
-        </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico rd">⚠</div></div>
-          <div className="s-l">At Risk</div>
-          <div className="s-v rd">{atRisk}</div>
-          <div className="s-s">Employees below 5 pts</div>
-        </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico gn">$</div></div>
-          <div className="s-l">Month Revenue</div>
-          <div className="s-v gn">${totalRevenue.toLocaleString()}</div>
-          <div className="s-s">Sales this month</div>
-        </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico cy">🎯</div></div>
-          <div className="s-l">QA Sessions</div>
-          <div className="s-v">{totalSessions}</div>
-          <div className="s-s">Coaching sessions logged</div>
-        </div>
-      </div>
-
-      <div className="two">
-        {/* Agent score leaderboard */}
-        <div className="pn">
-          <div className="pn-h"><div className="pn-t">Agent Reliability Board</div></div>
-          {(employees ?? []).length === 0 && <div className="empty">No agents found.</div>}
-          {(employees ?? []).map((e, i) => {
-            const pts = e.points ?? 7;
-            const pct = Math.round((pts / 7) * 100);
-            const color = pts >= 6 ? '#10b981' : pts >= 4 ? '#f59e0b' : '#ef4444';
-            return (
-              <div key={e.id} className="r-cd">
-                <div style={{ width: '22px', fontSize: '11px', fontWeight: 700, color: '#6b7689' }}>#{i + 1}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{e.name}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7689' }}>{e.role} · {e.department ?? '—'}</div>
-                  <div style={{ marginTop: '5px', height: '4px', background: '#e4e7eb', borderRadius: '2px' }}>
-                    <div style={{ height: '4px', borderRadius: '2px', background: color, width: `${pct}%` }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {/* Agent reliability board */}
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-hdr">
+            <div className="card-title">Agent Reliability Board</div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            {(employees ?? []).length === 0 && (
+              <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No agents found.</div>
+            )}
+            {(employees ?? []).map((e, i) => {
+              const pts = e.points ?? 7;
+              const pct = Math.round((pts / 7) * 100);
+              const hue = ((e.name || 'U').charCodeAt(0) * 13) % 360;
+              return (
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--line-2)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-4)', width: 22 }}>#{i + 1}</div>
+                  <div className="av-circle" style={{ width: 32, height: 32, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))`, flexShrink: 0 }}>
+                    {e.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
                   </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{e.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{e.role} · {e.department ?? '—'}</div>
+                    <div style={{ marginTop: 5, height: 4, background: 'var(--surface-3)', borderRadius: 2 }}>
+                      <div style={{ height: 4, borderRadius: 2, width: `${pct}%`, background: pts >= 6 ? 'var(--ok)' : pts >= 4 ? 'var(--warn)' : 'var(--err)' }} />
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 700, color: pts >= 6 ? 'var(--ok)' : pts >= 4 ? 'var(--warn)' : 'var(--err)', minWidth: 40, textAlign: 'right' }}>{pts}/7</div>
+                  <span className={`bdg ${pts >= 6 ? 'bdg-ok' : pts >= 4 ? 'bdg-warn' : 'bdg-err'}`}>
+                    {pts >= 6 ? 'Good' : pts >= 4 ? 'Warning' : 'At Risk'}
+                  </span>
                 </div>
-                <span style={{ fontSize: '14px', fontWeight: 700, color, minWidth: '40px', textAlign: 'right' }}>{pts}/7</span>
-                <span className={`pv-bdg ${pts >= 6 ? 'pv-bdg-green' : pts >= 4 ? 'pv-bdg-amber' : 'pv-bdg-red'}`}>
-                  {pts >= 6 ? 'Good' : pts >= 4 ? 'Warning' : 'At Risk'}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Top Sales Agents */}
-          <div className="pn" style={{ alignSelf: 'start' }}>
-            <div className="pn-t" style={{ marginBottom: '13px' }}>Top Sales · This Month</div>
-            {topAgents.length === 0 && <div className="empty">No sales logged this month.</div>}
-            {topAgents.map(([uid, data], i) => (
-              <div key={uid} className="r-cd">
-                <div style={{ width: '22px', fontSize: '11px', fontWeight: 700, color: '#6b7689' }}>#{i + 1}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{data.name}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7689' }}>{data.count} sales</div>
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#047857' }}>${data.revenue.toLocaleString()}</div>
-              </div>
-            ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Top sales agents */}
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card-hdr">
+              <div className="card-title">Top Sales · This Month</div>
+            </div>
+            <div style={{ padding: '0 18px 18px' }}>
+              {topAgents.length === 0 && (
+                <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No sales logged this month.</div>
+              )}
+              {topAgents.map(([uid, data], i) => {
+                const hue = (data.name.charCodeAt(0) * 13) % 360;
+                return (
+                  <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line-2)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-4)', width: 22 }}>#{i + 1}</div>
+                    <div className="av-circle" style={{ width: 30, height: 30, fontSize: 10, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                      {data.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{data.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{data.count} sales</div>
+                    </div>
+                    <div style={{ fontWeight: 700, color: 'var(--ok)', fontSize: 14 }}>${data.revenue.toLocaleString()}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Recent Coaching Sessions */}
-          <div className="pn" style={{ alignSelf: 'start' }}>
-            <div className="pn-t" style={{ marginBottom: '13px' }}>Recent Coaching Sessions</div>
-            {(sessions ?? []).length === 0 && <div className="empty">No coaching sessions yet.</div>}
-            {(sessions ?? []).slice(0, 6).map(s => (
-              <div key={s.id} className="r-cd">
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{s.agent?.name ?? '—'}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7689' }}>
-                    {s.type} · {new Date(s.created_at).toLocaleDateString()}
+          {/* Recent coaching sessions */}
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card-hdr">
+              <div className="card-title">Recent Coaching</div>
+            </div>
+            <div style={{ padding: '0 18px 18px' }}>
+              {(sessions ?? []).length === 0 && (
+                <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No coaching sessions yet.</div>
+              )}
+              {(sessions ?? []).slice(0, 6).map(s => {
+                const agentHue = ((s.agent?.name ?? 'A').charCodeAt(0) * 13) % 360;
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--line-2)' }}>
+                    <div className="av-circle" style={{ width: 28, height: 28, fontSize: 9, background: `linear-gradient(135deg, oklch(0.55 0.13 ${agentHue}), oklch(0.42 0.16 ${agentHue + 20}))` }}>
+                      {(s.agent?.name ?? 'A').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{s.agent?.name ?? '—'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{new Date(s.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <span className={`bdg ${s.type === 'Performance' ? 'bdg-ok' : 'bdg-warn'}`}>{s.type}</span>
                   </div>
-                </div>
-                <span className={`pv-bdg ${s.type === 'Performance' ? 'pv-bdg-green' : 'pv-bdg-amber'}`}>{s.type}</span>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

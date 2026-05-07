@@ -421,7 +421,7 @@ export default function ChatClient({
             <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setPendingFile(e.target.files[0]); e.target.value = ''; }} />
             <button type="button" onClick={() => fileInputRef.current?.click()} style={{ background: 'none', border: '1px solid #d8dde5', borderRadius: '8px', padding: '9px 12px', cursor: 'pointer', fontSize: '14px', color: '#6b7689', flexShrink: 0 }}>📎</button>
             <input type="text" value={text} onChange={e => setText(e.target.value)} placeholder={isDM ? `Message ${dmRecipient?.name || ''}…` : `Message ${activeLabel}…`} style={{ flex: 1, padding: '10px 14px', border: '1px solid #d8dde5', borderRadius: '8px', fontSize: '13px', outline: 'none' }} />
-            <button type="submit" className="pv-btn pv-btn-pri" disabled={sending || uploading || (!text.trim() && !pendingFile)} style={{ flexShrink: 0 }}>
+            <button type="submit" className="btn btn-acc" disabled={sending || uploading || (!text.trim() && !pendingFile)} style={{ flexShrink: 0 }}>
               {uploading ? 'Uploading…' : sending ? '…' : 'Send'}
             </button>
           </form>
@@ -503,8 +503,8 @@ export default function ChatClient({
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button onClick={() => setShowCreateChannel(false)} className="pv-btn pv-btn-sec">Cancel</button>
-                <button onClick={createChannel} disabled={!newChName.trim() || creating} className="pv-btn pv-btn-pri">
+                <button onClick={() => setShowCreateChannel(false)} className="btn btn-sec">Cancel</button>
+                <button onClick={createChannel} disabled={!newChName.trim() || creating} className="btn btn-acc">
                   {creating ? 'Creating…' : 'Create Channel'}
                 </button>
               </div>
@@ -601,7 +601,7 @@ export default function ChatClient({
             </div>
             <div style={{ padding: '16px 24px', borderTop: '1px solid #e4e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7689' }}>
               <span>🔵 Blue = role default · 🟢 Green = manual grant · Click grey to grant, green to revoke</span>
-              <button className="pv-btn pv-btn-sec" onClick={() => setShowAccessModal(false)}>Close</button>
+              <button className="btn btn-sec" onClick={() => setShowAccessModal(false)}>Close</button>
             </div>
           </div>
         </div>

@@ -20,7 +20,6 @@ export default function PayrollClient({
   const [sending, setSending] = useState<string | null>(null);
   const [sent, setSent] = useState<Set<string>>(new Set());
 
-  // Build per-employee attendance stats from logs
   const attendanceByUser: Record<string, { totalMins: number; daysPresent: number; daysLate: number }> = {};
   for (const log of attendanceLogs) {
     if (!attendanceByUser[log.user_id]) attendanceByUser[log.user_id] = { totalMins: 0, daysPresent: 0, daysLate: 0 };
@@ -32,14 +31,12 @@ export default function PayrollClient({
   const handleProcessAll = async () => {
     if (!confirm(`Process payroll for ${PERIOD}? This will create approved payslips for all employees.`)) return;
     setIsProcessing(true);
-
     const newPayrolls = employees.map(e => {
       const deductions = e.points < 7 ? (7 - e.points) * 20 : 0;
       const base_salary = e.salary || 2500;
       const net_pay = base_salary - deductions;
       return { user_id: e.id, period: PERIOD, base_salary, deductions, bonuses: 0, net_pay, status: 'Approved' };
     });
-
     const { data } = await dbOp('payrolls', 'insert', newPayrolls);
     if (data) setPayrolls([...data, ...payrolls]);
     setIsProcessing(false);
@@ -69,6 +66,11 @@ export default function PayrollClient({
     return { emp: e, base, deductions, net, isApproved, slip, att };
   });
 
+  const totalPayroll = currentPeriodList.reduce((s, i) => s + i.net, 0);
+  const totalDeductions = currentPeriodList.reduce((s, i) => s + i.deductions, 0);
+  const processedCount = currentPeriodList.filter(i => i.isApproved).length;
+  const sentCount = sent.size;
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -80,75 +82,123 @@ export default function PayrollClient({
         }
       ` }} />
 
-      <div className="pn-h no-print" style={{ marginBottom: '14px' }}>
-        <div>
-          <div className="pn-t">Payroll · {PERIOD}</div>
-          <div style={{ fontSize: '12px', color: '#6b7689', marginTop: '2px' }}>
-            Deductions = (7 − points) × $20 · Nightly policy engine applies penalties
+      <div className="page-fade no-print">
+        {/* Stat cards */}
+        <div className="stat-grid" style={{ marginBottom: 20 }}>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ok">$</div></div>
+            <div className="stat-l">TOTAL PAYROLL</div>
+            <div className="stat-v">${totalPayroll.toLocaleString()}</div>
+            <div className="stat-foot">{PERIOD}</div>
+          </div>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico er">↓</div></div>
+            <div className="stat-l">TOTAL DEDUCTIONS</div>
+            <div className="stat-v" style={{ color: 'var(--err)' }}>${totalDeductions.toLocaleString()}</div>
+            <div className="stat-foot">Points-based penalties</div>
+          </div>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ind">✓</div></div>
+            <div className="stat-l">PROCESSED</div>
+            <div className="stat-v">{processedCount}<span style={{ fontSize: 14, color: 'var(--ink-3)' }}>/{employees.length}</span></div>
+            <div className="stat-foot">Approved payslips</div>
+          </div>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ok">✉</div></div>
+            <div className="stat-l">SENT TO INBOX</div>
+            <div className="stat-v">{sentCount}</div>
+            <div className="stat-foot">This session</div>
           </div>
         </div>
-        <button className="pv-btn pv-btn-pri" onClick={handleProcessAll} disabled={isProcessing}>
-          {isProcessing ? 'Processing...' : 'Process & Approve All →'}
-        </button>
-      </div>
 
-      <div className="pn no-print">
-        {currentPeriodList.length === 0 && <div className="empty">No employees found.</div>}
-        {currentPeriodList.map(item => (
-          <div key={item.emp.id} className="r-cd" style={{ flexWrap: 'wrap', gap: '10px' }}>
-            <div className="av gy">{item.emp.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}</div>
-
-            <div style={{ flex: 1, minWidth: '140px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 600 }}>{item.emp.name}</div>
-              <div style={{ fontSize: '11px', color: '#6b7689' }}>{item.emp.department} · {item.emp.id.substring(0, 8)}</div>
-              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                {item.att.daysPresent}d present · {item.att.daysLate}d late · {Math.floor(item.att.totalMins / 60)}h tracked
-              </div>
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">Payroll · {PERIOD}</div>
+              <div className="card-sub">Deductions = (7 − points) × $20 · Nightly policy engine applies penalties</div>
             </div>
-
-            <div style={{ textAlign: 'right', minWidth: '70px' }}>
-              <div style={{ fontSize: '9.5px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Base</div>
-              <div style={{ fontWeight: 600 }}>${item.base.toLocaleString()}</div>
-            </div>
-
-            {item.deductions > 0 && (
-              <div style={{ textAlign: 'right', minWidth: '70px' }}>
-                <div style={{ fontSize: '9.5px', color: '#6b7689', textTransform: 'uppercase', fontWeight: 600 }}>Deduct</div>
-                <div style={{ color: '#dc2626', fontWeight: 600 }}>−${item.deductions.toLocaleString()}</div>
-              </div>
-            )}
-
-            <div style={{ textAlign: 'right', minWidth: '90px' }}>
-              <div style={{ fontSize: '9.5px', color: '#047857', textTransform: 'uppercase', fontWeight: 600 }}>Net Pay</div>
-              <div style={{ color: '#047857', fontWeight: 700, fontSize: '14px' }}>${item.net.toLocaleString()}</div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              {item.isApproved ? (
-                <>
-                  <button className="pv-btn pv-btn-sec" onClick={() => setPrintSlip(item)}>↓ PDF</button>
-                  <button
-                    className="pv-btn pv-btn-pri"
-                    disabled={sending === item.emp.id || sent.has(item.emp.id)}
-                    onClick={() => handleSendToInbox(item.emp, item)}
-                    style={{ fontSize: '11px' }}
-                  >
-                    {sent.has(item.emp.id) ? '✓ Sent' : sending === item.emp.id ? '...' : '✉ Send'}
-                  </button>
-                </>
-              ) : (
-                <span className="pv-bdg pv-bdg-amber">Draft</span>
-              )}
-            </div>
+            <button className="btn btn-acc btn-sm" onClick={handleProcessAll} disabled={isProcessing}>
+              {isProcessing ? 'Processing…' : '⚡ Process & Approve All'}
+            </button>
           </div>
-        ))}
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Attendance</th>
+                  <th>Base Salary</th>
+                  <th>Deductions</th>
+                  <th>Net Pay</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentPeriodList.map(item => {
+                  const hue = ((item.emp.name || 'U').charCodeAt(0) * 13) % 360;
+                  return (
+                    <tr key={item.emp.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div className="av-circle" style={{ width: 32, height: 32, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                            {item.emp.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{item.emp.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{item.emp.department}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
+                        {item.att.daysPresent}d · {item.att.daysLate}L · {Math.floor(item.att.totalMins / 60)}h
+                      </td>
+                      <td style={{ fontWeight: 600 }}>${item.base.toLocaleString()}</td>
+                      <td>
+                        {item.deductions > 0 ? (
+                          <span style={{ color: 'var(--err)', fontWeight: 600 }}>−${item.deductions.toLocaleString()}</span>
+                        ) : (
+                          <span style={{ color: 'var(--ink-4)' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ fontWeight: 700, fontSize: 15, color: 'var(--ok)' }}>${item.net.toLocaleString()}</td>
+                      <td>
+                        {item.isApproved
+                          ? <span className="bdg bdg-ok">Approved</span>
+                          : <span className="bdg bdg-warn">Draft</span>}
+                      </td>
+                      <td>
+                        {item.isApproved ? (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-sec btn-sm" onClick={() => setPrintSlip(item)}>↓ PDF</button>
+                            <button
+                              className="btn btn-acc btn-sm"
+                              disabled={sending === item.emp.id || sent.has(item.emp.id)}
+                              onClick={() => handleSendToInbox(item.emp, item)}
+                            >
+                              {sent.has(item.emp.id) ? '✓ Sent' : sending === item.emp.id ? '…' : '✉ Send'}
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>Process first</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
+      {/* Print / PDF payslip */}
       {printSlip && (
         <div className="print-container" style={{ background: '#fff', padding: '40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-          <div style={{ borderBottom: '2px solid #4f46e5', paddingBottom: '20px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ borderBottom: '2px solid oklch(0.52 0.20 268)', paddingBottom: '20px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              <div style={{ width: '50px', height: '50px', borderRadius: '10px', background: 'linear-gradient(135deg, #4f46e5, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '20px' }}>PV</div>
+              <div style={{ width: '50px', height: '50px', borderRadius: '10px', background: 'linear-gradient(135deg, oklch(0.52 0.20 268), oklch(0.42 0.22 280))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '20px' }}>PV</div>
               <div>
                 <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>Pioneers Veneers</div>
                 <div style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>Official Payslip Document</div>
@@ -200,8 +250,8 @@ export default function PayrollClient({
           </div>
 
           <div className="no-print" style={{ textAlign: 'center', marginTop: '24px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            <button className="pv-btn pv-btn-pri" onClick={() => window.print()}>🖨️ Print / Download PDF</button>
-            <button className="pv-btn pv-btn-sec" onClick={() => setPrintSlip(null)}>Close</button>
+            <button className="btn btn-acc" onClick={() => window.print()}>Print / Download PDF</button>
+            <button className="btn btn-sec" onClick={() => setPrintSlip(null)}>Close</button>
           </div>
         </div>
       )}

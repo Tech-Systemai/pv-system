@@ -13,21 +13,18 @@ export default async function MonitoringPage() {
     redirect(`/dashboard/${profile?.role || 'sales'}`);
   }
 
-  // Live workforce snapshot
   const { data: employees } = await admin
     .from('profiles')
     .select('id, name, role, clocked_in, current_activity, department, points')
     .in('role', ['sales', 'cx', 'supervisor'])
     .order('clocked_in', { ascending: false });
 
-  // Recent audit activity
   const { data: activity } = await admin
     .from('audit_logs')
     .select('action, entity_type, created_at')
     .order('created_at', { ascending: false })
     .limit(20);
 
-  // Today's attendance summary
   const today = new Date().toISOString().split('T')[0];
   const { data: todayLogs } = await admin
     .from('attendance_logs')
@@ -42,96 +39,105 @@ export default async function MonitoringPage() {
     : 0;
 
   return (
-    <div>
-      <div className="pn-h" style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#dc2626', animation: 'pulse 2s infinite' }}></div>
-          <div className="pn-t">Live System Monitoring</div>
+    <div className="page-fade">
+      {/* Stat cards */}
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h">
+            <div className="stat-ico ok" style={{ position: 'relative' }}>
+              <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)', marginRight: 0 }} />
+            </div>
+          </div>
+          <div className="stat-l">CLOCKED IN</div>
+          <div className="stat-v" style={{ color: 'var(--ok)' }}>{clockedInCount}</div>
+          <div className="stat-foot">of {totalCount} agents online</div>
         </div>
-        <div style={{ fontSize: '12px', color: '#6b7689' }}>Updated every page load · {new Date().toLocaleTimeString()}</div>
-      </div>
-
-      {/* KPI row */}
-      <div className="stat-grid" style={{ marginBottom: '24px' }}>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico gn">👥</div></div>
-          <div className="s-l">Clocked In</div>
-          <div className="s-v gn">{clockedInCount}</div>
-          <div className="s-s">of {totalCount} agents</div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico er">⚠</div></div>
+          <div className="stat-l">LATE TODAY</div>
+          <div className="stat-v" style={{ color: 'var(--err)' }}>{lateCount}</div>
+          <div className="stat-foot">Policy deductions pending</div>
         </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico rd">⚠</div></div>
-          <div className="s-l">Late Today</div>
-          <div className="s-v rd">{lateCount}</div>
-          <div className="s-s">Policy deductions pending</div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">⏱</div></div>
+          <div className="stat-l">AVG PRODUCTIVITY</div>
+          <div className="stat-v">{Math.floor(avgProductivity / 60)}<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--ink-3)' }}>h</span> {avgProductivity % 60}<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--ink-3)' }}>m</span></div>
+          <div className="stat-foot">From Apploye today</div>
         </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico ind">⏱</div></div>
-          <div className="s-l">Avg Productivity</div>
-          <div className="s-v">{Math.floor(avgProductivity / 60)}h {avgProductivity % 60}m</div>
-          <div className="s-s">From Apploye today</div>
-        </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico am">📊</div></div>
-          <div className="s-l">Offline</div>
-          <div className="s-v am">{totalCount - clockedInCount}</div>
-          <div className="s-s">Not clocked in</div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico gy">●</div></div>
+          <div className="stat-l">OFFLINE</div>
+          <div className="stat-v" style={{ color: 'var(--ink-3)' }}>{totalCount - clockedInCount}</div>
+          <div className="stat-foot">Not clocked in</div>
         </div>
       </div>
 
-      <div className="two">
-        {/* Live agent status */}
-        <div className="pn">
-          <div className="pn-t" style={{ marginBottom: '14px' }}>Agent Status Board</div>
-          {(employees ?? []).length === 0 && <div className="empty">No agents found.</div>}
-          {(employees ?? []).map(e => {
-            const todayLog = todayLogs?.find(l => l.user_id === e.id);
-            const prodMins = todayLog?.productive_time_minutes ?? 0;
-            return (
-              <div key={e.id} className="r-cd">
-                <div style={{ position: 'relative' }}>
-                  <div className="av" style={{ background: e.clocked_in ? '#ecfdf5' : '#f5f6f8', color: e.clocked_in ? '#047857' : '#6b7689' }}>
-                    {e.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
-                  </div>
-                  <div style={{ position: 'absolute', bottom: 0, right: 0, width: '8px', height: '8px', borderRadius: '50%', background: e.clocked_in ? '#10b981' : '#e4e7eb', border: '2px solid #fff' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{e.name}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7689' }}>
-                    {e.role} · {e.current_activity || (e.clocked_in ? 'Active' : 'Offline')}
-                  </div>
-                </div>
-                {prodMins > 0 && (
-                  <div style={{ fontSize: '11px', color: '#4f46e5', fontWeight: 600 }}>
-                    {Math.floor(prodMins / 60)}h {prodMins % 60}m
-                  </div>
-                )}
-                <span className={`pv-bdg ${e.clocked_in ? 'pv-bdg-green' : 'pv-bdg-gray'}`}>
-                  {e.clocked_in ? 'Online' : 'Offline'}
-                </span>
-                <span className={`pv-bdg ${e.points >= 6 ? 'pv-bdg-green' : e.points >= 4 ? 'pv-bdg-amber' : 'pv-bdg-red'}`}>
-                  {e.points}/7 pts
-                </span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {/* Live agent status board */}
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">Agent Status Board</div>
+              <div className="card-sub" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: 'var(--err)' }} />
+                Live · {new Date().toLocaleTimeString()}
               </div>
-            );
-          })}
+            </div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            {(employees ?? []).length === 0 && (
+              <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No agents found.</div>
+            )}
+            {(employees ?? []).map(e => {
+              const todayLog = todayLogs?.find(l => l.user_id === e.id);
+              const prodMins = todayLog?.productive_time_minutes ?? 0;
+              const hue = ((e.name || 'U').charCodeAt(0) * 13) % 360;
+              return (
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--line-2)' }}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div className="av-circle" style={{ width: 32, height: 32, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                      {e.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
+                    </div>
+                    <div style={{ position: 'absolute', bottom: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: e.clocked_in ? 'var(--ok)' : 'var(--line)', border: '2px solid var(--surface)' }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{e.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{e.role} · {e.current_activity || (e.clocked_in ? 'Active' : 'Offline')}</div>
+                  </div>
+                  {prodMins > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--accent-ink)', fontWeight: 600, fontFamily: 'var(--mono)' }}>
+                      {Math.floor(prodMins / 60)}h {prodMins % 60}m
+                    </div>
+                  )}
+                  <span className={`bdg ${e.clocked_in ? 'bdg-ok' : 'bdg-gy'}`}>{e.clocked_in ? 'Online' : 'Offline'}</span>
+                  <span className={`bdg ${(e.points ?? 7) >= 6 ? 'bdg-ok' : (e.points ?? 7) >= 4 ? 'bdg-warn' : 'bdg-err'}`}>{e.points ?? 7}/7</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Activity stream */}
-        <div className="pn">
-          <div className="pn-t" style={{ marginBottom: '14px' }}>Activity Stream</div>
-          {(activity ?? []).length === 0 && <div className="empty">No recent activity.</div>}
-          {(activity ?? []).map((a, i) => (
-            <div key={i} style={{ display: 'flex', gap: '12px', padding: '10px 0', borderBottom: '1px solid #f0f2f5', alignItems: 'center' }}>
-              <div style={{ fontFamily: 'monospace', fontSize: '10px', color: '#6b7689', minWidth: '55px' }}>
-                {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-hdr">
+            <div className="card-title">Activity Stream</div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            {(activity ?? []).length === 0 && (
+              <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No recent activity.</div>
+            )}
+            {(activity ?? []).map((a, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--line-2)', alignItems: 'center' }}>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ink-4)', minWidth: 50, flexShrink: 0 }}>
+                  {new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+                <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                  <strong style={{ color: 'var(--ink)' }}>{a.entity_type}</strong> · {a.action}
+                </div>
               </div>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f46e5', flexShrink: 0 }} />
-              <div style={{ fontSize: '12px', color: '#4a5568' }}>
-                <strong style={{ color: '#1a1f2e' }}>{a.entity_type}</strong> · {a.action}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>

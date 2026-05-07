@@ -3,8 +3,27 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-export default function TasksClient({ initialTasks, users, isMgmt, currentUserId }: { initialTasks: any[], users: any[], isMgmt: boolean, currentUserId: string }) {
+type FilterTab = 'all' | 'open' | 'high' | 'done';
+
+const PRIORITY_BADGE: Record<string, string> = {
+  High: 'bdg bdg-err',
+  Medium: 'bdg bdg-warn',
+  Low: 'bdg bdg-gy',
+};
+
+export default function TasksClient({
+  initialTasks,
+  users,
+  isMgmt,
+  currentUserId,
+}: {
+  initialTasks: any[];
+  users: any[];
+  isMgmt: boolean;
+  currentUserId: string;
+}) {
   const [tasks, setTasks] = useState(initialTasks);
+  const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -27,7 +46,6 @@ export default function TasksClient({ initialTasks, users, isMgmt, currentUserId
       priority: fd.get('priority') as string,
       completed: false,
     };
-
     const { data } = await dbOp('tasks', 'insert', newTask);
     if (data?.[0]) {
       const assignedUser = users.find(u => u.id === assignedTo);
@@ -45,61 +63,133 @@ export default function TasksClient({ initialTasks, users, isMgmt, currentUserId
 
   const open = tasks.filter(t => !t.completed);
   const done = tasks.filter(t => t.completed);
+  const high = tasks.filter(t => !t.completed && t.priority === 'High');
+
+  const TABS: { id: FilterTab; label: string; count: number }[] = [
+    { id: 'all', label: 'All', count: tasks.length },
+    { id: 'open', label: 'Open', count: open.length },
+    { id: 'high', label: 'High Priority', count: high.length },
+    { id: 'done', label: 'Done', count: done.length },
+  ];
+
+  const filtered = filterTab === 'all' ? tasks
+    : filterTab === 'open' ? open
+    : filterTab === 'high' ? high
+    : done;
 
   return (
-    <>
-      <div className="pn">
-        <div className="pn-h" style={{ marginBottom: '14px' }}>
+    <div className="page-fade">
+      {/* Stat cards */}
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">☑</div></div>
+          <div className="stat-l">TOTAL TASKS</div>
+          <div className="stat-v">{tasks.length}</div>
+          <div className="stat-foot">All assigned tasks</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico wn">◯</div></div>
+          <div className="stat-l">OPEN</div>
+          <div className="stat-v">{open.length}</div>
+          <div className="stat-foot">Pending completion</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico er">⚠</div></div>
+          <div className="stat-l">HIGH PRIORITY</div>
+          <div className="stat-v" style={{ color: 'var(--err)' }}>{high.length}</div>
+          <div className="stat-foot">Urgent open tasks</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">✓</div></div>
+          <div className="stat-l">COMPLETED</div>
+          <div className="stat-v">{done.length}</div>
+          <div className="stat-foot">Finished tasks</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card-hdr">
           <div>
-            <div className="pn-t">{isMgmt ? 'All Tasks' : 'My Tasks'}</div>
-            <div style={{ fontSize: '12px', color: '#6b7689', marginTop: '2px' }}>{open.length} open · {done.length} completed</div>
+            <div className="card-title">{isMgmt ? 'All Tasks' : 'My Tasks'}</div>
+            <div className="card-sub">{open.length} open · {done.length} completed</div>
           </div>
-          {isMgmt && <button className="pv-btn pv-btn-pri" onClick={() => setIsModalOpen(true)}>+ Assign Task</button>}
+          {isMgmt && (
+            <button className="btn btn-acc btn-sm" onClick={() => setIsModalOpen(true)}>+ Assign Task</button>
+          )}
         </div>
 
-        {tasks.length === 0 && <div className="empty">No tasks found.</div>}
-
-        {open.map(t => (
-          <div key={t.id} className="r-cd">
-            <div
-              onClick={() => toggleTask(t)}
-              style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid #cbd2e0', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}
-            />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600 }}>{t.title}</div>
-              <div style={{ fontSize: '11px', color: '#6b7689' }}>
-                → {t.assigned_user?.name ?? '—'} · By {t.by_user?.name ?? '—'} · Due {t.due_date ? new Date(t.due_date).toLocaleDateString() : '—'}
-              </div>
-            </div>
-            <span className={`pv-bdg ${t.priority === 'High' ? 'pv-bdg-red' : t.priority === 'Medium' ? 'pv-bdg-amber' : 'pv-bdg-gray'}`}>
-              {t.priority ?? 'Normal'}
-            </span>
-          </div>
-        ))}
-
-        {done.length > 0 && (
-          <>
-            <div style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', padding: '12px 0 6px', marginTop: '4px' }}>Completed</div>
-            {done.map(t => (
-              <div key={t.id} className="r-cd" style={{ opacity: 0.5 }}>
-                <div
-                  onClick={() => toggleTask(t)}
-                  style={{ width: '20px', height: '20px', borderRadius: '5px', border: '1.5px solid #10b981', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}
-                >✓</div>
-                <div style={{ flex: 1, textDecoration: 'line-through' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600 }}>{t.title}</div>
-                  <div style={{ fontSize: '11px', color: '#6b7689' }}>→ {t.assigned_user?.name ?? '—'}</div>
-                </div>
-              </div>
+        <div style={{ padding: '0 18px 12px' }}>
+          <div className="tabs">
+            {TABS.map(t => (
+              <button key={t.id} className={`tab${filterTab === t.id ? ' active' : ''}`} onClick={() => setFilterTab(t.id)}>
+                {t.label} <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>{t.count}</span>
+              </button>
             ))}
-          </>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+            No tasks in this view.
+          </div>
+        ) : (
+          <div style={{ padding: '0 18px 18px' }}>
+            {filtered.map(t => {
+              const hue = ((t.assigned_user?.name ?? 'U').charCodeAt(0) * 13) % 360;
+              const isOverdue = t.due_date && !t.completed && new Date(t.due_date) < new Date();
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+                    borderBottom: '1px solid var(--line-2)',
+                    opacity: t.completed ? 0.55 : 1,
+                  }}
+                >
+                  {/* Checkbox */}
+                  <button
+                    onClick={() => toggleTask(t)}
+                    style={{
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                      border: t.completed ? 'none' : '1.5px solid var(--line)',
+                      background: t.completed ? 'var(--ok)' : 'var(--surface)',
+                      color: '#fff', fontSize: 12, fontWeight: 700,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all .12s',
+                    }}
+                  >{t.completed ? '✓' : ''}</button>
+
+                  {/* Avatar */}
+                  <div className="av-circle" style={{ width: 30, height: 30, fontSize: 10, flexShrink: 0, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                    {(t.assigned_user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                  </div>
+
+                  {/* Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, textDecoration: t.completed ? 'line-through' : 'none', color: t.completed ? 'var(--ink-3)' : 'var(--ink)' }}>{t.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>
+                      → {t.assigned_user?.name ?? '—'} · By {t.by_user?.name ?? '—'}
+                      {t.due_date && (
+                        <span style={{ marginLeft: 8, color: isOverdue ? 'var(--err)' : 'var(--ink-4)', fontWeight: isOverdue ? 700 : 400 }}>
+                          Due {new Date(t.due_date).toLocaleDateString()}{isOverdue ? ' (overdue)' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className={PRIORITY_BADGE[t.priority] ?? 'bdg bdg-gy'}>{t.priority ?? 'Normal'}</span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
+      {/* Assign Task modal */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', padding: '24px', borderRadius: '14px', width: '420px', maxWidth: '100%' }}>
-            <div style={{ fontSize: '17px', fontWeight: 700, marginBottom: '16px' }}>Assign Task</div>
+        <div className="mb">
+          <div className="md" style={{ width: 420 }}>
+            <div className="md-t">Assign Task</div>
             <form onSubmit={handleAssign}>
               <div className="pv-fld">
                 <label>Assign to</label>
@@ -118,14 +208,14 @@ export default function TasksClient({ initialTasks, users, isMgmt, currentUserId
                   <option value="Low">Low</option>
                 </select>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="pv-btn pv-btn-pri" disabled={saving}>{saving ? 'Saving...' : 'Assign'}</button>
-                <button type="button" className="pv-btn pv-btn-sec" onClick={() => setIsModalOpen(false)}>Cancel</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="btn btn-acc" disabled={saving}>{saving ? 'Saving…' : 'Assign Task'}</button>
+                <button type="button" className="btn btn-sec" onClick={() => setIsModalOpen(false)}>Cancel</button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

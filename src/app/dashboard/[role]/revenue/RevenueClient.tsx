@@ -34,75 +34,131 @@ export default function RevenueClient({ initialSales, currentUserId }: { initial
 
   const totalRevenue = sales.reduce((sum, s) => sum + Number(s.amount), 0);
   const verified = sales.filter(s => s.status === 'Verified').length;
+  const pending = sales.length - verified;
+  const today = new Date().toDateString();
+  const todayTotal = sales
+    .filter(s => new Date(s.created_at).toDateString() === today)
+    .reduce((sum, s) => sum + Number(s.amount), 0);
 
   return (
-    <>
-      <div className="stat-grid" style={{ marginBottom: '16px' }}>
-        <div className="stat">
-          <div className="s-l">Total Logged</div>
-          <div className="s-v gn">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+    <div className="page-fade">
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">$</div></div>
+          <div className="stat-l">TOTAL LOGGED</div>
+          <div className="stat-v" style={{ color: 'var(--ok)' }}>${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div className="stat-foot">All-time revenue</div>
         </div>
-        <div className="stat">
-          <div className="s-l">Verified</div>
-          <div className="s-v">{verified}</div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">✓</div></div>
+          <div className="stat-l">VERIFIED</div>
+          <div className="stat-v">{verified}</div>
+          <div className="stat-foot">Confirmed sales</div>
         </div>
-        <div className="stat">
-          <div className="s-l">Pending Verification</div>
-          <div className="s-v am">{sales.length - verified}</div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico wn">⏳</div></div>
+          <div className="stat-l">PENDING</div>
+          <div className="stat-v" style={{ color: 'var(--warn)' }}>{pending}</div>
+          <div className="stat-foot">Awaiting verification</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">📅</div></div>
+          <div className="stat-l">TODAY</div>
+          <div className="stat-v">${todayTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div className="stat-foot">Logged today</div>
         </div>
       </div>
 
-      <div className="pn" style={{ marginBottom: '20px' }}>
-        <div className="pn-t" style={{ marginBottom: '13px' }}>Log New Sale</div>
-        {error && <div style={{ background: '#fee2e2', color: '#dc2626', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '12px' }}>{error}</div>}
-        <form onSubmit={handleLog}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-            <div className="pv-fld" style={{ margin: 0 }}>
-              <label>Customer ID</label>
-              <input type="text" name="customer_id" required placeholder="e.g. CUST-1042" />
-            </div>
-            <div className="pv-fld" style={{ margin: 0 }}>
-              <label>Customer Name</label>
-              <input type="text" name="customer_name" placeholder="Full name" />
-            </div>
-            <div className="pv-fld" style={{ margin: 0 }}>
-              <label>Customer Phone</label>
-              <input type="tel" name="customer_phone" placeholder="+1 555 000 0000" />
-            </div>
-            <div className="pv-fld" style={{ margin: 0 }}>
-              <label>Amount ($)</label>
-              <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" />
-            </div>
-          </div>
-          <button type="submit" className="pv-btn pv-btn-pri" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging...' : '+ Log Sale →'}
-          </button>
-        </form>
-      </div>
-
-      <div className="pn">
-        <div className="pn-h" style={{ marginBottom: '14px' }}>
-          <div className="pn-t">Recent Sales</div>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-hdr">
+          <div className="card-title">Log New Sale</div>
         </div>
-        {sales.length === 0 && <div className="empty">No sales logged yet.</div>}
-        {sales.map(s => (
-          <div key={s.id} className="r-cd">
-            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857', fontWeight: 700, fontSize: '13px' }}>$</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 600 }}>
-                {s.customer_name || s.customer_id}
-                {s.customer_name && s.customer_id && <span style={{ color: '#9ca3af', fontWeight: 400 }}> · {s.customer_id}</span>}
+        <div style={{ padding: '0 18px 18px' }}>
+          {error && (
+            <div style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)', padding: '10px 12px', borderRadius: 8, fontSize: 12, marginBottom: 12 }}>
+              {error}
+            </div>
+          )}
+          <form onSubmit={handleLog}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Customer ID</label>
+                <input type="text" name="customer_id" required placeholder="e.g. CUST-1042" />
               </div>
-              {s.customer_phone && (
-                <div style={{ fontSize: '11px', color: '#6b7689' }}>{s.customer_phone}</div>
-              )}
-              <div style={{ fontSize: '11px', color: '#9ca3af' }}>{new Date(s.created_at).toLocaleString()}</div>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Customer Name</label>
+                <input type="text" name="customer_name" placeholder="Full name" />
+              </div>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Customer Phone</label>
+                <input type="tel" name="customer_phone" placeholder="+1 555 000 0000" />
+              </div>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Amount ($)</label>
+                <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" />
+              </div>
             </div>
-            <div style={{ fontWeight: 700, color: '#047857' }}>${Number(s.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-            <span className={`pv-bdg ${s.status === 'Verified' ? 'pv-bdg-green' : 'pv-bdg-amber'}`}>{s.status}</span>
-          </div>
-        ))}
+            <button type="submit" className="btn btn-acc" disabled={isSubmitting}>
+              {isSubmitting ? 'Logging…' : '+ Log Sale →'}
+            </button>
+          </form>
+        </div>
       </div>
-    </>
+
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card-hdr">
+          <div>
+            <div className="card-title">Recent Sales</div>
+            <div className="card-sub">{sales.length} total entries</div>
+          </div>
+        </div>
+        {sales.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+            No sales logged yet.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Phone</th>
+                  <th>Date / Time</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.map(s => (
+                  <tr key={s.id}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'oklch(0.96 0.05 145)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ok)', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>$</div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{s.customer_name || s.customer_id}</div>
+                          {s.customer_name && s.customer_id && (
+                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{s.customer_id}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--ink-4)' }}>{s.customer_phone || '—'}</td>
+                    <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>
+                      {new Date(s.created_at).toLocaleString()}
+                    </td>
+                    <td style={{ fontWeight: 700, color: 'var(--ok)', fontSize: 14 }}>
+                      ${Number(s.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </td>
+                    <td>
+                      <span className={s.status === 'Verified' ? 'bdg bdg-ok' : 'bdg bdg-warn'}>{s.status}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

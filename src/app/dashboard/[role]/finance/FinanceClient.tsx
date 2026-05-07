@@ -14,6 +14,8 @@ type ManualEntry = {
   created_at: string;
 };
 
+type FinanceTab = 'overview' | 'revenue' | 'payroll' | 'manual';
+
 export default function FinanceClient({
   revenue,
   payrollExpenses,
@@ -24,17 +26,24 @@ export default function FinanceClient({
   manualEntries: any[];
 }) {
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>(initialManual);
-  const [tab, setTab] = useState<'overview' | 'revenue' | 'payroll' | 'manual'>('overview');
+  const [tab, setTab] = useState<FinanceTab>('overview');
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ category: 'Operations', description: '', amount: '', entry_type: 'expense' as 'income' | 'expense' });
+  const [form, setForm] = useState({
+    category: 'Operations',
+    description: '',
+    amount: '',
+    entry_type: 'expense' as 'income' | 'expense',
+  });
 
   const totalRevenue = revenue.filter(r => r.type === 'Sale').reduce((s, r) => s + Number(r.amount || 0), 0);
   const totalPayroll = payrollExpenses.reduce((s, p) => s + Number(p.net_pay || 0), 0);
   const totalManualExpenses = manualEntries.filter(e => e.entry_type === 'expense').reduce((s, e) => s + Number(e.amount || 0), 0);
   const totalManualIncome = manualEntries.filter(e => e.entry_type === 'income').reduce((s, e) => s + Number(e.amount || 0), 0);
   const totalExpenses = totalPayroll + totalManualExpenses;
-  const netProfit = totalRevenue + totalManualIncome - totalExpenses;
+  const grossIncome = totalRevenue + totalManualIncome;
+  const netProfit = grossIncome - totalExpenses;
+  const marginPct = grossIncome > 0 ? Math.round((netProfit / grossIncome) * 100) : 0;
 
   const handleAddEntry = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,170 +87,208 @@ export default function FinanceClient({
     URL.revokeObjectURL(url);
   };
 
-  const TAB_STYLE = (active: boolean) => ({
-    padding: '7px 16px',
-    borderRadius: '6px',
-    fontSize: '12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    background: active ? '#4f46e5' : 'transparent',
-    color: active ? '#fff' : '#6b7689',
-    border: 'none',
-  } as const);
+  const TABS: { id: FinanceTab; label: string; count?: number }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'revenue', label: 'Revenue', count: revenue.filter(r => r.type === 'Sale').length },
+    { id: 'payroll', label: 'Payroll', count: payrollExpenses.length },
+    { id: 'manual', label: 'Manual Entries', count: manualEntries.length },
+  ];
+
+  const maxExpense = Math.max(
+    totalPayroll,
+    ...EXPENSE_CATEGORIES.map(cat =>
+      manualEntries.filter(e => e.entry_type === 'expense' && e.category === cat).reduce((s, e) => s + Number(e.amount), 0)
+    )
+  );
 
   return (
-    <div>
-      <div className="pn-h" style={{ marginBottom: '20px' }}>
-        <div className="pn-t">Finance Overview</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="pv-btn pv-btn-sec" onClick={exportCSV}>↓ Export CSV</button>
-          <button className="pv-btn pv-btn-pri" onClick={() => setShowAdd(true)}>+ Log Entry</button>
+    <div className="page-fade">
+      {/* Stat cards */}
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">$</div></div>
+          <div className="stat-l">MTD REVENUE</div>
+          <div className="stat-v">${grossIncome.toLocaleString()}</div>
+          <div className="stat-foot">{revenue.filter(r => r.type === 'Sale').length} sales + {manualEntries.filter(e => e.entry_type === 'income').length} manual</div>
         </div>
-      </div>
-
-      {/* KPI row */}
-      <div className="stat-grid" style={{ marginBottom: '20px' }}>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico gn">$</div></div>
-          <div className="s-l">Total Revenue</div>
-          <div className="s-v gn">${(totalRevenue + totalManualIncome).toLocaleString()}</div>
-          <div style={{ fontSize: '10px', color: '#6b7689', marginTop: '2px' }}>{revenue.filter(r => r.type === 'Sale').length} sales + {manualEntries.filter(e => e.entry_type === 'income').length} manual</div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico er">↓</div></div>
+          <div className="stat-l">TOTAL EXPENSES</div>
+          <div className="stat-v" style={{ color: 'var(--err)' }}>${totalExpenses.toLocaleString()}</div>
+          <div className="stat-foot">Payroll + operations</div>
         </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico rd">↓</div></div>
-          <div className="s-l">Total Expenses</div>
-          <div className="s-v rd">${totalExpenses.toLocaleString()}</div>
-          <div style={{ fontSize: '10px', color: '#6b7689', marginTop: '2px' }}>Payroll: ${totalPayroll.toLocaleString()} + Other: ${totalManualExpenses.toLocaleString()}</div>
-        </div>
-        <div className="stat">
-          <div className="stat-h"><div className="s-ico" style={{ background: netProfit >= 0 ? '#ecfdf5' : '#fee2e2', color: netProfit >= 0 ? '#047857' : '#dc2626' }}>≈</div></div>
-          <div className="s-l">Net Profit</div>
-          <div className="s-v" style={{ color: netProfit >= 0 ? '#047857' : '#dc2626' }}>${netProfit.toLocaleString()}</div>
-          <div style={{ fontSize: '10px', color: '#6b7689', marginTop: '2px' }}>
-            Margin: {totalRevenue + totalManualIncome > 0 ? Math.round((netProfit / (totalRevenue + totalManualIncome)) * 100) : 0}%
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h">
+            <div className="stat-ico" style={{ background: netProfit >= 0 ? 'oklch(0.93 0.05 145)' : 'oklch(0.97 0.03 25)', color: netProfit >= 0 ? 'var(--ok)' : 'var(--err)' }}>≈</div>
           </div>
+          <div className="stat-l">NET PROFIT</div>
+          <div className="stat-v" style={{ color: netProfit >= 0 ? 'var(--ok)' : 'var(--err)' }}>${netProfit.toLocaleString()}</div>
+          <div className="stat-foot">Margin: {marginPct}%</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">📊</div></div>
+          <div className="stat-l">PAYROLL COST</div>
+          <div className="stat-v">${totalPayroll.toLocaleString()}</div>
+          <div className="stat-foot">{payrollExpenses.length} processed payslips</div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', background: '#f5f6f8', padding: '4px', borderRadius: '8px', width: 'fit-content' }}>
-        {(['overview', 'revenue', 'payroll', 'manual'] as const).map(t => (
-          <button key={t} style={TAB_STYLE(tab === t)} onClick={() => setTab(t)}>
-            {t === 'overview' ? 'Overview' : t === 'revenue' ? `Revenue (${revenue.filter(r => r.type === 'Sale').length})` : t === 'payroll' ? `Payroll (${payrollExpenses.length})` : `Manual (${manualEntries.length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* Overview tab */}
-      {tab === 'overview' && (
-        <div className="two" style={{ gap: '20px', alignItems: 'flex-start' }}>
-          <div className="pn">
-            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '14px' }}>Revenue Sources</div>
-            {[
-              { label: 'Sales Commission', amount: totalRevenue, color: '#10b981' },
-              { label: 'Manual Income', amount: totalManualIncome, color: '#4f46e5' },
-            ].map(row => (
-              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f0f2f5' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: row.color }} />
-                  <span style={{ fontSize: '13px' }}>{row.label}</span>
-                </div>
-                <span style={{ fontWeight: 700, color: row.color }}>${row.amount.toLocaleString()}</span>
-              </div>
+      <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card-hdr">
+          <div className="tabs" style={{ padding: 0, border: 'none', background: 'none' }}>
+            {TABS.map(t => (
+              <button key={t.id} className={`tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
+                {t.label}{t.count !== undefined && <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>{t.count}</span>}
+              </button>
             ))}
           </div>
-          <div className="pn">
-            <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '14px' }}>Expense Breakdown</div>
-            {[
-              { label: 'Payroll', amount: totalPayroll, color: '#ef4444' },
-              ...EXPENSE_CATEGORIES.map(cat => ({
-                label: cat,
-                amount: manualEntries.filter(e => e.entry_type === 'expense' && e.category === cat).reduce((s, e) => s + Number(e.amount), 0),
-                color: '#f59e0b',
-              })).filter(c => c.amount > 0),
-            ].map(row => (
-              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f0f2f5' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: row.color }} />
-                  <span style={{ fontSize: '13px' }}>{row.label}</span>
-                </div>
-                <span style={{ fontWeight: 700, color: '#dc2626' }}>${row.amount.toLocaleString()}</span>
-              </div>
-            ))}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-sec btn-sm" onClick={exportCSV}>↓ CSV</button>
+            <button className="btn btn-acc btn-sm" onClick={() => setShowAdd(true)}>+ Log Entry</button>
           </div>
         </div>
-      )}
 
-      {/* Revenue tab */}
-      {tab === 'revenue' && (
-        <div className="pn">
-          {revenue.filter(r => r.type === 'Sale').length === 0 && <div className="empty">No sales recorded yet.</div>}
-          {revenue.filter(r => r.type === 'Sale').map((r, i) => (
-            <div key={i} className="r-cd">
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#047857', fontSize: '14px' }}>$</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 600 }}>Sale — {r.profiles?.name ?? '—'}</div>
-                <div style={{ fontSize: '11px', color: '#6b7689' }}>{new Date(r.created_at).toLocaleDateString()}</div>
-              </div>
-              <span style={{ fontWeight: 700, color: '#047857' }}>${Number(r.amount).toLocaleString()}</span>
+        {/* Overview */}
+        {tab === 'overview' && (
+          <div style={{ padding: '0 18px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            {/* Revenue sources */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14, color: 'var(--ink)' }}>Revenue Sources</div>
+              {[
+                { label: 'Sales', amount: totalRevenue, hue: 145 },
+                { label: 'Manual Income', amount: totalManualIncome, hue: 200 },
+              ].map(row => {
+                const pct = grossIncome > 0 ? Math.round((row.amount / grossIncome) * 100) : 0;
+                return (
+                  <div key={row.label} style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                      <span style={{ color: 'var(--ink-3)' }}>{row.label}</span>
+                      <span style={{ fontWeight: 700, color: `oklch(0.45 0.15 ${row.hue})` }}>${row.amount.toLocaleString()}</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: `oklch(0.55 0.15 ${row.hue})`, borderRadius: 3 }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* Payroll tab */}
-      {tab === 'payroll' && (
-        <div className="pn">
-          {payrollExpenses.length === 0 && <div className="empty">No payroll records yet.</div>}
-          {payrollExpenses.map((p, i) => (
-            <div key={i} className="r-cd">
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', fontSize: '14px' }}>↓</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 600 }}>Payroll — {p.profiles?.name ?? 'Employee'}</div>
-                <div style={{ fontSize: '11px', color: '#6b7689' }}>{p.period} · Base: ${Number(p.base_salary).toLocaleString()} − Deductions: ${Number(p.deductions).toLocaleString()}</div>
-              </div>
-              <span style={{ fontWeight: 700, color: '#dc2626' }}>${Number(p.net_pay).toLocaleString()}</span>
+            {/* Expense breakdown */}
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14, color: 'var(--ink)' }}>Expense Breakdown</div>
+              {[
+                { label: 'Payroll', amount: totalPayroll },
+                ...EXPENSE_CATEGORIES.map(cat => ({
+                  label: cat,
+                  amount: manualEntries.filter(e => e.entry_type === 'expense' && e.category === cat).reduce((s, e) => s + Number(e.amount), 0),
+                })).filter(c => c.amount > 0),
+              ].map(row => {
+                const pct = maxExpense > 0 ? Math.round((row.amount / maxExpense) * 100) : 0;
+                return (
+                  <div key={row.label} style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                      <span style={{ color: 'var(--ink-3)' }}>{row.label}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--err)' }}>${row.amount.toLocaleString()}</span>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: 'oklch(0.55 0.18 25)', borderRadius: 3 }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Manual entries tab */}
-      {tab === 'manual' && (
-        <div className="pn">
-          {manualEntries.length === 0 && <div className="empty">No manual entries yet. Use "Log Entry" to add one.</div>}
-          {manualEntries.map(e => (
-            <div key={e.id} className="r-cd">
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: e.entry_type === 'income' ? '#ecfdf5' : '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: e.entry_type === 'income' ? '#047857' : '#b45309', fontSize: '13px' }}>
-                {e.entry_type === 'income' ? '+' : '−'}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 600 }}>{e.category} — {e.description || '—'}</div>
-                <div style={{ fontSize: '11px', color: '#6b7689' }}>{new Date(e.created_at).toLocaleDateString()} · {e.entry_type}</div>
-              </div>
-              <span style={{ fontWeight: 700, color: e.entry_type === 'income' ? '#047857' : '#dc2626' }}>
-                {e.entry_type === 'income' ? '+' : '−'}${Number(e.amount).toLocaleString()}
-              </span>
-              <button
-                onClick={() => e.id && handleDelete(e.id)}
-                style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '14px', padding: '2px 6px' }}
-              >✕</button>
-            </div>
-          ))}
-        </div>
-      )}
+        {/* Revenue tab */}
+        {tab === 'revenue' && (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead><tr><th>Description</th><th>Employee</th><th>Date</th><th>Amount</th></tr></thead>
+              <tbody>
+                {revenue.filter(r => r.type === 'Sale').length === 0 && (
+                  <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '30px 0' }}>No sales recorded yet.</td></tr>
+                )}
+                {revenue.filter(r => r.type === 'Sale').map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ fontWeight: 600 }}>Sale</td>
+                    <td style={{ color: 'var(--ink-3)' }}>{r.profiles?.name ?? '—'}</td>
+                    <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--ok)' }}>${Number(r.amount).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Payroll tab */}
+        {tab === 'payroll' && (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead><tr><th>Employee</th><th>Period</th><th>Base</th><th>Deductions</th><th>Net Pay</th></tr></thead>
+              <tbody>
+                {payrollExpenses.length === 0 && (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '30px 0' }}>No payroll records yet.</td></tr>
+                )}
+                {payrollExpenses.map((p, i) => (
+                  <tr key={i}>
+                    <td style={{ fontWeight: 600 }}>{p.profiles?.name ?? 'Employee'}</td>
+                    <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>{p.period}</td>
+                    <td>${Number(p.base_salary).toLocaleString()}</td>
+                    <td style={{ color: 'var(--err)' }}>−${Number(p.deductions).toLocaleString()}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--ok)' }}>${Number(p.net_pay).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Manual entries tab */}
+        {tab === 'manual' && (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="tbl">
+              <thead><tr><th>Type</th><th>Category</th><th>Description</th><th>Date</th><th>Amount</th><th></th></tr></thead>
+              <tbody>
+                {manualEntries.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '30px 0' }}>No manual entries yet.</td></tr>
+                )}
+                {manualEntries.map(e => (
+                  <tr key={e.id}>
+                    <td>
+                      <span className={e.entry_type === 'income' ? 'bdg bdg-ok' : 'bdg bdg-err'}>
+                        {e.entry_type === 'income' ? '+ Income' : '− Expense'}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{e.category}</td>
+                    <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{e.description || '—'}</td>
+                    <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>{new Date(e.created_at).toLocaleDateString()}</td>
+                    <td style={{ fontWeight: 700, color: e.entry_type === 'income' ? 'var(--ok)' : 'var(--err)' }}>
+                      {e.entry_type === 'income' ? '+' : '−'}${Number(e.amount).toLocaleString()}
+                    </td>
+                    <td>
+                      <button onClick={() => e.id && handleDelete(e.id)} style={{ background: 'none', border: 'none', color: 'var(--err)', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Add Entry Modal */}
       {showAdd && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', padding: '28px', borderRadius: '14px', width: '440px', maxWidth: '95%' }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '18px' }}>Log Finance Entry</div>
+        <div className="mb">
+          <div className="md" style={{ width: 440 }}>
+            <div className="md-t">Log Finance Entry</div>
             <form onSubmit={handleAddEntry}>
               <div className="pv-fld">
                 <label>Type</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="button" className={`pv-btn ${form.entry_type === 'expense' ? 'pv-btn-pri' : 'pv-btn-sec'}`} onClick={() => setForm(f => ({ ...f, entry_type: 'expense' }))}>Expense</button>
-                  <button type="button" className={`pv-btn ${form.entry_type === 'income' ? 'pv-btn-pri' : 'pv-btn-sec'}`} onClick={() => setForm(f => ({ ...f, entry_type: 'income' }))}>Income</button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className={`btn btn-sm ${form.entry_type === 'expense' ? 'btn-acc' : 'btn-sec'}`} onClick={() => setForm(f => ({ ...f, entry_type: 'expense' }))}>Expense</button>
+                  <button type="button" className={`btn btn-sm ${form.entry_type === 'income' ? 'btn-acc' : 'btn-sec'}`} onClick={() => setForm(f => ({ ...f, entry_type: 'income' }))}>Income</button>
                 </div>
               </div>
               <div className="pv-fld">
@@ -258,9 +305,9 @@ export default function FinanceClient({
                 <label>Amount ($)</label>
                 <input type="number" min="0.01" step="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" required />
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="submit" className="pv-btn pv-btn-pri" disabled={saving}>{saving ? 'Saving...' : 'Save Entry'}</button>
-                <button type="button" className="pv-btn pv-btn-sec" onClick={() => setShowAdd(false)}>Cancel</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="btn btn-acc" disabled={saving}>{saving ? 'Saving…' : 'Save Entry'}</button>
+                <button type="button" className="btn btn-sec" onClick={() => setShowAdd(false)}>Cancel</button>
               </div>
             </form>
           </div>

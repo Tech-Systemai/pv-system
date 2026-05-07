@@ -32,15 +32,9 @@ export default function DesignClient({ initialSettings }: { initialSettings: any
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 500 * 1024) {
-      setError('Logo must be under 500 KB');
-      return;
-    }
+    if (file.size > 500 * 1024) { setError('Logo must be under 500 KB'); return; }
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setLogo(ev.target?.result as string);
-      setError('');
-    };
+    reader.onload = (ev) => { setLogo(ev.target?.result as string); setError(''); };
     reader.readAsDataURL(file);
   };
 
@@ -60,74 +54,57 @@ export default function DesignClient({ initialSettings }: { initialSettings: any
       apply_reports: applyReports,
     };
     const { error: err } = await dbOp('brand_settings', 'upsert', payload);
-    if (err) {
-      setError(err);
-    } else {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    }
+    if (err) { setError(err); } else { setSaved(true); setTimeout(() => setSaved(false), 3000); }
     setSaving(false);
   };
 
   const initials = companyName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-    <div>
-      <div className="pn-h" style={{ marginBottom: '20px' }}>
+    <div className="page-fade">
+      <div className="briefing" style={{ marginBottom: 20 }}>
         <div>
-          <div className="pn-t">PDF Templates &amp; Brand Settings</div>
-          <div style={{ fontSize: '12px', color: '#6b7689', marginTop: '2px' }}>
-            Applied to all generated payslips, contracts, and reports
-          </div>
+          <div className="card-title">PDF Templates &amp; Brand Settings</div>
+          <div className="card-sub">Applied to all generated payslips, contracts, and reports</div>
         </div>
-        <button
-          className="pv-btn pv-btn-pri"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save Changes'}
-        </button>
+        <div className="briefing-actions">
+          <button className="btn btn-acc" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Changes'}
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div style={{ background: '#fee2e2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' }}>
+        <div style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
           {error}
         </div>
       )}
 
-      <div className="two" style={{ gap: '20px', alignItems: 'flex-start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'flex-start' }}>
         {/* Settings panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="pn">
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', marginBottom: '14px' }}>Company Identity</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card" style={{ padding: '20px 18px' }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Company Identity</div>
 
             <div className="pv-fld">
               <label>Company Logo</label>
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" style={{ display: 'none' }} onChange={handleLogoUpload} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '56px', height: '56px', borderRadius: '10px', border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: '#f9fafb', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 56, height: 56, borderRadius: 10, border: '1.5px dashed var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--surface-2)', flexShrink: 0 }}>
                   {logo ? (
                     <img src={logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : (
-                    <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: `linear-gradient(135deg, ${color}, ${color}cc)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '14px' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 8, background: `linear-gradient(135deg, ${color}, ${color}cc)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14 }}>
                       {initials}
                     </div>
                   )}
                 </div>
                 <div>
-                  <button className="pv-btn pv-btn-sec" onClick={() => fileRef.current?.click()}>
-                    Upload logo
-                  </button>
+                  <button className="btn btn-sec" onClick={() => fileRef.current?.click()}>Upload logo</button>
                   {logo && (
-                    <button
-                      className="pv-btn pv-btn-sec"
-                      style={{ marginLeft: '6px', color: '#dc2626' }}
-                      onClick={() => setLogo('')}
-                    >
-                      Remove
-                    </button>
+                    <button className="btn btn-sec" style={{ marginLeft: 6, color: 'var(--err)' }} onClick={() => setLogo('')}>Remove</button>
                   )}
-                  <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>PNG, JPG, SVG or WebP · Max 500 KB</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>PNG, JPG, SVG or WebP · Max 500 KB</div>
                 </div>
               </div>
             </div>
@@ -143,69 +120,45 @@ export default function DesignClient({ initialSettings }: { initialSettings: any
             </div>
           </div>
 
-          <div className="pn">
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', marginBottom: '14px' }}>Brand Color</div>
+          <div className="card" style={{ padding: '20px 18px' }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Brand Color</div>
             <div className="pv-fld">
               <label>Primary color</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input
-                  type="color"
-                  value={color}
-                  onChange={e => setColor(e.target.value)}
-                  style={{ width: '42px', height: '36px', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', padding: '2px' }}
-                />
-                <input
-                  type="text"
-                  value={color}
-                  onChange={e => {
-                    const v = e.target.value;
-                    if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setColor(v);
-                  }}
-                  style={{ width: '100px', fontFamily: 'monospace' }}
-                  maxLength={7}
-                />
-                <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: 42, height: 36, border: '1px solid var(--line)', borderRadius: 6, cursor: 'pointer', padding: 2 }} />
+                <input type="text" value={color} onChange={e => { const v = e.target.value; if (/^#[0-9a-fA-F]{0,6}$/.test(v)) setColor(v); }} style={{ width: 100, fontFamily: 'var(--mono)' }} maxLength={7} />
+                <div style={{ display: 'flex', gap: 6 }}>
                   {['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed'].map(c => (
-                    <div
-                      key={c}
-                      onClick={() => setColor(c)}
-                      style={{ width: '22px', height: '22px', borderRadius: '4px', background: c, cursor: 'pointer', border: color === c ? '2px solid #1a1f2e' : '2px solid transparent' }}
-                    />
+                    <div key={c} onClick={() => setColor(c)} style={{ width: 22, height: 22, borderRadius: 4, background: c, cursor: 'pointer', border: color === c ? '2px solid var(--ink)' : '2px solid transparent' }} />
                   ))}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="pn">
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', marginBottom: '14px' }}>Document Footer</div>
+          <div className="card" style={{ padding: '20px 18px' }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Document Footer</div>
             <div className="pv-fld">
               <label>Footer disclaimer text</label>
-              <textarea
-                rows={3}
-                value={footerText}
-                onChange={e => setFooterText(e.target.value)}
-                placeholder="Legal disclaimer or footer notice on all generated PDFs..."
-              />
+              <textarea rows={3} value={footerText} onChange={e => setFooterText(e.target.value)} placeholder="Legal disclaimer or footer notice on all generated PDFs…" />
             </div>
           </div>
 
-          <div className="pn">
-            <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', marginBottom: '14px' }}>Apply Branding To</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="card" style={{ padding: '20px 18px' }}>
+            <div className="card-title" style={{ marginBottom: 16 }}>Apply Branding To</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
                 { label: 'Payslips', value: applyPayslips, set: setApplyPayslips },
                 { label: 'Contracts', value: applyContracts, set: setApplyContracts },
                 { label: 'Reports & Warnings', value: applyReports, set: setApplyReports },
               ].map(({ label, value, set }) => (
-                <label key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', userSelect: 'none' }}>
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={e => set(e.target.checked)}
-                    style={{ width: '15px', height: '15px' }}
-                  />
-                  {label}
+                <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+                  <div
+                    onClick={() => set(!value)}
+                    style={{ width: 36, height: 20, borderRadius: 10, background: value ? 'var(--accent)' : 'var(--line)', position: 'relative', transition: 'background 0.2s', cursor: 'pointer', flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', top: 2, left: value ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                  </div>
+                  <span style={{ fontWeight: value ? 600 : 400, color: value ? 'var(--ink)' : 'var(--ink-3)' }}>{label}</span>
                 </label>
               ))}
             </div>
@@ -213,75 +166,65 @@ export default function DesignClient({ initialSettings }: { initialSettings: any
         </div>
 
         {/* Live preview panel */}
-        <div className="pn" style={{ position: 'sticky', top: '20px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', marginBottom: '14px' }}>Live Preview</div>
+        <div className="card" style={{ padding: '20px 18px', position: 'sticky', top: 20 }}>
+          <div className="card-title" style={{ marginBottom: 16 }}>Live Preview</div>
 
-          <div style={{ background: '#fff', border: '1px solid #e4e7eb', borderRadius: '8px', padding: '28px', fontFamily: 'Inter, sans-serif' }}>
-            {/* Header */}
-            <div style={{ borderBottom: `2px solid ${color}`, paddingBottom: '16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '9px', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: logo ? 'transparent' : `linear-gradient(135deg, ${color}, ${color}cc)` }}>
-                  {logo ? (
-                    <img src={logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                  ) : (
-                    <span style={{ color: '#fff', fontWeight: 700, fontSize: '16px' }}>{initials}</span>
-                  )}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: '28px', fontFamily: 'Inter, sans-serif' }}>
+            <div style={{ borderBottom: `2px solid ${color}`, paddingBottom: 16, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 9, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: logo ? 'transparent' : `linear-gradient(135deg, ${color}, ${color}cc)` }}>
+                  {logo ? <img src={logo} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{initials}</span>}
                 </div>
                 <div>
-                  <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{companyName}</div>
-                  <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tagline}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{companyName}</div>
+                  <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{tagline}</div>
                 </div>
               </div>
-              <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748b' }}>
-                <div>Period: April 2026</div>
+              <div style={{ textAlign: 'right', fontSize: 11, color: '#64748b' }}>
+                <div>Period: {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</div>
                 <div>Generated: {new Date().toLocaleDateString()}</div>
               </div>
             </div>
 
-            {/* Sample body */}
-            <div style={{ fontSize: '14px', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '18px', color: '#1a1f2e' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 18, color: '#1a1f2e' }}>
               Sample Document
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px', background: '#f8fafc', padding: '14px', borderRadius: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20, background: '#f8fafc', padding: 14, borderRadius: 8 }}>
               <div>
-                <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Employee</div>
-                <div style={{ fontWeight: 600, fontSize: '13px' }}>Jane Smith</div>
+                <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Employee</div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Jane Smith</div>
               </div>
               <div>
-                <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Net Pay</div>
-                <div style={{ fontWeight: 700, fontSize: '16px', color: '#10b981' }}>$2,500</div>
+                <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Net Pay</div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#10b981' }}>$2,500</div>
               </div>
             </div>
 
-            {/* Signature block */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '14px', marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 14, marginTop: 20 }}>
               <div style={{ width: '42%' }}>
-                <div style={{ borderTop: `1px solid ${color}`, paddingTop: '8px', fontSize: '11px', color: '#475569' }}>
-                  <strong>Finance Department</strong><br />
-                  {companyName} — Authorized Signature
+                <div style={{ borderTop: `1px solid ${color}`, paddingTop: 8, fontSize: 11, color: '#475569' }}>
+                  <strong>Finance Department</strong><br />{companyName} — Authorized Signature
                 </div>
               </div>
               <div style={{ width: '42%', textAlign: 'right' }}>
-                <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: '8px', fontSize: '11px', color: '#475569' }}>
-                  <strong>Employee Acknowledgement</strong><br />
-                  Jane Smith · Signature
+                <div style={{ borderTop: '1px solid #cbd5e1', paddingTop: 8, fontSize: 11, color: '#475569' }}>
+                  <strong>Employee Acknowledgement</strong><br />Jane Smith · Signature
                 </div>
               </div>
             </div>
 
-            {/* Footer */}
             {footerText && (
-              <div style={{ marginTop: '16px', fontSize: '9px', color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: '12px', textAlign: 'center', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 16, fontSize: 9, color: '#94a3b8', borderTop: '1px solid #f1f5f9', paddingTop: 12, textAlign: 'center', lineHeight: 1.5 }}>
                 {footerText}
               </div>
             )}
           </div>
 
-          <div style={{ marginTop: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {applyPayslips && <span className="pv-bdg pv-bdg-indigo">Payslips</span>}
-            {applyContracts && <span className="pv-bdg pv-bdg-green">Contracts</span>}
-            {applyReports && <span className="pv-bdg pv-bdg-amber">Reports</span>}
+          <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {applyPayslips && <span className="bdg bdg-acc">Payslips</span>}
+            {applyContracts && <span className="bdg bdg-ok">Contracts</span>}
+            {applyReports && <span className="bdg bdg-warn">Reports</span>}
           </div>
         </div>
       </div>
