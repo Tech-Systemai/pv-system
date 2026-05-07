@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import PerformanceClient from './PerformanceClient';
+import PerformanceOwnerClient from './PerformanceOwnerClient';
 
 export default async function PerformancePage() {
   const supabase = await createClient();
@@ -10,15 +11,36 @@ export default async function PerformancePage() {
 
   const admin = createAdminClient();
 
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id, name, role, points, salary, department')
+    .eq('id', user.id)
+    .single();
+
+  const isManagement = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
+
+  if (isManagement) {
+    const [{ data: employees }, { data: allViolations }] = await Promise.all([
+      admin.from('profiles').select('id, name, role, points, salary, department').order('name'),
+      admin.from('violations').select('*').order('triggered_at', { ascending: false }),
+    ]);
+
+    return (
+      <PerformanceOwnerClient
+        currentProfile={profile}
+        employees={employees ?? []}
+        allViolations={allViolations ?? []}
+      />
+    );
+  }
+
   const [
-    { data: profile },
     { data: violations },
     { data: attendanceLogs },
     { data: target },
     { data: salesLogs },
     { data: coachingSessions },
   ] = await Promise.all([
-    admin.from('profiles').select('id, name, role, points, salary, department').eq('id', user.id).single(),
     admin.from('violations').select('*').eq('user_id', user.id).order('triggered_at', { ascending: false }),
     admin.from('attendance_logs').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(60),
     admin.from('targets').select('*').eq('user_id', user.id).eq('period', new Date().toLocaleString('default', { month: 'long', year: 'numeric' })).maybeSingle(),
