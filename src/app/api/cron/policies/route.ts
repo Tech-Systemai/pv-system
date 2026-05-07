@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
+import { createClient } from '@/utils/supabase/server';
 
-// POST /api/cron/policies
-// Reads all active policies, evaluates today's attendance, creates violation records,
-// deducts points, and sends inbox notices to affected employees.
-// Called nightly by Vercel Cron or manually via the "Run Policies Now" button.
 export async function POST(request: Request) {
   const authHeader = request.headers.get('authorization');
   const secret = process.env.CRON_SECRET || 'dev-secret';
+
+  // Accept either: Bearer token (cron) or an authenticated owner/admin session (UI)
   if (authHeader !== `Bearer ${secret}`) {
-    return new NextResponse('Unauthorized', { status: 401 });
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const admin = createAdminClient();
+    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+    if (!['owner', 'admin'].includes(profile?.role ?? '')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   const admin = createAdminClient();
