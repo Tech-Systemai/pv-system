@@ -11,7 +11,7 @@ async function runApployeSync() {
 
   const today = new Date().toISOString().split('T')[0];
   const headers = {
-    'X-APPLOYE-API-KEY': apployeKey,
+    'Authorization': `Bearer ${apployeKey}`,
     'Content-Type': 'application/json',
   };
 
