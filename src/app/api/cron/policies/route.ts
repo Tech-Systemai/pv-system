@@ -123,6 +123,7 @@ export async function POST(request: Request) {
         inboxNotices.push({
           user_id: emp.id,
           title: `Violation — ${policy.name}`,
+          subject: `Violation — ${policy.name}`,
           content: `Date: ${todayDisplay}\nRule: ${policy.name}\n\nYou clocked in at ${clockStr}, ${lateMins} minute${lateMins !== 1 ? 's' : ''} late (${intervals} × 5-minute interval${intervals !== 1 ? 's' : ''}).\n\nPoints deducted: ${pts} pts (${intervals} × ${ptsPerInterval} pts per interval)\nSalary deducted: $${salaryDeducted} (${intervals} × 5% of your $${monthlySalary} monthly salary)\n\nPlease ensure punctual attendance to avoid further deductions.`,
           type: 'Violation Notice',
           sender: 'System (Policy Engine)',
@@ -152,6 +153,7 @@ export async function POST(request: Request) {
         inboxNotices.push({
           user_id: emp.id,
           title: `Violation — ${policy.name}`,
+          subject: `Violation — ${policy.name}`,
           content: `Date: ${todayDisplay}\nRule: ${policy.name}\n\nNo attendance was recorded for you today. You have been marked as absent.\n\nPoints deducted: ${pts} pts\nSalary deducted: $${salaryDeducted} (10% of your $${monthlySalary} monthly salary)\n\nIf this is an error, please contact your supervisor immediately.`,
           type: 'Violation Notice',
           sender: 'System (Policy Engine)',
@@ -170,6 +172,7 @@ export async function POST(request: Request) {
             inboxNotices.push({
               user_id: emp.id,
               title: `Productivity Alert — ${policy.name}`,
+              subject: `Productivity Alert — ${policy.name}`,
               content: `Date: ${todayDisplay}\n\nYour productive time today was ${hours} hours, below the 6-hour minimum. Your supervisor has been notified. No deductions applied for this alert, but repeated occurrences may trigger action.`,
               type: 'Productivity Alert',
               sender: 'System (Policy Engine)',
@@ -196,6 +199,7 @@ export async function POST(request: Request) {
             inboxNotices.push({
               user_id: emp.id,
               title: `Violation — ${policy.name}`,
+              subject: `Violation — ${policy.name}`,
               content: `Date: ${todayDisplay}\nRule: ${policy.name}\n\nYou logged only ${hours} hours of tracked productive time today. Minimum required is 6 hours.\n\nPoints deducted: ${pts} pts\nSalary deducted: $${salaryDeducted} (5% of your $${monthlySalary} monthly salary)\n\nEnsure your activity tracker is running throughout your shift.`,
               type: 'Violation Notice',
               sender: 'System (Policy Engine)',
@@ -216,6 +220,7 @@ export async function POST(request: Request) {
         inboxNotices.push({
           user_id: emp.id,
           title: `⚠ Termination Review Flag — ${emp.name}`,
+          subject: `⚠ Termination Review Flag — ${emp.name}`,
           content: `Date: ${todayDisplay}\n\nEmployee ${emp.name} has reached a reliability score of ${(currentPoints + pointDelta).toFixed(2)}/7, at or below the threshold of ${threshold}.\n\nThis employee has been flagged for termination review. Please schedule a review session immediately.`,
           type: 'Termination Flag',
           sender: 'System (Policy Engine)',

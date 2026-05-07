@@ -125,6 +125,7 @@ export default function PayrollClient({
     const { error } = await dbOp('inbox_documents', 'insert', {
       user_id: emp.id,
       title: `Payslip — ${PERIOD}`,
+      subject: `Payslip — ${PERIOD}`,
       content: lines.join('\n'),
       type: 'Payslip',
       sender: 'Finance / Management',

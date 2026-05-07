@@ -112,6 +112,7 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
     await dbOp('inbox_documents', 'insert', {
       user_id: empId,
       title: `Deduction Applied — ${rule}`,
+      subject: `Deduction Applied — ${rule}`,
       content: `${explanationText}\n\nPoints deducted: ${pts} pts\nSalary deducted: $${salary}\n\nIf you believe this is an error, contact your manager.`,
       type: 'Violation Notice',
       sender: 'Management',
@@ -210,6 +211,7 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
     await dbOp('inbox_documents', 'insert', {
       user_id: coachEmp,
       title: `Coaching Session Scheduled — ${new Date(coachDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+      subject: `Coaching Session Scheduled — ${new Date(coachDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
       content: coachNotes || 'A coaching session has been scheduled for you. Please confirm attendance.',
       type: 'Notice', sender: 'Management', requires_signature: true,
     });
@@ -229,6 +231,7 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
     await dbOp('inbox_documents', 'insert', {
       user_id: reportEmp,
       title: `Monthly Performance Report — ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
+      subject: `Monthly Performance Report — ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
       content: [
         `Performance Report — ${emp?.name}`,
         `Role: ${emp?.role}`,

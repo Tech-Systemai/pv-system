@@ -82,6 +82,7 @@ export default function CoachingClient({
     await dbOp('inbox_documents', 'insert', {
       user_id: pendingInbox.agentId,
       title: 'Coaching Session Summary',
+      subject: 'Coaching Session Summary',
       content: pendingInbox.summary,
       type: 'Coaching',
       sender: currentUserName ?? 'Supervisor',

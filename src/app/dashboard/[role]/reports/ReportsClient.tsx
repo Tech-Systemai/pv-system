@@ -65,6 +65,7 @@ export default function ReportsClient({
       await dbOp('inbox_documents', 'insert', {
         user_id: emp.id,
         title: `${r.type ?? 'QA Evaluation'} Report — ${new Date(r.created_at).toLocaleDateString()}`,
+        subject: `${r.type ?? 'QA Evaluation'} Report — ${new Date(r.created_at).toLocaleDateString()}`,
         content: r.notes ?? 'See attached report.',
         type: 'Report',
         sender: r.supervisor?.name ?? currentUserName,

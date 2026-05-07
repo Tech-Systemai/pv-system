@@ -89,6 +89,7 @@ export default function TicketsClient({
     await dbOp('inbox_documents', 'insert', {
       user_id: viewTicket.user_id,
       title: `Re: ${viewTicket.subject}`,
+      subject: `Re: ${viewTicket.subject}`,
       content: replyText.trim(),
       type: 'Notice',
       sender: 'Support Team',

@@ -109,6 +109,7 @@ export default function InboxClient({
       user_id: toId,
       sender_id: currentUserId,
       title: subject,
+      subject: subject,
       content: message,
       type,
       sender: currentUserName,
