@@ -11,15 +11,16 @@ async function runApployeSync() {
 
   const today = new Date().toISOString().split('T')[0];
   const headers = {
-    'Authorization': `Bearer ${apployeKey}`,
+    'X-APPLOYE-API-KEY': apployeKey,
     'Content-Type': 'application/json',
   };
 
   // ── 1. Fetch today's timesheets ──────────────────────────────────────────
-  const tsRes = await fetch(`https://public-api.apploye.com/v1/timesheets?date=${today}`, {
-    headers,
-    cache: 'no-store',
-  });
+  // Apploye uses start_date / end_date params (ISO 8601 date strings)
+  const tsRes = await fetch(
+    `https://public-api.apploye.com/v1/timesheets?start_date=${today}&end_date=${today}`,
+    { headers, cache: 'no-store' }
+  );
 
   if (!tsRes.ok) {
     const errText = await tsRes.text();
@@ -28,7 +29,8 @@ async function runApployeSync() {
   }
 
   const tsJson = await tsRes.json();
-  const timesheets: any[] = tsJson.data ?? tsJson.timesheets ?? tsJson.results ?? [];
+  // Apploye wraps results in "response"; fall back to other common keys
+  const timesheets: any[] = tsJson.response ?? tsJson.data ?? tsJson.timesheets ?? tsJson.results ?? [];
 
   // ── 2. Try to get currently running timers ───────────────────────────────
   // Apploye may expose a running-timers endpoint; if not, fall back to
