@@ -9,10 +9,12 @@ export default function PayrollClient({
   employees,
   initialPayrolls,
   attendanceLogs,
+  violations,
 }: {
   employees: any[];
   initialPayrolls: any[];
   attendanceLogs: any[];
+  violations: any[];
 }) {
   const [payrolls, setPayrolls] = useState(initialPayrolls);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -28,13 +30,26 @@ export default function PayrollClient({
     if (log.status === 'late') attendanceByUser[log.user_id].daysLate++;
   }
 
+  // Sum actual salary deductions from violations this month per employee
+  const violationDeductionByUser: Record<string, number> = {};
+  for (const v of violations) {
+    violationDeductionByUser[v.user_id] = parseFloat(
+      ((violationDeductionByUser[v.user_id] ?? 0) + (v.salary_deducted ?? 0)).toFixed(2)
+    );
+  }
+
+  const getDeductions = (emp: any): number => {
+    // Use actual violation salary_deducted sum; fall back to 0 (never the old formula)
+    return violationDeductionByUser[emp.id] ?? 0;
+  };
+
   const handleProcessAll = async () => {
     if (!confirm(`Process payroll for ${PERIOD}? This will create approved payslips for all employees.`)) return;
     setIsProcessing(true);
     const newPayrolls = employees.map(e => {
-      const deductions = e.points < 7 ? (7 - e.points) * 20 : 0;
+      const deductions = getDeductions(e);
       const base_salary = e.salary || 2500;
-      const net_pay = base_salary - deductions;
+      const net_pay = parseFloat((base_salary - deductions).toFixed(2));
       return { user_id: e.id, period: PERIOD, base_salary, deductions, bonuses: 0, net_pay, status: 'Approved' };
     });
     const { data } = await dbOp('payrolls', 'insert', newPayrolls);
@@ -58,9 +73,9 @@ export default function PayrollClient({
 
   const currentPeriodList = employees.map(e => {
     const slip = payrolls.find(p => p.user_id === e.id && p.period === PERIOD);
-    const deductions = slip ? slip.deductions : (e.points < 7 ? (7 - e.points) * 20 : 0);
+    const deductions = slip ? slip.deductions : getDeductions(e);
     const base = slip ? slip.base_salary : (e.salary || 2500);
-    const net = slip ? slip.net_pay : base - deductions;
+    const net = slip ? slip.net_pay : parseFloat((base - deductions).toFixed(2));
     const isApproved = slip?.status === 'Approved';
     const att = attendanceByUser[e.id] ?? { totalMins: 0, daysPresent: 0, daysLate: 0 };
     return { emp: e, base, deductions, net, isApproved, slip, att };
@@ -115,7 +130,7 @@ export default function PayrollClient({
           <div className="card-hdr">
             <div>
               <div className="card-title">Payroll · {PERIOD}</div>
-              <div className="card-sub">Deductions = (7 − points) × $20 · Nightly policy engine applies penalties</div>
+              <div className="card-sub">Deductions pulled from policy violations this month · percentage-based</div>
             </div>
             <button className="btn btn-acc btn-sm" onClick={handleProcessAll} disabled={isProcessing}>
               {isProcessing ? 'Processing…' : '⚡ Process & Approve All'}

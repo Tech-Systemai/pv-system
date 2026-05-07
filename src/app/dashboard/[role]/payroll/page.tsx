@@ -18,7 +18,20 @@ export default async function PayrollPage() {
   const { data: payrolls } = await admin.from('payrolls').select('*').order('created_at', { ascending: false });
   const { data: attendance } = await admin.from('attendance_logs').select('user_id, clock_in_time, clock_out_time, productive_time_minutes, date');
 
+  // Current month window for violation sums
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00Z`;
+  const { data: violations } = await admin
+    .from('violations')
+    .select('user_id, salary_deducted, points_deducted, triggered_at')
+    .gte('triggered_at', monthStart);
+
   return (
-    <PayrollClient employees={employees || []} initialPayrolls={payrolls || []} attendanceLogs={attendance || []} />
+    <PayrollClient
+      employees={employees || []}
+      initialPayrolls={payrolls || []}
+      attendanceLogs={attendance || []}
+      violations={violations || []}
+    />
   );
 }

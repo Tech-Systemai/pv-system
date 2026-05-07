@@ -50,6 +50,19 @@ export async function POST(request: Request) {
     .select('*')
     .eq('date', today);
 
+  // 3b. Load violations already created today to avoid duplicates
+  const { data: todayViolations } = await admin
+    .from('violations')
+    .select('user_id, policy_id')
+    .gte('triggered_at', `${today}T00:00:00Z`)
+    .lte('triggered_at', `${today}T23:59:59Z`);
+
+  const alreadyFired = new Set<string>(
+    (todayViolations ?? [])
+      .filter((v: any) => v.policy_id)
+      .map((v: any) => `${v.user_id}:${v.policy_id}`)
+  );
+
   const violations: any[] = [];
   const pointUpdates: Record<string, number> = {};
   const inboxNotices: any[] = [];
@@ -66,6 +79,9 @@ export async function POST(request: Request) {
     for (const policy of policies) {
       const trigger: string = policy.trigger ?? '';
       const action: string = policy.action ?? '';
+
+      const fireKey = `${emp.id}:${policy.id}`;
+      if (alreadyFired.has(fireKey)) continue; // already ran today for this employee+policy
 
       // ── LATE CLOCK-IN ────────────────────────────────────────────────────────
       if (trigger.toLowerCase().includes('late clock-in') && log?.status === 'late') {
@@ -102,6 +118,7 @@ export async function POST(request: Request) {
           points_deducted: pts,
           salary_deducted: salaryDeducted,
         });
+        alreadyFired.add(fireKey);
 
         inboxNotices.push({
           user_id: emp.id,
@@ -130,6 +147,7 @@ export async function POST(request: Request) {
           points_deducted: pts,
           salary_deducted: salaryDeducted,
         });
+        alreadyFired.add(fireKey);
 
         inboxNotices.push({
           user_id: emp.id,
@@ -173,6 +191,7 @@ export async function POST(request: Request) {
               points_deducted: pts,
               salary_deducted: salaryDeducted,
             });
+            alreadyFired.add(fireKey);
 
             inboxNotices.push({
               user_id: emp.id,
