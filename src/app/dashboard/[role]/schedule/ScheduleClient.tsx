@@ -30,7 +30,7 @@ function formatWeekLabel(monday: Date) {
   return `${monday.toLocaleDateString('default', { month: 'short', day: 'numeric' })} – ${sunday.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
 
-type Shift = { id?: string; user_id: string; week: string; day: string; shift_start: string; shift_end: string };
+type Shift = { id?: string; user_id: string; week: string; day: string; shift_start: string; shift_end: string; team?: string };
 
 export default function ScheduleClient({
   initialSchedules, users, isMgmt, currentUserId,
@@ -90,7 +90,8 @@ export default function ScheduleClient({
         }
         setSaveSuccess('Shift removed.');
       } else {
-        const payload: Shift = { user_id: editCell.userId, week: weekKey, day: editCell.day, shift_start: editStart, shift_end: editEnd };
+        const emp = users.find((u: any) => u.id === editCell.userId);
+        const payload: Shift = { user_id: editCell.userId, week: weekKey, day: editCell.day, shift_start: editStart, shift_end: editEnd, team: emp?.role ?? 'general' };
         if (existing?.id) {
           const { error } = await dbOp('schedules', 'update', { shift_start: editStart, shift_end: editEnd }, { id: existing.id });
           if (error) throw new Error(error);
