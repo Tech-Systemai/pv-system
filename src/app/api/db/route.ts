@@ -27,8 +27,17 @@ export async function POST(req: NextRequest) {
   try {
     let result: any;
 
+    // Safety net: inbox_documents must always have subject
+    const insertData = operation === 'insert' && table === 'inbox_documents'
+      ? (Array.isArray(data) ? data : [data]).map((row: any) => ({
+          ...row,
+          subject: row.subject || row.title || '',
+          title:   row.title   || row.subject || '',
+        }))
+      : (Array.isArray(data) ? data : [data]);
+
     if (operation === 'insert') {
-      const q = admin.from(table).insert(Array.isArray(data) ? data : [data]);
+      const q = admin.from(table).insert(insertData);
       result = selectClause ? await q.select(selectClause) : await q.select();
     } else if (operation === 'update') {
       let q = admin.from(table).update(data);

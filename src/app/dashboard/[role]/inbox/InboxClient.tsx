@@ -9,7 +9,7 @@ const TAG_COLORS: Record<string, string> = {
   CX: 'bdg-ok', Notice: 'bdg-acc', Payslip: 'bdg-ok', Contract: 'bdg-acc',
   Report: 'bdg-gy', Warning: 'bdg-err', 'Action Plan': 'bdg-warn',
   'Violation Notice': 'bdg-err', 'Productivity Alert': 'bdg-warn',
-  'Termination Flag': 'bdg-err', payslip: 'bdg-ok',
+  'Termination Flag': 'bdg-err', payslip: 'bdg-ok', Coaching: 'bdg-acc',
 };
 const HUES = [268, 75, 155, 25, 290, 200, 50, 320];
 
@@ -23,20 +23,32 @@ function Avatar({ name, size = 34 }: { name: string; size?: number }) {
   );
 }
 
+type Doc = {
+  id: any; user_id: string; sender_id?: string; sender?: string;
+  title?: string; subject?: string; content?: string; type?: string;
+  is_read?: boolean; is_signed?: boolean; signed_by?: string;
+  requires_signature?: boolean; archived?: boolean; reply_to?: any;
+  created_at: string; attachment_url?: string; attachment_name?: string;
+};
+
 export default function InboxClient({
   initialDocs, allUsers, currentUserId, isMgmt,
 }: {
   initialDocs: any[]; allUsers: any[]; currentUserId: string; isMgmt: boolean;
 }) {
-  const [docs, setDocs] = useState(initialDocs);
-  const [selId, setSelId] = useState<string | null>(initialDocs[0]?.id ?? null);
+  const [docs, setDocs] = useState<Doc[]>(initialDocs);
+  const [selId, setSelId] = useState<any>(initialDocs[0]?.id ?? null);
   const [tab, setTab] = useState<'inbox' | 'sent'>('inbox');
   const [composeOpen, setComposeOpen] = useState(false);
-  const [replyTo, setReplyTo] = useState<any>(null);
+  const [replyTo, setReplyTo] = useState<Doc | null>(null);
+  const [forwardDoc, setForwardDoc] = useState<Doc | null>(null);
   const [sending, setSending] = useState(false);
   const [signName, setSignName] = useState('');
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const composeRef = useRef<HTMLFormElement>(null);
+  const fwdRef = useRef<HTMLFormElement>(null);
 
   const currentUser = allUsers.find((u: any) => u.id === currentUserId);
   const currentUserName = currentUser?.name ?? 'Unknown';
@@ -46,18 +58,17 @@ export default function InboxClient({
     setTimeout(() => setToast(null), 4000);
   };
 
-  // ── Supabase realtime: push new messages as they arrive ────────────────────
+  // ── Supabase realtime ───────────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel(`inbox-${currentUserId}`)
-      .on(
-        'postgres_changes',
+      .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inbox_documents', filter: `user_id=eq.${currentUserId}` },
         (payload) => {
           setDocs(prev => {
             if (prev.some(d => d.id === payload.new.id)) return prev;
-            return [payload.new, ...prev];
+            return [payload.new as Doc, ...prev];
           });
           showToast('New message received');
         }
@@ -75,16 +86,33 @@ export default function InboxClient({
   const current = visibleDocs.find(d => d.id === selId) ?? visibleDocs[0] ?? null;
   const unread = (isMgmt ? docs.filter(d => !d.archived) : inboxDocs).filter(d => !d.is_read).length;
 
-  const handleOpen = async (doc: any) => {
+  // ── File upload via Supabase Storage ───────────────────────────────────────
+  const uploadAttachment = async (file: File): Promise<{ url: string; name: string } | null> => {
+    setUploading(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split('.').pop();
+      const path = `inbox/${currentUserId}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('employee-docs').upload(path, file, { upsert: true });
+      if (error) { showToast(`Upload failed: ${error.message}`, false); return null; }
+      const { data: urlData } = supabase.storage.from('employee-docs').getPublicUrl(path);
+      return { url: urlData.publicUrl, name: file.name };
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleOpen = async (doc: Doc) => {
     setSelId(doc.id);
     setSignName('');
+    setReplyTo(null);
     if (!doc.is_read && doc.user_id === currentUserId) {
       await dbOp('inbox_documents', 'update', { is_read: true }, { id: doc.id });
       setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, is_read: true } : d));
     }
   };
 
-  const handleArchive = async (doc: any) => {
+  const handleArchive = async (doc: Doc) => {
     const { error } = await dbOp('inbox_documents', 'update', { archived: true }, { id: doc.id });
     if (error) { showToast(`Archive failed: ${error}`, false); return; }
     setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, archived: true } : d));
@@ -92,7 +120,7 @@ export default function InboxClient({
     showToast('Archived');
   };
 
-  const handleSign = async (doc: any) => {
+  const handleSign = async (doc: Doc) => {
     if (!signName.trim()) return;
     const { error } = await dbOp('inbox_documents', 'update', { is_signed: true, signed_by: signName }, { id: doc.id });
     if (error) { showToast(`Signature failed: ${error}`, false); return; }
@@ -100,12 +128,14 @@ export default function InboxClient({
     showToast('Document signed');
   };
 
-  const handleSend = async (
-    toId: string, subject: string, message: string,
-    type: string, reqSig: boolean, replyToId?: string
-  ) => {
+  const handleSend = async (opts: {
+    toId: string; subject: string; message: string;
+    type: string; reqSig: boolean; replyToId?: any;
+    attachmentUrl?: string; attachmentName?: string;
+  }) => {
     setSending(true);
-    const { data, error } = await dbOp('inbox_documents', 'insert', {
+    const { toId, subject, message, type, reqSig, replyToId, attachmentUrl, attachmentName } = opts;
+    const payload: any = {
       user_id: toId,
       sender_id: currentUserId,
       title: subject,
@@ -116,17 +146,14 @@ export default function InboxClient({
       requires_signature: reqSig,
       is_read: false,
       archived: false,
-      ...(replyToId ? { reply_to: replyToId } : {}),
-    });
+    };
+    if (replyToId) payload.reply_to = replyToId;
+    if (attachmentUrl) { payload.attachment_url = attachmentUrl; payload.attachment_name = attachmentName; }
+
+    const { data, error } = await dbOp('inbox_documents', 'insert', payload);
     setSending(false);
-    if (error) {
-      showToast(`Send failed: ${error}`, false);
-      return false;
-    }
-    if (data?.[0]) {
-      // Add to sent view immediately
-      setDocs(prev => [data[0], ...prev]);
-    }
+    if (error) { showToast(`Send failed: ${error}`, false); return false; }
+    if (data?.[0]) setDocs(prev => [data[0], ...prev]);
     showToast('Message sent');
     return true;
   };
@@ -134,61 +161,103 @@ export default function InboxClient({
   const handleCompose = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const ok = await handleSend(
-      fd.get('to') as string,
-      fd.get('subject') as string,
-      fd.get('message') as string,
-      fd.get('type') as string,
-      fd.get('req_sig') === 'on',
-    );
-    if (ok) {
-      setComposeOpen(false);
-      composeRef.current?.reset();
+    let attachmentUrl: string | undefined;
+    let attachmentName: string | undefined;
+    if (attachFile) {
+      const result = await uploadAttachment(attachFile);
+      if (!result) return;
+      attachmentUrl = result.url;
+      attachmentName = result.name;
     }
+    const ok = await handleSend({
+      toId: fd.get('to') as string,
+      subject: fd.get('subject') as string,
+      message: fd.get('message') as string,
+      type: fd.get('type') as string,
+      reqSig: fd.get('req_sig') === 'on',
+      attachmentUrl,
+      attachmentName,
+    });
+    if (ok) { setComposeOpen(false); setAttachFile(null); composeRef.current?.reset(); }
   };
 
   const handleReply = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!replyTo) return;
     const fd = new FormData(e.currentTarget);
-    const recipientId = replyTo.sender_id ?? replyTo.user_id;
-    const ok = await handleSend(
-      recipientId,
-      `Re: ${replyTo.title ?? replyTo.subject ?? 'Message'}`,
-      fd.get('message') as string,
-      'Notice',
-      false,
-      replyTo.id,
-    );
+    const recipientId = replyTo.sender_id && replyTo.sender_id !== currentUserId
+      ? replyTo.sender_id
+      : replyTo.user_id;
+    let attachmentUrl: string | undefined;
+    let attachmentName: string | undefined;
+    const fileInput = (e.currentTarget.elements.namedItem('attachment') as HTMLInputElement);
+    const file = fileInput?.files?.[0];
+    if (file) {
+      const result = await uploadAttachment(file);
+      if (!result) return;
+      attachmentUrl = result.url;
+      attachmentName = result.name;
+    }
+    const ok = await handleSend({
+      toId: recipientId,
+      subject: `Re: ${replyTo.title ?? replyTo.subject ?? 'Message'}`,
+      message: fd.get('message') as string,
+      type: 'Notice',
+      reqSig: false,
+      replyToId: replyTo.id,
+      attachmentUrl,
+      attachmentName,
+    });
     if (ok) setReplyTo(null);
   };
 
-  const openReply = (doc: any) => {
-    setReplyTo(doc);
+  const handleForward = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!forwardDoc) return;
+    const fd = new FormData(e.currentTarget);
+    let attachmentUrl = forwardDoc.attachment_url;
+    let attachmentName = forwardDoc.attachment_name;
+    const fileInput = (e.currentTarget.elements.namedItem('attachment') as HTMLInputElement);
+    const file = fileInput?.files?.[0];
+    if (file) {
+      const result = await uploadAttachment(file);
+      if (!result) return;
+      attachmentUrl = result.url;
+      attachmentName = result.name;
+    }
+    const originalSender = forwardDoc.sender ?? 'Unknown';
+    const originalDate = new Date(forwardDoc.created_at).toLocaleString();
+    const fwdBody = `${fd.get('message') as string}\n\n-------- Forwarded Message --------\nFrom: ${originalSender}\nDate: ${originalDate}\nSubject: ${forwardDoc.title ?? forwardDoc.subject ?? ''}\n\n${forwardDoc.content ?? ''}`;
+    const ok = await handleSend({
+      toId: fd.get('to') as string,
+      subject: `Fwd: ${forwardDoc.title ?? forwardDoc.subject ?? 'Message'}`,
+      message: fwdBody,
+      type: forwardDoc.type ?? 'Notice',
+      reqSig: false,
+      attachmentUrl,
+      attachmentName,
+    });
+    if (ok) { setForwardDoc(null); fwdRef.current?.reset(); }
   };
 
-  const recipientName = (doc: any) => {
-    const u = allUsers.find((u: any) => u.id === doc.user_id);
-    return u?.name ?? 'Unknown';
-  };
+  const recipientName = (doc: Doc) => allUsers.find((u: any) => u.id === doc.user_id)?.name ?? 'Unknown';
 
   return (
     <div className="page-fade">
-      <div className="card" style={{ height: 620, padding: 0, display: 'grid', gridTemplateColumns: '300px 1fr', overflow: 'hidden' }}>
+      <div className="card" style={{ height: 660, padding: 0, display: 'grid', gridTemplateColumns: '300px 1fr', overflow: 'hidden' }}>
 
         {/* ── Left panel ── */}
         <div style={{ borderRight: '1px solid var(--line)', overflowY: 'auto', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column' }}>
-          {/* Header */}
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>
                 Inbox {unread > 0 && <span className="bdg bdg-acc" style={{ marginLeft: 6 }}>{unread}</span>}
               </div>
-              <button className="btn btn-acc btn-sm" onClick={() => setComposeOpen(true)}>+ Compose</button>
+              <button className="btn btn-acc btn-sm" onClick={() => { setComposeOpen(true); setAttachFile(null); }}>+ Compose</button>
             </div>
             <div className="tabs" style={{ marginBottom: 0 }}>
-              <button className={`tab${tab === 'inbox' ? ' tab-a' : ''}`} onClick={() => setTab('inbox')}>Inbox</button>
-              <button className={`tab${tab === 'sent' ? ' tab-a' : ''}`} onClick={() => setTab('sent')}>Sent</button>
+              <button className={`tab${tab === 'inbox' ? ' active' : ''}`} onClick={() => setTab('inbox')}>Inbox</button>
+              <button className={`tab${tab === 'sent' ? ' active' : ''}`} onClick={() => setTab('sent')}>Sent</button>
             </div>
           </div>
 
@@ -199,7 +268,7 @@ export default function InboxClient({
           )}
 
           {visibleDocs.map((doc) => {
-            const isActive = doc.id === (current?.id);
+            const isActive = doc.id === current?.id;
             return (
               <div key={doc.id} onClick={() => handleOpen(doc)} style={{
                 padding: '11px 14px', borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
@@ -227,7 +296,8 @@ export default function InboxClient({
                   {doc.content?.slice(0, 55) ?? '—'}
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  <span className={`bdg ${TAG_COLORS[doc.type] ?? 'bdg-gy'}`} style={{ fontSize: 9 }}>{doc.type ?? 'DOC'}</span>
+                  <span className={`bdg ${TAG_COLORS[doc.type ?? ''] ?? 'bdg-gy'}`} style={{ fontSize: 9 }}>{doc.type ?? 'DOC'}</span>
+                  {doc.attachment_name && <span className="bdg bdg-gy" style={{ fontSize: 9 }}>📎</span>}
                   {doc.requires_signature && !doc.is_signed && <span className="bdg bdg-warn" style={{ fontSize: 9 }}>Sign needed</span>}
                   {doc.is_signed && <span className="bdg bdg-ok" style={{ fontSize: 9 }}>Signed</span>}
                 </div>
@@ -240,11 +310,12 @@ export default function InboxClient({
         {current ? (
           <div style={{ display: 'flex', flexDirection: 'column', background: 'white', overflow: 'hidden' }}>
             {/* Toolbar */}
-            <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--line-2)', display: 'flex', gap: 8, flexShrink: 0 }}>
-              <button className="btn btn-acc btn-sm" onClick={() => openReply(current)}>↩ Reply</button>
+            <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--line-2)', display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+              <button className="btn btn-acc btn-sm" onClick={() => { setReplyTo(current); setForwardDoc(null); }}>↩ Reply</button>
+              <button className="btn btn-sec btn-sm" onClick={() => { setForwardDoc(current); setReplyTo(null); }}>→ Forward</button>
               <button className="btn btn-sec btn-sm" onClick={() => handleArchive(current)}>Archive</button>
               {isMgmt && (
-                <span style={{ fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginLeft: 'auto', alignSelf: 'center' }}>
+                <span style={{ fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginLeft: 'auto' }}>
                   To: {recipientName(current)}
                 </span>
               )}
@@ -264,7 +335,7 @@ export default function InboxClient({
                     {new Date(current.created_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
-                <span className={`bdg ${TAG_COLORS[current.type] ?? 'bdg-gy'}`}>{current.type ?? 'DOC'}</span>
+                <span className={`bdg ${TAG_COLORS[current.type ?? ''] ?? 'bdg-gy'}`}>{current.type ?? 'DOC'}</span>
               </div>
 
               {current.reply_to && (
@@ -276,6 +347,20 @@ export default function InboxClient({
               <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>
                 {current.content ?? 'No content.'}
               </div>
+
+              {/* Attachment */}
+              {current.attachment_url && (
+                <div style={{ marginTop: 20, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 9, border: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>📎</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{current.attachment_name ?? 'Attachment'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>File attachment</div>
+                  </div>
+                  <a href={current.attachment_url} target="_blank" rel="noopener noreferrer" className="btn btn-sec btn-sm">
+                    Download
+                  </a>
+                </div>
+              )}
 
               {current.requires_signature && !current.is_signed && current.user_id === currentUserId && (
                 <div style={{ background: 'var(--warn-soft)', padding: 14, borderRadius: 9, border: '1px solid oklch(0.85 0.08 75)', marginTop: 20 }}>
@@ -306,9 +391,14 @@ export default function InboxClient({
                   </div>
                   <textarea name="message" rows={3} required placeholder="Write your reply…"
                     className="fld-input" style={{ resize: 'vertical', marginBottom: 8, display: 'block', width: '100%' }} />
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 12, color: 'var(--ink-3)', display: 'block', marginBottom: 4 }}>Attach file (optional)</label>
+                    <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                      style={{ fontSize: 12 }} />
+                  </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="submit" className="btn btn-acc btn-sm" disabled={sending}>
-                      {sending ? 'Sending…' : '↩ Send Reply'}
+                    <button type="submit" className="btn btn-acc btn-sm" disabled={sending || uploading}>
+                      {sending || uploading ? 'Sending…' : '↩ Send Reply'}
                     </button>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReplyTo(null)}>Cancel</button>
                   </div>
@@ -331,22 +421,20 @@ export default function InboxClient({
             <form ref={composeRef} onSubmit={handleCompose}>
               <div className="pv-fld">
                 <label>To</label>
-                <select name="to" required className="fld-input">
+                <select name="to" required>
                   <option value="">— Select recipient —</option>
-                  {allUsers
-                    .filter((u: any) => u.id !== currentUserId)
-                    .map((u: any) => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                    ))}
+                  {allUsers.filter((u: any) => u.id !== currentUserId).map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
                 </select>
               </div>
               <div className="pv-fld">
                 <label>Subject</label>
-                <input type="text" name="subject" className="fld-input" placeholder="e.g. Performance Notice — May 2026" required />
+                <input type="text" name="subject" placeholder="e.g. Performance Notice — May 2026" required />
               </div>
               <div className="pv-fld">
                 <label>Type</label>
-                <select name="type" className="fld-input">
+                <select name="type">
                   <option value="Notice">Notice</option>
                   <option value="Report">Report</option>
                   <option value="Warning">Warning</option>
@@ -354,18 +442,82 @@ export default function InboxClient({
                   <option value="Contract">Contract</option>
                   <option value="Payslip">Payslip</option>
                   <option value="HR">HR</option>
+                  <option value="Coaching">Coaching</option>
                 </select>
               </div>
               <div className="pv-fld">
                 <label>Message</label>
-                <textarea name="message" rows={6} className="fld-input" placeholder="Write your message…" required style={{ resize: 'vertical' }} />
+                <textarea name="message" rows={5} placeholder="Write your message…" required style={{ resize: 'vertical' }} />
+              </div>
+              <div className="pv-fld">
+                <label>Attach file (PDF, image, doc…)</label>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                  onChange={e => setAttachFile(e.target.files?.[0] ?? null)}
+                  style={{ fontSize: 13 }} />
+                {attachFile && (
+                  <div style={{ fontSize: 12, color: 'var(--ok)', marginTop: 4 }}>
+                    📎 {attachFile.name} ({(attachFile.size / 1024).toFixed(0)} KB)
+                    <button type="button" style={{ marginLeft: 8, color: 'var(--err)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}
+                      onClick={() => setAttachFile(null)}>Remove</button>
+                  </div>
+                )}
               </div>
               <label className="chk" style={{ marginBottom: 16 }}>
                 <input type="checkbox" name="req_sig" /> Require recipient signature
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="btn btn-acc" disabled={sending}>{sending ? 'Sending…' : 'Send Message'}</button>
-                <button type="button" className="btn btn-sec" onClick={() => setComposeOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-acc" disabled={sending || uploading}>
+                  {uploading ? 'Uploading…' : sending ? 'Sending…' : 'Send Message'}
+                </button>
+                <button type="button" className="btn btn-sec" onClick={() => { setComposeOpen(false); setAttachFile(null); }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Forward modal */}
+      {forwardDoc && (
+        <div className="mb" onClick={e => { if (e.target === e.currentTarget) setForwardDoc(null); }}>
+          <div className="md" style={{ width: 540 }}>
+            <div className="md-t">Forward Message</div>
+            <form ref={fwdRef} onSubmit={handleForward}>
+              <div className="pv-fld">
+                <label>To</label>
+                <select name="to" required>
+                  <option value="">— Select recipient —</option>
+                  {allUsers.filter((u: any) => u.id !== currentUserId).map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="pv-fld">
+                <label>Subject</label>
+                <input type="text" name="fwd_subject" value={`Fwd: ${forwardDoc.title ?? forwardDoc.subject ?? 'Message'}`} readOnly
+                  style={{ background: 'var(--surface-2)', color: 'var(--ink-3)' }} />
+              </div>
+              <div className="pv-fld">
+                <label>Add a note (optional)</label>
+                <textarea name="message" rows={3} placeholder="Add a note before the forwarded content…" style={{ resize: 'vertical' }} />
+              </div>
+              <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--ink-3)', marginBottom: 14, borderLeft: '3px solid var(--line)', lineHeight: 1.6, maxHeight: 120, overflowY: 'auto' }}>
+                <strong>Original:</strong> {forwardDoc.content?.slice(0, 200)}{(forwardDoc.content?.length ?? 0) > 200 ? '…' : ''}
+              </div>
+              {forwardDoc.attachment_url && (
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
+                  📎 Original attachment will be forwarded: <em>{forwardDoc.attachment_name}</em>
+                </div>
+              )}
+              <div className="pv-fld">
+                <label>Add new attachment (optional)</label>
+                <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                  style={{ fontSize: 13 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="btn btn-acc" disabled={sending || uploading}>
+                  {uploading ? 'Uploading…' : sending ? 'Forwarding…' : '→ Forward'}
+                </button>
+                <button type="button" className="btn btn-sec" onClick={() => setForwardDoc(null)}>Cancel</button>
               </div>
             </form>
           </div>

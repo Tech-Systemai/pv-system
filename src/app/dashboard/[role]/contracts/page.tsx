@@ -8,7 +8,7 @@ export default async function ContractsPage() {
   if (!user) return null;
 
   const admin = createAdminClient();
-  const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+  const { data: profile } = await admin.from('profiles').select('role, name').eq('id', user.id).single();
   const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
 
   const cQuery = admin.from('contracts').select(`*, profiles!contracts_user_id_fkey(name, role, salary)`).order('created_at', { ascending: false });
@@ -22,6 +22,7 @@ export default async function ContractsPage() {
       users={users || []}
       isMgmt={isMgmt}
       currentUserId={user.id}
+      currentUserName={profile?.name ?? 'Management'}
     />
   );
 }
