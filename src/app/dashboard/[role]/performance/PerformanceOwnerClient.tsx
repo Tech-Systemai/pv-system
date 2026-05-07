@@ -52,7 +52,13 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
   const [vList, setVList] = useState(allViolations);
   const [empList, setEmpList] = useState(employees);
   const [picked, setPicked] = useState<Employee | null>(null);
+  const [pickedTab, setPickedTab] = useState<'overview' | 'log'>('overview');
   const [addOpen, setAddOpen] = useState<string | null>(null);
+  const [editViolation, setEditViolation] = useState<Violation | null>(null);
+  const [editVPts, setEditVPts] = useState('');
+  const [editVSalary, setEditVSalary] = useState('');
+  const [editVExplanation, setEditVExplanation] = useState('');
+  const [editVSaving, setEditVSaving] = useState(false);
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [coachEmp, setCoachEmp] = useState('');
   const [coachDate, setCoachDate] = useState('');
@@ -101,6 +107,69 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
     setEmpList(prev => prev.map(e => e.id === empId ? { ...e, points: newPoints } : e));
     showToast(`Deduction added · ${pts} pts ($${salary}) — ${targetEmp?.name.split(' ')[0]} notified`);
     setAddOpen(null);
+  };
+
+  const openEditViolation = (v: Violation) => {
+    setEditViolation(v);
+    setEditVPts(String(v.points_deducted));
+    setEditVSalary(String(v.salary_deducted));
+    setEditVExplanation(v.explanation);
+  };
+
+  const handleEditViolation = async () => {
+    if (!editViolation) return;
+    setEditVSaving(true);
+    const newPts = parseFloat(editVPts) || 0;
+    const newSalary = parseFloat(editVSalary) || 0;
+    const oldPts = editViolation.points_deducted || 0;
+    const ptsDiff = oldPts - newPts; // positive = points being restored
+
+    const targetEmp = empList.find(e => e.id === editViolation.user_id);
+    const currentPts = targetEmp?.points ?? 0;
+    const restoredPoints = Math.min(7, parseFloat((currentPts + ptsDiff).toFixed(2)));
+
+    await Promise.all([
+      dbOp('violations', 'update', {
+        rule_name: editViolation.rule_name,
+        explanation: editVExplanation,
+        points_deducted: newPts,
+        salary_deducted: newSalary,
+      }, { id: editViolation.id }),
+      ptsDiff !== 0
+        ? dbOp('profiles', 'update', { points: restoredPoints }, { id: editViolation.user_id })
+        : Promise.resolve(),
+    ]);
+
+    setVList(prev => prev.map(v => v.id === editViolation.id
+      ? { ...v, explanation: editVExplanation, points_deducted: newPts, salary_deducted: newSalary }
+      : v
+    ));
+    if (ptsDiff !== 0) {
+      setEmpList(prev => prev.map(e => e.id === editViolation.user_id ? { ...e, points: restoredPoints } : e));
+    }
+    showToast('Violation updated');
+    setEditViolation(null);
+    setEditVSaving(false);
+  };
+
+  const handleDeleteViolation = async (v: Violation) => {
+    if (!confirm(`Delete this violation and restore ${v.points_deducted} pts to ${empList.find(e => e.id === v.user_id)?.name}?`)) return;
+    const targetEmp = empList.find(e => e.id === v.user_id);
+    const currentPts = targetEmp?.points ?? 0;
+    const restoredPoints = Math.min(7, parseFloat((currentPts + (v.points_deducted || 0)).toFixed(2)));
+
+    await Promise.all([
+      dbOp('violations', 'delete', undefined, { id: v.id }),
+      v.points_deducted > 0
+        ? dbOp('profiles', 'update', { points: restoredPoints }, { id: v.user_id })
+        : Promise.resolve(),
+    ]);
+
+    setVList(prev => prev.filter(x => x.id !== v.id));
+    if (v.points_deducted > 0) {
+      setEmpList(prev => prev.map(e => e.id === v.user_id ? { ...e, points: restoredPoints } : e));
+    }
+    showToast(`Violation deleted · ${v.points_deducted} pts restored`);
   };
 
   const handleScheduleCoaching = async () => {
@@ -327,73 +396,177 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
         </div>
       </div>
 
-      {/* Employee detail modal */}
-      {picked && (
-        <div className="mb" onClick={e => { if (e.target === e.currentTarget) setPicked(null); }}>
-          <div className="md" style={{ width: 620 }}>
-            <div className="md-t">{picked.name} · Performance</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 14, marginTop: -8, textTransform: 'capitalize' }}>
-              {picked.role}{picked.department ? ` · ${picked.department}` : ''} · score {(picked.points ?? 7).toFixed(1)} / 7
-            </div>
-
-            {/* 3-col stats */}
-            <div style={{
-              padding: 16, background: 'var(--surface-2)', borderRadius: 9,
-              marginBottom: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14,
-            }}>
-              <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Score</div>
-                <div style={{ fontSize: 22, fontWeight: 600, color: scoreColor(picked.points ?? 7) }}>{(picked.points ?? 7).toFixed(1)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Violations</div>
-                <div style={{ fontSize: 22, fontWeight: 600 }}>{getViolations(picked.id).length}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Deductions</div>
-                <div style={{ fontSize: 22, fontWeight: 600, color: getDeductions(picked) > 0 ? 'var(--err)' : 'var(--ink-4)' }}>
-                  ${getDeductions(picked)}
-                </div>
-              </div>
-            </div>
-
-            {getViolations(picked.id).length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                  Recent violations
-                </div>
-                {getViolations(picked.id).slice(0, 3).map(v => (
-                  <div key={v.id} style={{ fontSize: 12, padding: '7px 0', borderBottom: '1px solid var(--line-2)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <span className="mono" style={{ color: 'var(--err)', fontWeight: 600, minWidth: 50, fontSize: 11 }}>−{v.points_deducted}pt</span>
-                    <span style={{ fontWeight: 600 }}>{v.rule_name}</span>
-                    {!v.acknowledged && <span className="bdg bdg-warn" style={{ fontSize: 9 }}>New</span>}
+      {/* Employee detail modal — tabbed: Overview + Deduction Log */}
+      {picked && (() => {
+        const pickedViolations = getViolations(picked.id);
+        const autoV = pickedViolations.filter((v: any) => v.policy_id);
+        const manualV = pickedViolations.filter((v: any) => !v.policy_id);
+        const totalPtsDeducted = pickedViolations.reduce((s: number, v: any) => s + (v.points_deducted ?? 0), 0);
+        const totalSalDeducted = pickedViolations.reduce((s: number, v: any) => s + (v.salary_deducted ?? 0), 0);
+        return (
+          <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setPicked(null); setPickedTab('overview'); } }}>
+            <div className="md" style={{ width: 680, maxHeight: '85vh', overflowY: 'auto' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                <Avatar name={picked.name} hue={roleHue(picked.role)} size={36} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>{picked.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'capitalize' }}>
+                    {picked.role}{picked.department ? ` · ${picked.department}` : ''}
                   </div>
-                ))}
-                {getViolations(picked.id).length > 3 && (
-                  <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>
-                    +{getViolations(picked.id).length - 3} more violations
+                </div>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setPicked(null); setPickedTab('overview'); }}>✕</button>
+              </div>
+
+              {/* Tabs */}
+              <div className="tabs" style={{ marginBottom: 16, borderBottom: '1px solid var(--line-2)', paddingBottom: 0 }}>
+                <button className={`tab${pickedTab === 'overview' ? ' tab-a' : ''}`} onClick={() => setPickedTab('overview')}>Overview</button>
+                <button className={`tab${pickedTab === 'log' ? ' tab-a' : ''}`} onClick={() => setPickedTab('log')}>
+                  Deduction Log {pickedViolations.length > 0 && <span className="bdg bdg-warn" style={{ fontSize: 9, marginLeft: 4 }}>{pickedViolations.length}</span>}
+                </button>
+              </div>
+
+              {pickedTab === 'overview' && (
+                <>
+                  {/* 4-col stat strip */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+                    {[
+                      ['Score', (picked.points ?? 7).toFixed(1), scoreColor(picked.points ?? 7)],
+                      ['Violations', String(pickedViolations.length), 'var(--ink)'],
+                      ['Pts deducted', `−${totalPtsDeducted.toFixed(1)}`, totalPtsDeducted > 0 ? 'var(--err)' : 'var(--ink-4)'],
+                      ['Salary deducted', `$${totalSalDeducted.toFixed(0)}`, totalSalDeducted > 0 ? 'var(--err)' : 'var(--ink-4)'],
+                    ].map(([label, value, color]) => (
+                      <div key={label} style={{ padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 9 }}>
+                        <div style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontSize: 20, fontWeight: 600, color }}>{value}</div>
+                      </div>
+                    ))}
                   </div>
-                )}
+
+                  {/* Breakdown: auto vs manual */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+                    <div style={{ padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 9 }}>
+                      <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 6 }}>AUTO (Policy Engine)</div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{autoV.length} violation{autoV.length !== 1 ? 's' : ''}</div>
+                      <div style={{ fontSize: 11, color: 'var(--err)' }}>
+                        −{autoV.reduce((s: number, v: any) => s + (v.points_deducted ?? 0), 0).toFixed(1)} pts
+                        · −${autoV.reduce((s: number, v: any) => s + (v.salary_deducted ?? 0), 0).toFixed(0)}
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 9 }}>
+                      <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 6 }}>MANUAL (Manager)</div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{manualV.length} deduction{manualV.length !== 1 ? 's' : ''}</div>
+                      <div style={{ fontSize: 11, color: 'var(--err)' }}>
+                        −{manualV.reduce((s: number, v: any) => s + (v.points_deducted ?? 0), 0).toFixed(1)} pts
+                        · −${manualV.reduce((s: number, v: any) => s + (v.salary_deducted ?? 0), 0).toFixed(0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button className="btn btn-acc btn-sm" onClick={() => { setAddOpen(picked.id); setPicked(null); }}>+ Add deduction</button>
+                    <button className="btn btn-sec btn-sm" onClick={() => { setCoachEmp(picked.id); setPicked(null); setShowCoachModal(true); }}>Schedule coaching</button>
+                    <button className="btn btn-sec btn-sm" onClick={() => { setReportEmp(picked.id); setPicked(null); setShowReportModal(true); }}>Send report</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setPickedTab('log')}>View full log →</button>
+                  </div>
+                </>
+              )}
+
+              {pickedTab === 'log' && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                      All deductions — edit or delete to correct mistakes. Deleting restores points.
+                    </div>
+                    <button className="btn btn-acc btn-sm" onClick={() => { setAddOpen(picked.id); setPicked(null); }}>+ Add</button>
+                  </div>
+                  {pickedViolations.length === 0 ? (
+                    <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 12 }}>
+                      No violations or deductions on record.
+                    </div>
+                  ) : (
+                    pickedViolations.map((v: any) => (
+                      <div key={v.id} style={{
+                        padding: '12px 14px', marginBottom: 8, borderRadius: 9,
+                        background: v.policy_id ? 'var(--surface-2)' : 'oklch(0.98 0.01 265)',
+                        border: `1px solid ${v.policy_id ? 'var(--line-2)' : 'oklch(0.88 0.04 265)'}`,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                          <span className={`bdg ${v.policy_id ? 'bdg-gy' : 'bdg-acc'}`} style={{ fontSize: 9, flexShrink: 0 }}>
+                            {v.policy_id ? 'AUTO' : 'MANUAL'}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                              <span style={{ fontSize: 12.5, fontWeight: 600 }}>{v.rule_name}</span>
+                              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                                {new Date(v.triggered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 11.5, color: 'var(--ink-2)', lineHeight: 1.5, marginBottom: 6 }}>{v.explanation}</div>
+                            <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
+                              <span style={{ color: 'var(--err)', fontFamily: 'var(--mono)' }}>−{v.points_deducted} pts</span>
+                              <span style={{ color: 'var(--err)', fontFamily: 'var(--mono)' }}>−${v.salary_deducted}</span>
+                              {!v.acknowledged && <span className="bdg bdg-warn" style={{ fontSize: 9 }}>Unacknowledged</span>}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                            <button className="btn btn-ghost btn-sm" style={{ fontSize: 11 }}
+                              onClick={() => openEditViolation(v)}>Edit</button>
+                            <button className="btn btn-ghost btn-sm"
+                              style={{ fontSize: 11, color: 'var(--err)' }}
+                              onClick={() => handleDeleteViolation(v)}>Delete</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Edit Violation Modal */}
+      {editViolation && (
+        <div className="mb" onClick={e => { if (e.target === e.currentTarget) setEditViolation(null); }}>
+          <div className="md" style={{ width: 480 }}>
+            <div className="md-t">Edit Violation</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 14, marginTop: -8 }}>
+              Editing a violation adjusts the stored amounts and updates the employee's point balance.
+            </div>
+            <div className="pv-fld">
+              <label>Rule name</label>
+              <input className="fld-input" value={editViolation.rule_name} readOnly style={{ opacity: 0.6 }} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div className="pv-fld">
+                <label>Points deducted</label>
+                <input className="fld-input mono" type="number" step="0.5" min="0" max="7"
+                  value={editVPts} onChange={e => setEditVPts(e.target.value)} />
+              </div>
+              <div className="pv-fld">
+                <label>Salary deducted ($)</label>
+                <input className="fld-input mono" type="number" min="0"
+                  value={editVSalary} onChange={e => setEditVSalary(e.target.value)} />
+              </div>
+            </div>
+            <div className="pv-fld">
+              <label>Explanation</label>
+              <textarea className="fld-input" rows={3} value={editVExplanation}
+                onChange={e => setEditVExplanation(e.target.value)}
+                style={{ resize: 'vertical' }} />
+            </div>
+            {parseFloat(editVPts) !== editViolation.points_deducted && (
+              <div style={{ background: 'oklch(0.97 0.02 75)', padding: '8px 12px', borderRadius: 7, fontSize: 12, color: 'oklch(0.45 0.12 75)', marginBottom: 14 }}>
+                ⚠ Points balance will be adjusted by {(editViolation.points_deducted - parseFloat(editVPts || '0')).toFixed(2)} pts
               </div>
             )}
-
-            <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 14, lineHeight: 1.6 }}>
-              Open this employee's full <strong>My Performance</strong> view to see attendance, coaching, and target progress.
-            </div>
-
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="btn btn-acc btn-sm" onClick={() => { setAddOpen(picked.id); setPicked(null); }}>
-                + Add deduction
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-acc" onClick={handleEditViolation} disabled={editVSaving}>
+                {editVSaving ? 'Saving…' : 'Save Changes'}
               </button>
-              <button className="btn btn-sec btn-sm" onClick={() => { setCoachEmp(picked.id); setPicked(null); setShowCoachModal(true); }}>
-                Schedule coaching
-              </button>
-              <button className="btn btn-sec btn-sm" onClick={() => { setReportEmp(picked.id); setPicked(null); setShowReportModal(true); }}>
-                Send report
-              </button>
-              <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setPicked(null)}>
-                Close
-              </button>
+              <button className="btn btn-sec" onClick={() => setEditViolation(null)}>Cancel</button>
             </div>
           </div>
         </div>

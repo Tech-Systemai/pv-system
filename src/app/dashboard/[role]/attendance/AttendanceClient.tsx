@@ -14,6 +14,36 @@ type Log = {
 
 type User = { id: string; name: string; clocked_in?: boolean };
 
+type Schedule = {
+  user_id: string;
+  shift_start: string;
+  shift_end: string;
+  week: string;
+  day: string;
+};
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function getMondayKey(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
+
+function getScheduledMins(schedules: Schedule[], userId: string, dateStr: string): number | null {
+  const week = getMondayKey(dateStr);
+  const day = DAY_NAMES[new Date(dateStr + 'T00:00:00').getDay()];
+  const s = schedules.find(x => x.user_id === userId && x.week === week && x.day === day);
+  if (!s?.shift_start || !s?.shift_end) return null;
+  const [sh, sm] = s.shift_start.split(':').map(Number);
+  const [eh, em] = s.shift_end.split(':').map(Number);
+  const startMins = sh * 60 + sm;
+  const endMins = eh * 60 + em;
+  return endMins > startMins ? endMins - startMins : null;
+}
+
 function fmtTime(iso?: string | null) {
   if (!iso) return '—';
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -46,11 +76,13 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
 export default function AttendanceClient({
   initialLogs,
   users,
+  schedules,
   isMgmt,
   currentUserId,
 }: {
   initialLogs: Log[];
   users: User[];
+  schedules: Schedule[];
   isMgmt: boolean;
   currentUserId: string;
 }) {
@@ -91,19 +123,21 @@ export default function AttendanceClient({
   };
 
   const exportCSV = () => {
-    const rows = ['Name,Date,Day,Clock In,Clock Out,Hours,Status'];
+    const rows = ['Name,Date,Day,Clock In,Clock Out,Scheduled,Productive,Status'];
     for (const u of usersToDisplay) {
       const userLogs = logsToDisplay.filter(l => l.user_id === u.id);
       if (userLogs.length === 0) {
-        rows.push(`${u.name},—,—,—,—,—,—`);
+        rows.push(`${u.name},—,—,—,—,—,—,—`);
       } else {
         for (const l of userLogs) {
+          const schMins = l.date ? getScheduledMins(schedules, u.id, l.date) : null;
           rows.push([
             u.name,
             l.date ?? '—',
             fmtDay(l.date),
             l.clock_in_time ? new Date(l.clock_in_time).toLocaleTimeString() : '—',
             l.clock_out_time ? new Date(l.clock_out_time).toLocaleTimeString() : '—',
+            schMins ? fmtDuration(schMins) : '—',
             fmtDuration(l.productive_time_minutes),
             l.status ?? '—',
           ].join(','));
@@ -146,7 +180,7 @@ export default function AttendanceClient({
         </div>
         <div className="stat-card" style={{ cursor: 'default' }}>
           <div className="stat-h"><div className="stat-ico ind">◷</div></div>
-          <div className="stat-l">AVG SHIFT</div>
+          <div className="stat-l">AVG PRODUCTIVE</div>
           <div className="stat-v">{avgShiftH.toFixed(1)}<span style={{ fontSize: 14, color: 'var(--ink-3)', fontWeight: 400 }}>h</span></div>
           <div className="stat-foot">Per tracked session</div>
         </div>
@@ -193,13 +227,14 @@ export default function AttendanceClient({
                   <th>Day</th>
                   <th>Clock In</th>
                   <th>Clock Out</th>
-                  <th>Duration</th>
+                  <th title="Hours scheduled for this shift">Scheduled</th>
+                  <th title="Tracked productive time from Apploye">Productive</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {logsToDisplay.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '32px 0' }}>No attendance records yet</td></tr>
+                  <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '32px 0' }}>No attendance records yet</td></tr>
                 ) : (
                   logsToDisplay
                     .slice()
@@ -209,6 +244,11 @@ export default function AttendanceClient({
                       const hue = ((user?.name || 'U').charCodeAt(0) * 13) % 360;
                       const st = STATUS_STYLE[log.status ?? 'present'] ?? STATUS_STYLE.present;
                       const isToday = log.date === today;
+                      const schMins = log.date ? getScheduledMins(schedules, log.user_id, log.date) : null;
+                      const prodMins = log.productive_time_minutes ?? 0;
+                      const efficiency = schMins && schMins > 0 && prodMins > 0
+                        ? Math.min(100, Math.round((prodMins / schMins) * 100))
+                        : null;
                       return (
                         <tr key={log.id ?? i} style={{ background: isToday ? 'oklch(0.98 0.01 250)' : undefined }}>
                           <td>
@@ -230,8 +270,24 @@ export default function AttendanceClient({
                           <td style={{ fontSize: 13, fontFamily: 'var(--mono)', color: log.clock_out_time ? 'oklch(0.40 0.12 25)' : 'var(--ink-4)' }}>
                             {fmtTime(log.clock_out_time)}
                           </td>
+                          <td style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--ink-3)' }}>
+                            {schMins ? fmtDuration(schMins) : <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                          </td>
                           <td style={{ fontSize: 13, fontFamily: 'var(--mono)' }}>
-                            {fmtDuration(log.productive_time_minutes)}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ color: prodMins > 0 ? 'var(--ink)' : 'var(--ink-4)' }}>
+                                {fmtDuration(prodMins || null)}
+                              </span>
+                              {efficiency !== null && (
+                                <span style={{
+                                  fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
+                                  background: efficiency >= 90 ? 'oklch(0.94 0.06 145)' : efficiency >= 70 ? 'oklch(0.95 0.07 85)' : 'oklch(0.95 0.06 25)',
+                                  color: efficiency >= 90 ? 'oklch(0.38 0.14 145)' : efficiency >= 70 ? 'oklch(0.46 0.15 85)' : 'oklch(0.46 0.18 25)',
+                                }}>
+                                  {efficiency}%
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td>
                             <span style={{ background: st.bg, color: st.color, padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
@@ -294,15 +350,18 @@ export default function AttendanceClient({
                         const inTime  = fmtTime(log.clock_in_time);
                         const outTime = fmtTime(log.clock_out_time);
                         const dur     = fmtDuration(log.productive_time_minutes);
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`;
+                        const schMins = getScheduledMins(schedules, u.id, dateStr);
+                        const schStr = schMins ? ` · Sched: ${fmtDuration(schMins)}` : '';
                         if (log.status === 'late') {
                           bg = 'oklch(0.96 0.05 85)'; dot = 'L';
-                          title = `Late · In: ${inTime} · Out: ${outTime} · ${dur}`;
+                          title = `Late · In: ${inTime} · Out: ${outTime} · ${dur}${schStr}`;
                         } else if (log.status === 'absent') {
                           bg = 'oklch(0.96 0.05 25)'; dot = 'A';
                           title = 'Absent';
                         } else {
                           bg = 'oklch(0.96 0.05 145)'; dot = '·';
-                          title = `Present · In: ${inTime} · Out: ${outTime} · ${dur}`;
+                          title = `Present · In: ${inTime} · Out: ${outTime} · ${dur}${schStr}`;
                         }
                       }
 

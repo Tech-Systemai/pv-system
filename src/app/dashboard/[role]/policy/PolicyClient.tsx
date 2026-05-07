@@ -48,13 +48,15 @@ export default function PolicyClient({ initialPolicies }: { initialPolicies: any
     setRunning(true);
     setRunResult(null);
     try {
+      // No Bearer token — rely on the session cookie (owner/admin session auth)
       const res = await fetch('/api/cron/policies', {
         method: 'POST',
-        headers: { authorization: 'Bearer dev-secret' },
+        credentials: 'include',
       });
       const json = await res.json();
       if (json.success) {
-        setRunResult(`✓ Policies evaluated for ${json.date}: ${json.violations_created} violation${json.violations_created !== 1 ? 's' : ''} created, ${json.employees_affected} employee${json.employees_affected !== 1 ? 's' : ''} affected, ${json.inbox_notices_sent} inbox notice${json.inbox_notices_sent !== 1 ? 's' : ''} sent.`);
+        const skipped = json.employees_skipped > 0 ? ` · ${json.employees_skipped} skipped (terminated/inactive)` : '';
+        setRunResult(`✓ Evaluated ${json.employees_evaluated} employee${json.employees_evaluated !== 1 ? 's' : ''} for ${json.date}${skipped}: ${json.violations_created} violation${json.violations_created !== 1 ? 's' : ''} created · ${json.employees_affected} affected · ${json.inbox_notices_sent} inbox notice${json.inbox_notices_sent !== 1 ? 's' : ''} sent.`);
         setPolicies(policies.map((p: any) => ({
           ...p,
           executed: (p.executed ?? 0) + (json.violations_created > 0 ? 1 : 0),

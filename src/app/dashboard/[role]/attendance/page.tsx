@@ -16,10 +16,15 @@ export default async function AttendancePage() {
   const logsQuery = admin.from('attendance_logs').select('*').order('date', { ascending: false }).limit(500);
   const { data: logs } = isMgmt ? await logsQuery : await logsQuery.eq('user_id', user.id);
 
+  const { data: schedules } = await admin
+    .from('schedules')
+    .select('user_id, shift_start, shift_end, week, day');
+
   return (
     <AttendanceClient
       initialLogs={logs || []}
       users={allUsers || []}
+      schedules={schedules || []}
       isMgmt={isMgmt}
       currentUserId={user.id}
     />
