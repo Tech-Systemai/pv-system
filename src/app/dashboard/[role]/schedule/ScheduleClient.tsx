@@ -49,6 +49,8 @@ export default function ScheduleClient({
   const [editStart, setEditStart] = useState('09:00');
   const [editEnd, setEditEnd] = useState('17:00');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const weekShifts = shifts.filter(s => s.week === weekKey);
@@ -76,23 +78,34 @@ export default function ScheduleClient({
   const saveShift = async (off = false) => {
     if (!editCell) return;
     setSaving(true);
+    setSaveError('');
+    setSaveSuccess('');
     const existing = getShift(editCell.userId, editCell.day);
-    if (off) {
-      if (existing?.id) {
-        await dbOp('schedules', 'delete', undefined, { id: existing.id });
-        setShifts(prev => prev.filter(s => s.id !== existing.id));
-      }
-    } else {
-      const payload: Shift = { user_id: editCell.userId, week: weekKey, day: editCell.day, shift_start: editStart, shift_end: editEnd };
-      if (existing?.id) {
-        await dbOp('schedules', 'update', { shift_start: editStart, shift_end: editEnd }, { id: existing.id });
-        setShifts(prev => prev.map(s => s.id === existing.id ? { ...s, shift_start: editStart, shift_end: editEnd } : s));
+    try {
+      if (off) {
+        if (existing?.id) {
+          const { error } = await dbOp('schedules', 'delete', undefined, { id: existing.id });
+          if (error) throw new Error(error);
+          setShifts(prev => prev.filter(s => s.id !== existing.id));
+        }
+        setSaveSuccess('Shift removed.');
       } else {
-        const { data } = await dbOp('schedules', 'insert', payload);
-        if (data?.[0]) setShifts(prev => [...prev, data[0]]);
+        const payload: Shift = { user_id: editCell.userId, week: weekKey, day: editCell.day, shift_start: editStart, shift_end: editEnd };
+        if (existing?.id) {
+          const { error } = await dbOp('schedules', 'update', { shift_start: editStart, shift_end: editEnd }, { id: existing.id });
+          if (error) throw new Error(error);
+          setShifts(prev => prev.map(s => s.id === existing.id ? { ...s, shift_start: editStart, shift_end: editEnd } : s));
+        } else {
+          const { data, error } = await dbOp('schedules', 'insert', payload);
+          if (error) throw new Error(error);
+          if (data?.[0]) setShifts(prev => [...prev, data[0]]);
+        }
+        setSaveSuccess(`Shift saved: ${editStart}–${editEnd}`);
       }
+      setEditCell(null);
+    } catch (e: any) {
+      setSaveError(e.message ?? 'Failed to save shift. The schedules table may not exist — run the SQL migration in Supabase.');
     }
-    setEditCell(null);
     setSaving(false);
   };
 
@@ -127,6 +140,17 @@ export default function ScheduleClient({
           <div className="stat-foot">{submitted ? 'Submitted for approval' : 'Pending submission'}</div>
         </div>
       </div>
+
+      {saveError && (
+        <div style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.88 0.07 25)', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+          ✕ {saveError}
+        </div>
+      )}
+      {saveSuccess && (
+        <div style={{ background: 'oklch(0.97 0.03 145)', color: 'var(--ok)', border: '1px solid oklch(0.88 0.07 145)', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+          ✓ {saveSuccess}
+        </div>
+      )}
 
       {/* Header */}
       <div className="card" style={{ overflow: 'hidden' }}>
