@@ -89,23 +89,44 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
 
   const handleAddDeduction = async (empId: string, rule: string, pts: number, salary: number, explanation: string) => {
     const targetEmp = empList.find(e => e.id === empId);
-    const newPoints = Math.max(0, (targetEmp?.points ?? 7) - pts);
-    await Promise.all([
+    const newPoints = Math.max(0, parseFloat(((targetEmp?.points ?? 7) - pts).toFixed(2)));
+    const explanationText = explanation || rule;
+    const now = new Date().toISOString();
+
+    const [vRes, pRes] = await Promise.all([
       dbOp('violations', 'insert', {
         user_id: empId, rule_name: rule,
-        explanation: explanation || rule,
+        explanation: explanationText,
         points_deducted: pts, salary_deducted: salary,
-        triggered_at: new Date().toISOString(), acknowledged: false,
+        triggered_at: now, acknowledged: false,
       }),
       dbOp('profiles', 'update', { points: newPoints }, { id: empId }),
     ]);
-    setVList(prev => [{
+
+    if (vRes.error || pRes.error) {
+      showToast(`Error saving deduction: ${vRes.error || pRes.error}`);
+      return;
+    }
+
+    // Notify employee via inbox
+    await dbOp('inbox_documents', 'insert', {
+      user_id: empId,
+      title: `Deduction Applied — ${rule}`,
+      content: `${explanationText}\n\nPoints deducted: ${pts} pts\nSalary deducted: $${salary}\n\nIf you believe this is an error, contact your manager.`,
+      type: 'Violation Notice',
+      sender: 'Management',
+      requires_signature: false,
+      is_read: false,
+    });
+
+    const savedViolation = vRes.data?.[0] ?? {
       id: Math.random().toString(36).slice(2), user_id: empId, rule_name: rule,
-      explanation: explanation || rule, points_deducted: pts, salary_deducted: salary,
-      triggered_at: new Date().toISOString(), acknowledged: false,
-    }, ...prev]);
+      explanation: explanationText, points_deducted: pts, salary_deducted: salary,
+      triggered_at: now, acknowledged: false,
+    };
+    setVList(prev => [savedViolation, ...prev]);
     setEmpList(prev => prev.map(e => e.id === empId ? { ...e, points: newPoints } : e));
-    showToast(`Deduction added · ${pts} pts ($${salary}) — ${targetEmp?.name.split(' ')[0]} notified`);
+    showToast(`Deduction saved · ${pts} pts · $${salary} · ${targetEmp?.name.split(' ')[0]} notified`);
     setAddOpen(null);
   };
 
@@ -128,7 +149,7 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
     const currentPts = targetEmp?.points ?? 0;
     const restoredPoints = Math.min(7, parseFloat((currentPts + ptsDiff).toFixed(2)));
 
-    await Promise.all([
+    const [vRes, pRes] = await Promise.all([
       dbOp('violations', 'update', {
         rule_name: editViolation.rule_name,
         explanation: editVExplanation,
@@ -137,8 +158,14 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
       }, { id: editViolation.id }),
       ptsDiff !== 0
         ? dbOp('profiles', 'update', { points: restoredPoints }, { id: editViolation.user_id })
-        : Promise.resolve(),
+        : Promise.resolve({ data: null, error: null }),
     ]);
+
+    if (vRes.error || pRes.error) {
+      showToast(`Error saving: ${vRes.error || pRes.error}`);
+      setEditVSaving(false);
+      return;
+    }
 
     setVList(prev => prev.map(v => v.id === editViolation.id
       ? { ...v, explanation: editVExplanation, points_deducted: newPts, salary_deducted: newSalary }
@@ -158,12 +185,17 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
     const currentPts = targetEmp?.points ?? 0;
     const restoredPoints = Math.min(7, parseFloat((currentPts + (v.points_deducted || 0)).toFixed(2)));
 
-    await Promise.all([
+    const [dRes, pRes] = await Promise.all([
       dbOp('violations', 'delete', undefined, { id: v.id }),
       v.points_deducted > 0
         ? dbOp('profiles', 'update', { points: restoredPoints }, { id: v.user_id })
-        : Promise.resolve(),
+        : Promise.resolve({ data: null, error: null }),
     ]);
+
+    if (dRes.error || pRes.error) {
+      showToast(`Error deleting: ${dRes.error || pRes.error}`);
+      return;
+    }
 
     setVList(prev => prev.filter(x => x.id !== v.id));
     if (v.points_deducted > 0) {
