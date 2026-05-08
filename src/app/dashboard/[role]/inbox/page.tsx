@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import InboxClient from './InboxClient';
+import { getPermMatrix, resolveViewType, isAdminView } from '@/utils/getPermissions';
 
 export default async function InboxPage() {
   const supabase = await createClient();
@@ -8,10 +9,15 @@ export default async function InboxPage() {
   if (!user) return null;
 
   const admin = createAdminClient();
-  const { data: profile } = await admin.from('profiles').select('role, name').eq('id', user.id).single();
-  const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
+  const [{ data: profile }, matrix] = await Promise.all([
+    admin.from('profiles').select('role, name').eq('id', user.id).single(),
+    getPermMatrix(),
+  ]);
 
-  // Pending documents (approval_status = 'pending') are only visible in the Approvals section, not inbox
+  const viewType = resolveViewType(matrix, 'inbox', profile?.role ?? '');
+  const isMgmt = isAdminView(viewType);
+
+  // Pending documents (approval_status = 'pending') are only visible in the Approvals section
   let documents: any[] = [];
   if (isMgmt) {
     const { data } = await admin
