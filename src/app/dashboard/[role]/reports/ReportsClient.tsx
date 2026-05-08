@@ -100,6 +100,8 @@ export default function ReportsClient({
         content: r.notes ?? 'Please review the attached report.',
         type: 'Report',
         sender: supervisorName,
+        submitted_by_name: supervisorName,
+        approval_status: 'pending',
         requires_signature: true,
         is_read: false,
         html_content: html,

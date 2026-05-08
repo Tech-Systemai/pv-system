@@ -8,7 +8,7 @@ export default async function SchedulePage() {
   if (!user) return null;
 
   const admin = createAdminClient();
-  const { data: profile } = await admin.from('profiles').select('role, id').eq('id', user.id).single();
+  const { data: profile } = await admin.from('profiles').select('role, name').eq('id', user.id).single();
   const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
 
   const { data: users } = await admin.from('profiles').select('id, name, role').in('role', ['sales', 'cx', 'supervisor']);
@@ -20,6 +20,7 @@ export default async function SchedulePage() {
       users={users || []}
       isMgmt={isMgmt}
       currentUserId={user.id}
+      currentUserName={profile?.name ?? ''}
     />
   );
 }

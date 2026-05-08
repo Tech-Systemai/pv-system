@@ -17,11 +17,26 @@ export default async function ApprovalsPage() {
   const [
     { data: timeoff },
     { data: schedules },
-    { data: payrolls }
+    { data: payrolls },
+    { data: docs },
   ] = await Promise.all([
-    admin.from('time_off_requests').select(`*, profiles(name)`).eq('status', 'Pending'),
-    admin.from('schedules').select('*').eq('status', 'Pending'),
-    admin.from('payrolls').select(`*, profiles!payrolls_user_id_fkey(name)`).eq('status', 'Pending'),
+    admin
+      .from('time_off_requests')
+      .select('*, profiles!time_off_requests_user_id_fkey(name)')
+      .eq('status', 'Pending'),
+    admin
+      .from('schedules')
+      .select('*, profiles!schedules_user_id_fkey(name, role)')
+      .eq('status', 'Pending'),
+    admin
+      .from('payrolls')
+      .select('*, profiles!payrolls_user_id_fkey(name)')
+      .eq('status', 'Pending'),
+    admin
+      .from('inbox_documents')
+      .select('*, profiles!inbox_documents_user_id_fkey(name)')
+      .eq('approval_status', 'pending')
+      .order('created_at', { ascending: false }),
   ]);
 
   return (
@@ -29,6 +44,7 @@ export default async function ApprovalsPage() {
       initialTimeoff={timeoff || []}
       initialSchedules={schedules || []}
       initialPayrolls={payrolls || []}
+      initialDocs={docs || []}
     />
   );
 }

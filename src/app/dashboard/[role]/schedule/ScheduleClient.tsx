@@ -33,9 +33,9 @@ function formatWeekLabel(monday: Date) {
 type Shift = { id?: string; user_id: string; week: string; day: string; shift_start: string; shift_end: string; team?: string; created_by?: string };
 
 export default function ScheduleClient({
-  initialSchedules, users, isMgmt, currentUserId,
+  initialSchedules, users, isMgmt, currentUserId, currentUserName,
 }: {
-  initialSchedules: any[]; users: any[]; isMgmt: boolean; currentUserId: string;
+  initialSchedules: any[]; users: any[]; isMgmt: boolean; currentUserId: string; currentUserName: string;
 }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const monday = getMondayOfWeek(weekOffset);
@@ -49,9 +49,15 @@ export default function ScheduleClient({
   const [editStart, setEditStart] = useState('09:00');
   const [editEnd, setEditEnd] = useState('17:00');
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+
+  // Track which weeks have been submitted (initialise from DB status)
+  const [submittedWeeks, setSubmittedWeeks] = useState<Set<string>>(
+    () => new Set(initialSchedules.filter(s => s.status === 'Pending' || s.status === 'Approved').map(s => s.week).filter(Boolean))
+  );
+  const isCurrentWeekSubmitted = submittedWeeks.has(weekKey);
 
   const weekShifts = shifts.filter(s => s.week === weekKey);
   const plannedCount = weekShifts.length;
@@ -137,8 +143,8 @@ export default function ScheduleClient({
         <div className="stat-card" style={{ cursor: 'default' }}>
           <div className="stat-h"><div className="stat-ico ok">📋</div></div>
           <div className="stat-l">APPROVED</div>
-          <div className="stat-v">{submitted ? approvedCount : 0}<span style={{ fontSize: 14, color: 'var(--ink-3)' }}>/{plannedCount}</span></div>
-          <div className="stat-foot">{submitted ? 'Submitted for approval' : 'Pending submission'}</div>
+          <div className="stat-v">{isCurrentWeekSubmitted ? approvedCount : 0}<span style={{ fontSize: 14, color: 'var(--ink-3)' }}>/{plannedCount}</span></div>
+          <div className="stat-foot">{isCurrentWeekSubmitted ? 'Submitted for approval' : 'Pending submission'}</div>
         </div>
       </div>
 
@@ -164,12 +170,28 @@ export default function ScheduleClient({
             <button className="btn btn-sec btn-sm" onClick={() => setWeekOffset(w => w - 1)}>← Prev</button>
             <button className="btn btn-sec btn-sm" onClick={() => setWeekOffset(0)} disabled={weekOffset === 0}>This week</button>
             <button className="btn btn-sec btn-sm" onClick={() => setWeekOffset(w => w + 1)}>Next →</button>
-            {isMgmt && (
+            {isMgmt && weekShifts.length > 0 && (
               <button
-                className={`btn btn-sm ${submitted ? 'btn-sec' : 'btn-acc'}`}
-                onClick={() => setSubmitted(s => !s)}
+                className={`btn btn-sm ${isCurrentWeekSubmitted ? 'btn-sec' : 'btn-acc'}`}
+                disabled={isCurrentWeekSubmitted || submitting}
+                onClick={async () => {
+                  setSubmitting(true);
+                  setSaveError('');
+                  try {
+                    await Promise.all(
+                      weekShifts
+                        .filter(s => s.id)
+                        .map(s => dbOp('schedules', 'update', { status: 'Pending', submitted_by_name: currentUserName }, { id: s.id }))
+                    );
+                    setSubmittedWeeks(prev => new Set([...prev, weekKey]));
+                    setSaveSuccess('Schedule submitted for approval');
+                  } catch {
+                    setSaveError('Failed to submit for approval');
+                  }
+                  setSubmitting(false);
+                }}
               >
-                {submitted ? '✓ Submitted' : 'Submit for Approval'}
+                {submitting ? '…' : isCurrentWeekSubmitted ? '✓ Submitted' : 'Submit for Approval'}
               </button>
             )}
           </div>

@@ -179,6 +179,8 @@ export default function PayrollClient({
       content: `Your payslip for ${PERIOD} is ready. Net pay: $${item.net.toLocaleString()}. Please review and sign below.`,
       type: 'Payslip',
       sender: 'Finance / Management',
+      submitted_by_name: 'Finance / Management',
+      approval_status: 'pending',
       requires_signature: true,
       is_read: false,
       html_content: html,
