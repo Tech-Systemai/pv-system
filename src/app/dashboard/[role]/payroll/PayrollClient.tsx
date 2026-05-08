@@ -5,6 +5,71 @@ import { dbOp } from '@/utils/db';
 
 const PERIOD = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
+function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
+  const date = new Date().toLocaleDateString();
+  const vRows = empViolations.map(v => `
+    <tr>
+      <td style="padding:7px 10px;font-weight:500;font-size:12px">${v.rule_name ?? ''}</td>
+      <td style="padding:7px 10px;color:#64748b;font-size:12px">${v.explanation ?? ''}</td>
+      <td style="padding:7px 10px;color:#94a3b8;font-size:12px;white-space:nowrap">${new Date(v.triggered_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+      <td style="padding:7px 10px;text-align:right;color:#ef4444;font-size:12px">−${v.points_deducted ?? 0}</td>
+      <td style="padding:7px 10px;text-align:right;color:#ef4444;font-weight:600;font-size:12px">−$${(v.salary_deducted ?? 0).toFixed(2)}</td>
+    </tr>`).join('');
+  const bonusRow = (item.bonuses ?? 0) > 0
+    ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Bonus</span><span style="font-weight:600;color:#10b981">+$${item.bonuses}</span></div>` : '';
+  const deductTable = empViolations.length > 0 ? `
+    <div style="margin-bottom:24px">
+      <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:10px">Deduction Detail</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f8fafc">
+          <th style="text-align:left;padding:8px 10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;font-size:11px">Rule</th>
+          <th style="text-align:left;padding:8px 10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;font-size:11px">Reason</th>
+          <th style="text-align:left;padding:8px 10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;font-size:11px">Date</th>
+          <th style="text-align:right;padding:8px 10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;font-size:11px">Points</th>
+          <th style="text-align:right;padding:8px 10px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0;font-size:11px">Amount</th>
+        </tr></thead>
+        <tbody>${vRows}</tbody>
+        <tfoot><tr style="background:#fff7f7">
+          <td colspan="4" style="padding:8px 10px;font-weight:700;font-size:13px">Total Deductions</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700;color:#ef4444;font-size:13px">−$${item.deductions.toLocaleString()}</td>
+        </tr></tfoot>
+      </table>
+      ${item.slip?.deduction_notes ? `<div style="margin-top:8px;font-size:12px;color:#64748b;padding:6px 10px;background:#fffbeb;border-radius:6px;border-left:3px solid #f59e0b">Note: ${item.slip.deduction_notes}</div>` : ''}
+    </div>` : '';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Payslip — ${PERIOD}</title>
+<style>body{font-family:Inter,Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 40px;color:#1a1f2e;line-height:1.6}table{width:100%;border-collapse:collapse}@media print{body{margin:0}}</style>
+</head><body>
+<div style="border-bottom:2px solid #4f46e5;padding-bottom:20px;margin-bottom:30px;display:flex;justify-content:space-between;align-items:flex-start">
+  <div style="display:flex;align-items:center;gap:15px">
+    <div style="width:50px;height:50px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px">PV</div>
+    <div><div style="font-size:24px;font-weight:800;color:#0f172a">Pioneers Veneers</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Official Payslip Document</div></div>
+  </div>
+  <div style="text-align:right"><div style="font-size:14px;font-weight:600">Period: ${PERIOD}</div><div style="font-size:12px;color:#64748b">Generated: ${date}</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px">
+  <div>
+    <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:8px">Employee</div>
+    <div style="font-size:18px;font-weight:700;color:#0f172a">${emp.name}</div>
+    <div style="font-size:13px;color:#475569">${emp.role}${emp.department ? ' · ' + emp.department : ''}</div>
+    <div style="font-size:12px;color:#475569;margin-top:8px;line-height:1.6">Days present: ${item.att?.daysPresent ?? '—'}<br>Days late: ${item.att?.daysLate ?? '—'}<br>Tracked hours: ${Math.floor((item.att?.totalMins ?? 0)/60)}h ${(item.att?.totalMins ?? 0)%60}m</div>
+  </div>
+  <div style="background:#f8fafc;padding:20px;border-radius:12px">
+    <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:10px">Payment Summary</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Base Salary</span><span style="font-weight:600">$${item.base.toLocaleString()}</span></div>
+    ${bonusRow}
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px;font-size:13px"><span style="color:#ef4444">Total Deductions</span><span style="color:#ef4444;font-weight:600">−$${item.deductions.toLocaleString()}</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;font-weight:700">Net Pay</span><span style="font-size:24px;font-weight:800;color:#10b981">$${item.net.toLocaleString()}</span></div>
+  </div>
+</div>
+${deductTable}
+<div style="margin-top:40px;display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:20px">
+  <div style="width:40%"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Finance Department</div><div style="font-size:11px;color:#64748b">Pioneers Veneers — Authorized Signature</div></div></div>
+  <div style="width:40%;text-align:right"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Employee Acknowledgement</div><div style="font-size:11px;color:#64748b">${emp.name}</div></div></div>
+</div>
+<div style="margin-top:24px;font-size:9px;color:#94a3b8;text-align:center;border-top:1px solid #f1f5f9;padding-top:12px">Official payslip · Pioneers Veneers Enterprise Platform · ${PERIOD} · ${date}</div>
+</body></html>`;
+}
+
 export default function PayrollClient({
   employees,
   initialPayrolls,
@@ -106,31 +171,19 @@ export default function PayrollClient({
   const handleSendToInbox = async (emp: any, item: any) => {
     setSending(emp.id);
     const empViolations = violationsByUser[emp.id] ?? [];
-    const lines = [
-      `Your payslip for ${PERIOD} is ready.`,
-      '',
-      `Base Salary:   $${item.base.toLocaleString()}`,
-    ];
-    if (empViolations.length > 0) {
-      lines.push('', 'Deductions breakdown:');
-      for (const v of empViolations) {
-        lines.push(`  • ${v.rule_name} (${new Date(v.triggered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}): −$${(v.salary_deducted ?? 0).toFixed(2)}`);
-      }
-      if (item.slip?.deduction_notes) lines.push(`  Note: ${item.slip.deduction_notes}`);
-    }
-    if ((item.slip?.bonuses ?? 0) > 0) lines.push('', `Bonus:         +$${item.slip.bonuses}`);
-    lines.push('', `Total Deductions: −$${item.deductions.toLocaleString()}`, `Net Pay:       $${item.net.toLocaleString()}`);
-    lines.push('', 'Please sign and acknowledge receipt.');
-
+    const html = buildPayslipHtml(emp, item, empViolations);
+    const subject = `Payslip — ${PERIOD}`;
     const { error } = await dbOp('inbox_documents', 'insert', {
       user_id: emp.id,
-      title: `Payslip — ${PERIOD}`,
-      subject: `Payslip — ${PERIOD}`,
-      content: lines.join('\n'),
+      title: subject, subject,
+      content: `Your payslip for ${PERIOD} is ready. Net pay: $${item.net.toLocaleString()}. Please review and sign below.`,
       type: 'Payslip',
       sender: 'Finance / Management',
       requires_signature: true,
       is_read: false,
+      html_content: html,
+      doc_ref_type: 'payslip',
+      doc_ref_id: String(item.slip?.id ?? emp.id),
     });
     if (error) { showToast(`Send failed: ${error}`); }
     else { setSent(prev => new Set([...prev, emp.id])); showToast(`Payslip sent to ${emp.name.split(' ')[0]}`); }

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
-import { createClient } from '@/utils/supabase/client';
 
 type Section = { title: string; content: string };
 type Contract = {
@@ -248,36 +247,21 @@ export default function ContractsClient({
     if (!viewingContract) return;
     setIsSending(true);
     try {
-      const supabase = createClient();
       const resolvedSections = parseSections(viewingContract.content).length
         ? parseSections(viewingContract.content)
         : CONTRACT_TEMPLATES[viewingContract.type] ?? [];
-
-      const html     = buildContractHtml(viewingContract, resolvedSections);
-      const blob     = new Blob([html], { type: 'text/html' });
-      const fname    = `contract-${viewingContract.type.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}.html`;
-      const storagePath = `contracts/${viewingContract.user_id}/${fname}`;
-
-      let attachmentUrl: string | undefined;
-      let attachmentName: string | undefined;
-      const { error: upErr } = await supabase.storage.from('employee-docs').upload(storagePath, blob, { upsert: true, contentType: 'text/html' });
-      if (!upErr) {
-        const { data: urlData } = supabase.storage.from('employee-docs').getPublicUrl(storagePath);
-        attachmentUrl  = urlData.publicUrl;
-        attachmentName = `${viewingContract.type} Agreement.html`;
-      }
-
+      const html    = buildContractHtml(viewingContract, resolvedSections);
       const subject = `${viewingContract.type} Agreement`;
-      const content = `Dear ${viewingContract.profiles?.name ?? 'Employee'},\n\nYour ${viewingContract.type} employment agreement is attached. Please review all terms carefully and provide your signature in the Contracts section.\n\nEffective Date: ${viewingContract.effective_date}${viewingContract.end_date ? `\nEnd Date: ${viewingContract.end_date}` : ''}\n\nBest regards,\nPioneers Veneers Management`;
-      const payload: any = {
+      const { error } = await dbOp('inbox_documents', 'insert', {
         user_id: viewingContract.user_id, sender_id: currentUserId,
-        title: subject, subject, content, type: 'Contract',
-        sender: currentUserName, requires_signature: true,
-        is_read: false, archived: false,
-      };
-      if (attachmentUrl) { payload.attachment_url = attachmentUrl; payload.attachment_name = attachmentName; }
-
-      const { error } = await dbOp('inbox_documents', 'insert', payload);
+        title: subject, subject,
+        content: `Your ${viewingContract.type} employment agreement is ready. Please review and sign below.`,
+        type: 'Contract', sender: currentUserName,
+        requires_signature: true, is_read: false, archived: false,
+        html_content: html,
+        doc_ref_type: 'contract',
+        doc_ref_id: String(viewingContract.id ?? ''),
+      });
       if (error) showToast(`Send failed: ${error}`, false);
       else showToast('Contract sent to employee inbox');
     } finally {
