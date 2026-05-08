@@ -123,10 +123,19 @@ export default function InboxClient({
   const handleSign = async (doc: Doc) => {
     if (!signName.trim()) return;
     setSigSaving(true);
-    const { error } = await dbOp('inbox_documents', 'update', { is_signed: true, signed_by: signName.trim() }, { id: doc.id });
+
+    const cursiveStyle = `font-family:'Dancing Script','Brush Script MT',cursive;font-size:28px;color:#1a1f2e`;
+    const signedDate = `Signed ${new Date().toLocaleDateString()} · `;
+    const updatedHtml = doc.html_content
+      ?.replace('<!--EMP_SIG_PLACEHOLDER-->', `<span style="${cursiveStyle}">${signName.trim()}</span>`)
+      ?.replace('<!--EMP_DATE_PLACEHOLDER-->', signedDate);
+
+    const updates: Record<string, unknown> = { is_signed: true, signed_by: signName.trim() };
+    if (updatedHtml) updates.html_content = updatedHtml;
+
+    const { error } = await dbOp('inbox_documents', 'update', updates, { id: doc.id });
     if (error) { showToast(`Signature failed: ${error}`, false); setSigSaving(false); return; }
 
-    // For contracts: also update the contracts table
     if (doc.doc_ref_type === 'contract' && doc.doc_ref_id) {
       const now = new Date().toISOString();
       await dbOp('contracts', 'update', {
@@ -135,7 +144,7 @@ export default function InboxClient({
       }, { id: doc.doc_ref_id });
     }
 
-    setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, is_signed: true, signed_by: signName.trim() } : d));
+    setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, is_signed: true, signed_by: signName.trim(), html_content: updatedHtml ?? d.html_content } : d));
     setSignName('');
     setSigSaving(false);
     showToast('Document signed');

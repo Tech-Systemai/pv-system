@@ -64,7 +64,7 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
 ${deductTable}
 <div style="margin-top:40px;display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:20px">
   <div style="width:40%"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Finance Department</div><div style="font-size:11px;color:#64748b">Pioneers Veneers — Authorized Signature</div></div></div>
-  <div style="width:40%;text-align:right"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Employee Acknowledgement</div><div style="font-size:11px;color:#64748b">${emp.name}</div></div></div>
+  <div style="width:40%;text-align:right"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Employee Acknowledgement</div><div style="font-size:11px;color:#64748b">${emp.name}</div><div style="margin-top:8px;min-height:36px;font-family:'Dancing Script','Brush Script MT',cursive;font-size:28px;color:#1a1f2e"><!--EMP_SIG_PLACEHOLDER--></div><div style="font-size:10px;color:#94a3b8;margin-top:2px"><!--EMP_DATE_PLACEHOLDER-->Signature &amp; Date</div></div></div>
 </div>
 <div style="margin-top:24px;font-size:9px;color:#94a3b8;text-align:center;border-top:1px solid #f1f5f9;padding-top:12px">Official payslip · Pioneers Veneers Enterprise Platform · ${PERIOD} · ${date}</div>
 </body></html>`;
