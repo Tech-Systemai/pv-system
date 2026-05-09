@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { dbOp } from '@/utils/db';
 import type { ViewType, PermMatrix } from '@/utils/getPermissions';
 
@@ -53,6 +54,7 @@ export default function PermissionsClient({
   categories: string[];
   roles: string[];
 }) {
+  const router = useRouter();
   const [matrix, setMatrix] = useState<PermMatrix>(initialMatrix);
   const [saving, setSaving] = useState(false);
   const [saved,  setSaved]  = useState(false);
@@ -75,6 +77,7 @@ export default function PermissionsClient({
       setError(`Save failed: ${err}`);
     } else {
       setSaved(true);
+      router.refresh(); // invalidate Router Cache so portal switches see new permissions
       setTimeout(() => setSaved(false), 4000);
     }
     setSaving(false);

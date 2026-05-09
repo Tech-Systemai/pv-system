@@ -7,6 +7,7 @@ import NotificationBell from '@/components/NotificationBell';
 import ProfileButton from '@/components/ProfileButton';
 import TopBarTitle from '@/components/TopBarTitle';
 import TopBarClock from '@/components/TopBarClock';
+import { getPermMatrix, resolveViewType, PERM_DEFAULTS } from '@/utils/getPermissions';
 
 export default async function DashboardLayout({
   children,
@@ -23,11 +24,10 @@ export default async function DashboardLayout({
   }
 
   const admin = createAdminClient();
-  const { data: profile, error: profileError } = await admin
-    .from('profiles')
-    .select('role, name, username, email, contract_url, id_document_url')
-    .eq('id', user.id)
-    .single();
+  const [{ data: profile, error: profileError }, matrix] = await Promise.all([
+    admin.from('profiles').select('role, name, username, email, contract_url, id_document_url').eq('id', user.id).single(),
+    getPermMatrix(),
+  ]);
 
   // If profile is missing, auto-create it so the user isn't stuck
   if (!profile) {
@@ -42,6 +42,11 @@ export default async function DashboardLayout({
 
   const effectiveRole = profile?.role ?? user.user_metadata?.role ?? 'sales';
   const { role: urlRole } = await params;
+
+  const allowedModules: Record<string, string> = {};
+  for (const mod of Object.keys(PERM_DEFAULTS)) {
+    allowedModules[mod] = resolveViewType(matrix, mod, urlRole);
+  }
 
   const isManagement = effectiveRole === 'owner' || effectiveRole === 'admin';
   if (profile && effectiveRole !== urlRole && !isManagement) {
@@ -76,7 +81,7 @@ export default async function DashboardLayout({
   return (
     <div className="pv">
       <div className="pv-grid">
-        <Sidebar role={urlRole} />
+        <Sidebar role={urlRole} allowedModules={allowedModules} />
 
         <main className="main">
           <header className="tb">

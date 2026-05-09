@@ -47,7 +47,8 @@ export async function getPermMatrix(): Promise<PermMatrix> {
   for (const mod of Object.keys(PERM_DEFAULTS)) {
     merged[mod] = {};
     for (const role of Object.keys(PERM_DEFAULTS[mod])) {
-      merged[mod][role] = normalise((data.matrix as any)[mod]?.[role]) ?? PERM_DEFAULTS[mod][role];
+      const raw = (data.matrix as any)[mod]?.[role];
+      merged[mod][role] = raw !== undefined ? normalise(raw) : PERM_DEFAULTS[mod][role];
     }
   }
   return merged;

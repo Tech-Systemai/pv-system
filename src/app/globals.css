@@ -735,3 +735,70 @@ a { color: inherit; text-decoration: none; }
 .kanban-col-head { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--line-2); }
 .kanban-card { background: white; border-radius: 9px; padding: 12px; border: 1px solid var(--line); box-shadow: var(--sh-1); cursor: pointer; transition: box-shadow .15s; }
 .kanban-card:hover { box-shadow: var(--sh-2); }
+
+/* ── MOBILE HAMBURGER (hidden on desktop) ── */
+.sb-mob-btn {
+  display: none;
+  position: fixed; top: 13px; left: 14px; z-index: 201;
+  width: 36px; height: 36px; border-radius: 9px;
+  background: var(--ink); color: white; border: none; cursor: pointer;
+  align-items: center; justify-content: center; font-size: 17px;
+  box-shadow: var(--sh-2); flex-shrink: 0;
+}
+.sb-mob-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 199;
+  background: oklch(0.10 0.012 265 / .55);
+  backdrop-filter: blur(4px);
+  animation: fdin .15s;
+}
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px) {
+  /* Shell — let the page scroll naturally */
+  .pv { overflow: visible; height: auto; min-height: 100svh; }
+  .pv-grid { grid-template-columns: 1fr; height: auto; min-height: 100svh; }
+
+  /* Sidebar — off-screen by default, slides in as overlay */
+  .sb {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 200;
+    width: 272px; height: 100svh;
+    transform: translateX(-100%);
+    transition: transform .25s var(--ease);
+  }
+  .sb.mob-open { transform: translateX(0); box-shadow: 0 8px 48px oklch(0 0 0 / .4); }
+
+  /* Show hamburger + overlay on mobile */
+  .sb-mob-btn { display: flex; }
+  .sb-mob-overlay.active { display: block; }
+
+  /* Main area fills full width; topbar gets left padding for the hamburger */
+  .main { height: auto; min-height: 100svh; }
+  .tb { padding: 11px 14px 11px 60px; gap: 8px; flex-wrap: nowrap; }
+  .tb-cmd { display: none; }
+  .sys-pill { display: none; }
+
+  /* Content padding */
+  .cnt { padding: 14px 12px; }
+  .foot { padding: 10px 14px; gap: 10px; }
+  .foot-v { margin-left: 0; }
+
+  /* Grids collapse to 2-col on phone */
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+  .two, .two-col { grid-template-columns: 1fr; }
+  .three { grid-template-columns: 1fr 1fr; }
+
+  /* Tables scroll horizontally */
+  .tbl { font-size: 12px; }
+  .tbl th, .tbl td { padding: 8px 10px; }
+
+  /* Kanban narrower cards */
+  .kanban-col { flex: 0 0 185px; }
+
+  /* Tabs overflow scroll */
+  .tabs { overflow-x: auto; max-width: 100%; }
+
+  /* Modals fill screen width */
+  .mb { padding: 16px; }
+  .md { width: 100% !important; max-width: 100% !important; border-radius: 12px; }
+}

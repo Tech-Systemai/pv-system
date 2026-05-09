@@ -27,6 +27,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [viewApplicant, setViewApplicant] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [addError, setAddError] = useState('');
   const [hireError, setHireError] = useState('');
   const [showRejected, setShowRejected] = useState(false);
   const router = useRouter();
@@ -48,6 +49,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
   const handleAdd = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setAddError('');
     const fd = new FormData(e.currentTarget);
     const newApp = {
       name: fd.get('name') as string,
@@ -58,11 +60,15 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
       status: 'Reviewing',
       stage: 'Applied',
     };
-    const { data } = await dbOp('hr_applicants', 'insert', newApp);
-    if (data?.[0]) setApplicants(prev => [data[0], ...prev]);
-    setIsAddModalOpen(false);
+    const { data, error } = await dbOp('hr_applicants', 'insert', newApp);
+    if (error) {
+      setAddError(`Failed to add applicant: ${error}`);
+    } else {
+      if (data?.[0]) setApplicants(prev => [data[0], ...prev]);
+      setIsAddModalOpen(false);
+      (e.target as HTMLFormElement).reset();
+    }
     setIsSubmitting(false);
-    (e.target as HTMLFormElement).reset();
   };
 
   const moveStage = async (app: any, direction: 'next' | 'prev') => {
@@ -161,7 +167,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
           <button className="btn btn-sec btn-sm" onClick={() => setShowRejected(s => !s)}>
             {showRejected ? 'Hide rejected' : `Rejected (${rejected.length})`}
           </button>
-          <button className="btn btn-acc btn-sm" onClick={() => setIsAddModalOpen(true)}>+ Add Applicant</button>
+          <button className="btn btn-acc btn-sm" onClick={() => { setAddError(''); setIsAddModalOpen(true); }}>+ Add Applicant</button>
         </div>
       </div>
 
@@ -251,6 +257,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
           <div className="md" style={{ width: 440 }}>
             <div className="md-t">Add Applicant</div>
             <form onSubmit={handleAdd}>
+              {addError && <div style={{ background: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)', padding: '8px 12px', borderRadius: 7, fontSize: 12, marginBottom: 12 }}>{addError}</div>}
               <div className="pv-fld"><label>Full Name</label><input type="text" name="name" required /></div>
               <div className="pv-fld"><label>Email</label><input type="email" name="email" required /></div>
               <div className="pv-fld">
@@ -267,7 +274,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
               <div className="pv-fld"><label>Notes (optional)</label><textarea name="notes_field" rows={3} placeholder="Interviewer notes, observations…" /></div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" className="btn btn-acc" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : 'Add'}</button>
-                <button type="button" className="btn btn-sec" onClick={() => setIsAddModalOpen(false)}>Cancel</button>
+                <button type="button" className="btn btn-sec" onClick={() => { setIsAddModalOpen(false); setAddError(''); }}>Cancel</button>
               </div>
             </form>
           </div>
