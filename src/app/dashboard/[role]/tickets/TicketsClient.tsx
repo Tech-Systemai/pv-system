@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-type FilterTab = 'all' | 'mine' | 'unassigned' | 'critical';
+type FilterTab = 'all' | 'employee' | 'customer' | 'mine' | 'unassigned' | 'critical';
 
 const PRIORITY_BADGE: Record<string, string> = {
   High:   'bdg bdg-err',
@@ -14,6 +14,11 @@ const PRIORITY_BADGE: Record<string, string> = {
 const STATUS_BADGE: Record<string, string> = {
   Open:     'bdg bdg-acc',
   Resolved: 'bdg bdg-ok',
+};
+
+const TYPE_BADGE: Record<string, string> = {
+  employee: 'bdg bdg-gy',
+  customer: 'bdg bdg-acc',
 };
 
 function SlaBar({ createdAt, priority }: { createdAt: string; priority: string }) {
@@ -37,29 +42,32 @@ function SlaBar({ createdAt, priority }: { createdAt: string; priority: string }
 }
 
 export default function TicketsClient({
-  initialTickets, isMgmt, currentUserId, allUsers,
+  initialTickets, isMgmt, userRole, currentUserId, allUsers,
 }: {
-  initialTickets: any[]; isMgmt: boolean; currentUserId: string; allUsers?: any[];
+  initialTickets: any[]; isMgmt: boolean; userRole: string; currentUserId: string; allUsers?: any[];
 }) {
-  const [tickets, setTickets] = useState(initialTickets);
-  const [filterTab, setFilterTab] = useState<FilterTab>('all');
+  const [tickets, setTickets]       = useState(initialTickets);
+  const [filterTab, setFilterTab]   = useState<FilterTab>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewTicket, setViewTicket] = useState<any>(null);
-  const [replyText, setReplyText] = useState('');
+  const [replyText, setReplyText]   = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  const isCX = userRole === 'cx';
 
   const open     = tickets.filter(t => t.status !== 'Resolved');
   const resolved = tickets.filter(t => t.status === 'Resolved');
 
   const filtered = (() => {
-    const base = tickets;
     switch (filterTab) {
-      case 'mine':       return base.filter(t => t.user_id === currentUserId);
-      case 'unassigned': return base.filter(t => !t.assigned_to && t.status !== 'Resolved');
-      case 'critical':   return base.filter(t => t.priority === 'High' && t.status !== 'Resolved');
-      default:           return base;
+      case 'employee':   return tickets.filter(t => (t.ticket_type ?? 'employee') === 'employee');
+      case 'customer':   return tickets.filter(t => t.ticket_type === 'customer');
+      case 'mine':       return tickets.filter(t => t.user_id === currentUserId);
+      case 'unassigned': return tickets.filter(t => !t.assigned_to && t.status !== 'Resolved');
+      case 'critical':   return tickets.filter(t => t.priority === 'High' && t.status !== 'Resolved');
+      default:           return tickets;
     }
   })();
 
@@ -68,16 +76,27 @@ export default function TicketsClient({
     setIsSubmitting(true);
     setSubmitError('');
     const fd = new FormData(e.currentTarget);
-    const newTicket = {
-      subject: fd.get('subject') as string,
+    const titleVal = fd.get('subject') as string;
+    const newTicket: Record<string, any> = {
+      title:       titleVal,
       description: fd.get('description') as string,
-      priority: fd.get('priority') as string,
-      user_id: currentUserId,
-      status: 'Open',
+      priority:    fd.get('priority') as string,
+      ticket_type: fd.get('ticket_type') as string,
+      user_id:     currentUserId,
+      status:      'Open',
     };
-    const { data, error } = await dbOp('tickets', 'insert', newTicket, undefined, '*, profiles(name)');
+    let { data, error } = await dbOp('tickets', 'insert', newTicket);
+    // If ticket_type column not yet migrated, retry without it
+    if (error && (error.toLowerCase().includes('ticket_type') || error.toLowerCase().includes('schema cache'))) {
+      ({ data, error } = await dbOp('tickets', 'insert', {
+        title: titleVal, description: newTicket.description,
+        priority: newTicket.priority, user_id: currentUserId, status: 'Open',
+      }));
+    }
     if (error) { setSubmitError(error); setIsSubmitting(false); return; }
-    if (data?.[0]) setTickets([data[0], ...tickets]);
+    const nameMap = Object.fromEntries((allUsers ?? []).map((u: any) => [u.id, u.name]));
+    const row = data?.[0] ?? { ...newTicket, id: `tmp-${Date.now()}`, created_at: new Date().toISOString() };
+    setTickets(prev => [{ ...row, profiles: { name: nameMap[currentUserId] ?? 'Me' } }, ...prev]);
     setIsSubmitting(false);
     setIsModalOpen(false);
     (e.target as HTMLFormElement).reset();
@@ -87,12 +106,13 @@ export default function TicketsClient({
     if (!viewTicket || !replyText.trim()) return;
     setIsReplying(true);
     await dbOp('inbox_documents', 'insert', {
-      user_id: viewTicket.user_id,
-      title: `Re: ${viewTicket.subject}`,
-      subject: `Re: ${viewTicket.subject}`,
-      content: replyText.trim(),
-      type: 'Notice',
-      sender: 'Support Team',
+      user_id:            viewTicket.user_id,
+      sender_id:          currentUserId,
+      title:              `Re: ${viewTicket.title ?? viewTicket.subject}`,
+      subject:            `Re: ${viewTicket.title ?? viewTicket.subject}`,
+      content:            replyText.trim(),
+      type:               'Notice',
+      sender:             'Support Team',
       requires_signature: false,
     });
     await dbOp('tickets', 'update', { status: 'Resolved' }, { id: viewTicket.id });
@@ -107,12 +127,25 @@ export default function TicketsClient({
     setTickets(prev => prev.map(t => t.id === id ? { ...t, status: 'Open' } : t));
   };
 
-  const TABS: { id: FilterTab; label: string; count: number }[] = [
+  // Tabs shown to everyone
+  const baseTabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'all',        label: 'All',        count: tickets.length },
     { id: 'mine',       label: 'Mine',       count: tickets.filter(t => t.user_id === currentUserId).length },
     { id: 'unassigned', label: 'Unassigned', count: tickets.filter(t => !t.assigned_to && t.status !== 'Resolved').length },
     { id: 'critical',   label: 'Critical',   count: tickets.filter(t => t.priority === 'High' && t.status !== 'Resolved').length },
   ];
+
+  // Admin / management get the split-by-type tabs first
+  const TABS = isMgmt
+    ? [
+        { id: 'employee' as FilterTab, label: 'Employee', count: tickets.filter(t => (t.ticket_type ?? 'employee') === 'employee').length },
+        { id: 'customer' as FilterTab, label: 'Customer', count: tickets.filter(t => t.ticket_type === 'customer').length },
+        ...baseTabs,
+      ]
+    : baseTabs;
+
+  // Default ticket type for the form
+  const defaultType = isCX ? 'customer' : 'employee';
 
   return (
     <div className="page-fade">
@@ -124,12 +157,30 @@ export default function TicketsClient({
           <div className="stat-v">{open.length}</div>
           <div className="stat-foot">Awaiting resolution</div>
         </div>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico er">⚠</div></div>
-          <div className="stat-l">CRITICAL</div>
-          <div className="stat-v" style={{ color: 'var(--err)' }}>{tickets.filter(t => t.priority === 'High' && t.status !== 'Resolved').length}</div>
-          <div className="stat-foot">High priority · SLA at risk</div>
-        </div>
+        {isMgmt && (
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ind">👤</div></div>
+            <div className="stat-l">EMPLOYEE TICKETS</div>
+            <div className="stat-v">{tickets.filter(t => (t.ticket_type ?? 'employee') === 'employee').length}</div>
+            <div className="stat-foot">Internal · Private</div>
+          </div>
+        )}
+        {isMgmt && (
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ok">🌐</div></div>
+            <div className="stat-l">CUSTOMER TICKETS</div>
+            <div className="stat-v">{tickets.filter(t => t.ticket_type === 'customer').length}</div>
+            <div className="stat-foot">CX · Shared</div>
+          </div>
+        )}
+        {!isMgmt && (
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico er">⚠</div></div>
+            <div className="stat-l">CRITICAL</div>
+            <div className="stat-v" style={{ color: 'var(--err)' }}>{tickets.filter(t => t.priority === 'High' && t.status !== 'Resolved').length}</div>
+            <div className="stat-foot">High priority · SLA at risk</div>
+          </div>
+        )}
         <div className="stat-card" style={{ cursor: 'default' }}>
           <div className="stat-h"><div className="stat-ico wn">○</div></div>
           <div className="stat-l">UNASSIGNED</div>
@@ -148,7 +199,7 @@ export default function TicketsClient({
         <div className="card-hdr">
           <div>
             <div className="card-title">Support Tickets</div>
-            <div className="card-sub">{open.length} open · Avg first-response 4m 12s</div>
+            <div className="card-sub">{open.length} open · tickets shared across all portals</div>
           </div>
           <button className="btn btn-acc btn-sm" onClick={() => setIsModalOpen(true)}>+ New Ticket</button>
         </div>
@@ -174,7 +225,8 @@ export default function TicketsClient({
                 <tr>
                   <th>#</th>
                   <th>Title</th>
-                  {isMgmt && <th>From</th>}
+                  {(isMgmt || isCX) && <th>From</th>}
+                  <th>Type</th>
                   <th>Priority</th>
                   <th>Status</th>
                   <th>SLA</th>
@@ -184,16 +236,22 @@ export default function TicketsClient({
               <tbody>
                 {filtered.map((t, i) => {
                   const ageMs = Date.now() - new Date(t.created_at).getTime();
-                  const ageH = ageMs / 3_600_000;
+                  const ageH  = ageMs / 3_600_000;
                   const ageLabel = ageH < 1 ? `${Math.round(ageH * 60)}m` : ageH < 24 ? `${ageH.toFixed(1)}h` : `${Math.floor(ageH / 24)}d`;
+                  const tType = t.ticket_type ?? 'employee';
                   return (
                     <tr key={t.id} onClick={() => { setViewTicket(t); setReplyText(''); }} style={{ cursor: 'pointer' }}>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>#{(1000 + i).toString(16).toUpperCase()}</td>
                       <td>
-                        <div style={{ fontWeight: 500 }}>{t.subject}</div>
+                        <div style={{ fontWeight: 500 }}>{t.title ?? t.subject}</div>
                         {t.description && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{t.description.slice(0, 80)}</div>}
                       </td>
-                      {isMgmt && <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t.profiles?.name ?? 'Unknown'}</td>}
+                      {(isMgmt || isCX) && <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{t.profiles?.name ?? 'Unknown'}</td>}
+                      <td>
+                        <span className={TYPE_BADGE[tType] ?? 'bdg bdg-gy'} style={{ fontSize: 10 }}>
+                          {tType === 'customer' ? '🌐 Customer' : '👤 Employee'}
+                        </span>
+                      </td>
                       <td><span className={PRIORITY_BADGE[t.priority] ?? 'bdg bdg-gy'}>{t.priority}</span></td>
                       <td><span className={STATUS_BADGE[t.status] ?? 'bdg bdg-gy'}>{t.status}</span></td>
                       <td onClick={e => e.stopPropagation()}>
@@ -216,13 +274,22 @@ export default function TicketsClient({
             <div className="md-t">Create Support Ticket</div>
             <form onSubmit={handleCreate}>
               <div className="pv-fld"><label>Issue Title</label><input type="text" name="subject" required /></div>
-              <div className="pv-fld">
-                <label>Priority</label>
-                <select name="priority">
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="pv-fld">
+                  <label>Type</label>
+                  <select name="ticket_type" defaultValue={defaultType}>
+                    <option value="employee">👤 Employee (Private)</option>
+                    <option value="customer">🌐 Customer (Shared)</option>
+                  </select>
+                </div>
+                <div className="pv-fld">
+                  <label>Priority</label>
+                  <select name="priority">
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
               </div>
               <div className="pv-fld"><label>Description</label><textarea name="description" rows={4} required /></div>
               {submitError && (
@@ -245,17 +312,31 @@ export default function TicketsClient({
           <div className="md" style={{ width: 520, maxHeight: '85vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{viewTicket.subject}</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{viewTicket.title ?? viewTicket.subject}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
-                  {isMgmt && viewTicket.profiles?.name && `From ${viewTicket.profiles.name} · `}
+                  {(isMgmt || isCX) && viewTicket.profiles?.name && `From ${viewTicket.profiles.name} · `}
                   {new Date(viewTicket.created_at).toLocaleString()}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 12 }}>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <span className={TYPE_BADGE[viewTicket.ticket_type ?? 'employee'] ?? 'bdg bdg-gy'} style={{ fontSize: 10 }}>
+                  {viewTicket.ticket_type === 'customer' ? '🌐 Customer' : '👤 Employee'}
+                </span>
                 <span className={PRIORITY_BADGE[viewTicket.priority] ?? 'bdg bdg-gy'}>{viewTicket.priority}</span>
                 <span className={STATUS_BADGE[viewTicket.status] ?? 'bdg bdg-gy'}>{viewTicket.status}</span>
               </div>
             </div>
+
+            {viewTicket.ticket_type !== 'customer' && (
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', background: 'var(--surface-2)', padding: '6px 10px', borderRadius: 6, marginBottom: 10, border: '1px solid var(--line)' }}>
+                🔒 Private — visible only to the submitter and management
+              </div>
+            )}
+            {viewTicket.ticket_type === 'customer' && (
+              <div style={{ fontSize: 11, color: 'oklch(0.44 0.12 268)', background: 'var(--accent-soft)', padding: '6px 10px', borderRadius: 6, marginBottom: 10, border: '1px solid var(--accent-line)' }}>
+                🌐 Customer ticket — visible to all CX agents and management
+              </div>
+            )}
 
             {viewTicket.status !== 'Resolved' && (
               <div style={{ marginBottom: 14 }}>

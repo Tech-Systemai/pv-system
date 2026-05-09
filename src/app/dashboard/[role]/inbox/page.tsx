@@ -25,13 +25,17 @@ export default async function InboxPage() {
     .filter(d => { if (seen.has(d.id)) return false; seen.add(d.id); return true; })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const { data: users } = await admin.from('profiles').select('id, name, role');
+  const [{ data: users }, { data: folders }] = await Promise.all([
+    admin.from('profiles').select('id, name, role'),
+    admin.from('inbox_folders').select('*').eq('user_id', user.id).order('created_at'),
+  ]);
 
   return (
     <InboxClient
       initialDocs={documents || []}
       allUsers={users || []}
       currentUserId={user.id}
+      initialFolders={folders || []}
     />
   );
 }

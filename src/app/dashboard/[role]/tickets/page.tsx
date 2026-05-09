@@ -7,27 +7,50 @@ export default async function TicketsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const admin = createAdminClient();
+  const admin    = createAdminClient();
   const { data: profile } = await admin.from('profiles').select('name, role').eq('id', user.id).single();
-  const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
+  const userRole = profile?.role ?? '';
+  const isMgmt   = ['owner', 'admin', 'supervisor'].includes(userRole);
+  const isCX     = userRole === 'cx';
 
-  const tQuery = admin
-    .from('tickets')
-    .select('*, profiles(name)')
-    .order('created_at', { ascending: false });
+  // Fetch tickets and profiles separately — avoids broken PostgREST FK join
+  // (tickets.user_id → auth.users, not profiles, so profiles(name) fails)
+  const [ticketResult, { data: allProfiles }] = await Promise.all([
+    isMgmt
+      ? admin.from('tickets').select('*').order('created_at', { ascending: false })
+      : isCX
+        ? admin.from('tickets').select('*')
+            .or(`ticket_type.eq.customer,user_id.eq.${user.id}`)
+            .order('created_at', { ascending: false })
+        : admin.from('tickets').select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false }),
+    admin.from('profiles').select('id, name, role').order('name'),
+  ]);
 
-  const { data: tickets } = isMgmt ? await tQuery : await tQuery.eq('user_id', user.id);
+  // If CX query failed (ticket_type column not yet migrated), fall back to own tickets
+  let ticketData = ticketResult.data;
+  if (ticketResult.error && isCX) {
+    const { data: fallback } = await admin
+      .from('tickets').select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    ticketData = fallback;
+  }
 
-  const { data: allUsers } = isMgmt
-    ? await admin.from('profiles').select('id, name, role').order('name')
-    : { data: [] };
+  const nameMap = Object.fromEntries((allProfiles ?? []).map(p => [p.id, p.name]));
+  const tickets = (ticketData ?? []).map(t => ({
+    ...t,
+    profiles: { name: nameMap[t.user_id] ?? 'Unknown' },
+  }));
 
   return (
     <TicketsClient
-      initialTickets={tickets || []}
+      initialTickets={tickets}
       isMgmt={isMgmt}
+      userRole={userRole}
       currentUserId={user.id}
-      allUsers={allUsers || []}
+      allUsers={allProfiles || []}
     />
   );
 }

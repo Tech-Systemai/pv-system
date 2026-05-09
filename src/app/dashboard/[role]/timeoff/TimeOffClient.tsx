@@ -56,8 +56,10 @@ export default function TimeOffClient({
     const { data, error } = await dbOp('time_off_requests', 'insert', newReq);
     if (error) {
       setSubmitError(error);
-    } else if (data && data[0]) {
-      setRequests([{ ...data[0], profiles: { name: currentUserName } }, ...requests]);
+    } else {
+      // Use returned row if available, fall back to submitted data so state always updates
+      const saved = data?.[0] ?? { ...newReq, id: `tmp-${Date.now()}`, created_at: new Date().toISOString() };
+      setRequests(prev => [{ ...saved, profiles: { name: currentUserName } }, ...prev]);
       (e.target as HTMLFormElement).reset();
       setIsFormOpen(false);
     }

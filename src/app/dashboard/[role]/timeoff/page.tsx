@@ -11,16 +11,24 @@ export default async function TimeOffPage() {
   const { data: profile } = await admin.from('profiles').select('name, role').eq('id', user.id).single();
   const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
 
-  const reqQuery = admin
-    .from('time_off_requests')
-    .select(`*, profiles:user_id(name)`)
-    .order('created_at', { ascending: false });
+  // Avoid PostgREST FK join (time_off_requests.user_id → auth.users, not profiles).
+  // Fetch requests and profiles separately then merge names in JS.
+  const [{ data: reqData }, { data: allProfiles }] = await Promise.all([
+    isMgmt
+      ? admin.from('time_off_requests').select('*').order('created_at', { ascending: false })
+      : admin.from('time_off_requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    admin.from('profiles').select('id, name'),
+  ]);
 
-  const { data: requests } = isMgmt ? await reqQuery : await reqQuery.eq('user_id', user.id);
+  const nameMap = Object.fromEntries((allProfiles ?? []).map(p => [p.id, p.name]));
+  const requests = (reqData ?? []).map(r => ({
+    ...r,
+    profiles: { name: nameMap[r.user_id] ?? 'Unknown' },
+  }));
 
   return (
     <TimeOffClient
-      initialRequests={requests || []}
+      initialRequests={requests}
       isMgmt={isMgmt}
       currentUserId={user.id}
       currentUserName={profile?.name || 'User'}

@@ -23,35 +23,43 @@ function Avatar({ name, size = 34 }: { name: string; size?: number }) {
   );
 }
 
+type Folder = { id: string; user_id: string; name: string; created_at: string };
+
 type Doc = {
   id: any; user_id: string; sender_id?: string; sender?: string;
   title?: string; subject?: string; content?: string; type?: string;
   is_read?: boolean; is_signed?: boolean; signed_by?: string;
   requires_signature?: boolean; archived?: boolean; reply_to?: any;
-  created_at: string;
+  created_at: string; folder_id?: string | null;
   attachment_url?: string; attachment_name?: string;
   html_content?: string; doc_ref_type?: string; doc_ref_id?: string;
 };
 
 export default function InboxClient({
-  initialDocs, allUsers, currentUserId,
+  initialDocs, allUsers, currentUserId, initialFolders,
 }: {
-  initialDocs: any[]; allUsers: any[]; currentUserId: string;
+  initialDocs: any[]; allUsers: any[]; currentUserId: string; initialFolders: any[];
 }) {
-  const [docs, setDocs]               = useState<Doc[]>(initialDocs);
-  const [selId, setSelId]             = useState<any>(initialDocs[0]?.id ?? null);
-  const [tab, setTab]                 = useState<'inbox' | 'sent'>('inbox');
-  const [composeOpen, setComposeOpen] = useState(false);
-  const [replyTo, setReplyTo]         = useState<Doc | null>(null);
-  const [forwardDoc, setForwardDoc]   = useState<Doc | null>(null);
-  const [sending, setSending]         = useState(false);
-  const [signName, setSignName]       = useState('');
-  const [sigSaving, setSigSaving]     = useState(false);
-  const [toast, setToast]             = useState<{ msg: string; ok: boolean } | null>(null);
-  const [attachFile, setAttachFile]   = useState<File | null>(null);
-  const [uploading, setUploading]     = useState(false);
+  const [docs, setDocs]                 = useState<Doc[]>(initialDocs);
+  const [selId, setSelId]               = useState<any>(null);
+  const [tab, setTab]                   = useState<'inbox' | 'sent'>('inbox');
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery]   = useState('');
+  const [folders, setFolders]           = useState<Folder[]>(initialFolders);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [addingFolder, setAddingFolder] = useState(false);
+  const [composeOpen, setComposeOpen]   = useState(false);
+  const [replyTo, setReplyTo]           = useState<Doc | null>(null);
+  const [forwardDoc, setForwardDoc]     = useState<Doc | null>(null);
+  const [sending, setSending]           = useState(false);
+  const [signName, setSignName]         = useState('');
+  const [sigSaving, setSigSaving]       = useState(false);
+  const [toast, setToast]               = useState<{ msg: string; ok: boolean } | null>(null);
+  const [attachFile, setAttachFile]     = useState<File | null>(null);
+  const [uploading, setUploading]       = useState(false);
   const composeRef = useRef<HTMLFormElement>(null);
   const fwdRef     = useRef<HTMLFormElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const currentUser     = allUsers.find((u: any) => u.id === currentUserId);
   const currentUserName = currentUser?.name ?? 'Unknown';
@@ -61,7 +69,6 @@ export default function InboxClient({
     setTimeout(() => setToast(null), 4000);
   };
 
-  // ── Realtime ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -79,14 +86,50 @@ export default function InboxClient({
     return () => { supabase.removeChannel(channel); };
   }, [currentUserId]);
 
-  const inboxDocs   = docs.filter(d => !d.archived && d.user_id === currentUserId);
-  const sentDocs    = docs.filter(d => !d.archived && d.sender_id === currentUserId && d.user_id !== currentUserId);
-  const visibleDocs = tab === 'sent' ? sentDocs : inboxDocs;
+  const inboxDocs = docs.filter(d => !d.archived && d.user_id === currentUserId);
+  const sentDocs  = docs.filter(d => !d.archived && d.sender_id === currentUserId && d.user_id !== currentUserId);
+  const unread    = inboxDocs.filter(d => !d.is_read).length;
 
-  const current = visibleDocs.find(d => d.id === selId) ?? visibleDocs[0] ?? null;
-  const unread  = inboxDocs.filter(d => !d.is_read).length;
+  const baseList = activeFolder
+    ? docs.filter(d => !d.archived && d.folder_id === activeFolder)
+    : (tab === 'sent' ? sentDocs : inboxDocs);
 
-  // ── File upload ──────────────────────────────────────────────────────────────
+  const filteredDocs = searchQuery.trim()
+    ? baseList.filter(d => {
+        const q = searchQuery.toLowerCase();
+        return (d.subject ?? d.title ?? '').toLowerCase().includes(q)
+          || (d.sender ?? '').toLowerCase().includes(q)
+          || (d.content ?? '').toLowerCase().includes(q);
+      })
+    : baseList;
+
+  const current = filteredDocs.find(d => d.id === selId) ?? null;
+
+  const recipientName = (doc: Doc) => allUsers.find((u: any) => u.id === doc.user_id)?.name ?? 'Unknown';
+
+  const buildThread = (anchor: Doc): Doc[] => {
+    const findRoot = (d: Doc): Doc => {
+      if (!d.reply_to) return d;
+      const parent = docs.find(x => x.id === d.reply_to);
+      return parent ? findRoot(parent) : d;
+    };
+    const root = findRoot(anchor);
+    const inThread = new Set<any>([root.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      docs.forEach(d => {
+        if (d.reply_to && inThread.has(d.reply_to) && !inThread.has(d.id)) {
+          inThread.add(d.id); changed = true;
+        }
+      });
+    }
+    return docs
+      .filter(d => !d.archived && inThread.has(d.id))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  };
+
+  // ── File upload ────────────────────────────────────────────────────────────
   const uploadAttachment = async (file: File): Promise<{ url: string; name: string } | null> => {
     setUploading(true);
     try {
@@ -100,6 +143,7 @@ export default function InboxClient({
     } finally { setUploading(false); }
   };
 
+  // ── Message actions ────────────────────────────────────────────────────────
   const handleOpen = async (doc: Doc) => {
     setSelId(doc.id);
     setSignName('');
@@ -121,35 +165,28 @@ export default function InboxClient({
   const handleSign = async (doc: Doc) => {
     if (!signName.trim()) return;
     setSigSaving(true);
-
     const cursiveStyle = `font-family:'Dancing Script','Brush Script MT',cursive;font-size:28px;color:#1a1f2e`;
     const signedDate = `Signed ${new Date().toLocaleDateString()} · `;
     const updatedHtml = doc.html_content
       ?.replace('<!--EMP_SIG_PLACEHOLDER-->', `<span style="${cursiveStyle}">${signName.trim()}</span>`)
       ?.replace('<!--EMP_DATE_PLACEHOLDER-->', signedDate);
-
     const updates: Record<string, unknown> = { is_signed: true, signed_by: signName.trim() };
     if (updatedHtml) updates.html_content = updatedHtml;
-
     const { error } = await dbOp('inbox_documents', 'update', updates, { id: doc.id });
     if (error) { showToast(`Signature failed: ${error}`, false); setSigSaving(false); return; }
-
     if (doc.doc_ref_type === 'contract' && doc.doc_ref_id) {
-      const now = new Date().toISOString();
       await dbOp('contracts', 'update', {
         employee_signature: signName.trim(),
-        employee_signed_at: now,
+        employee_signed_at: new Date().toISOString(),
         status: 'Signed',
       }, { id: doc.doc_ref_id });
     }
     if (doc.doc_ref_type === 'report' && doc.doc_ref_id) {
-      const now = new Date().toISOString();
       await dbOp('reports', 'update', {
         employee_signature: signName.trim(),
-        employee_signed_at: now,
+        employee_signed_at: new Date().toISOString(),
       }, { id: doc.doc_ref_id });
     }
-
     setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, is_signed: true, signed_by: signName.trim(), html_content: updatedHtml ?? d.html_content } : d));
     setSignName('');
     setSigSaving(false);
@@ -169,16 +206,12 @@ export default function InboxClient({
       sender: currentUserName, requires_signature: reqSig,
       is_read: false, archived: false,
     };
-    if (replyToId)    { payload.reply_to       = replyToId; }
-    if (attachmentUrl){ payload.attachment_url  = attachmentUrl; payload.attachment_name = attachmentName; }
-
+    if (replyToId)     { payload.reply_to       = replyToId; }
+    if (attachmentUrl) { payload.attachment_url  = attachmentUrl; payload.attachment_name = attachmentName; }
     const { data, error } = await dbOp('inbox_documents', 'insert', payload);
     setSending(false);
     if (error) { showToast(`Send failed: ${error}`, false); return false; }
-    if (data?.[0]) {
-      setDocs(prev => [data[0], ...prev]);
-      setSelId(data[0].id);
-    }
+    if (data?.[0]) { setDocs(prev => [data[0], ...prev]); setSelId(data[0].id); }
     showToast('Message sent');
     return true;
   };
@@ -205,6 +238,7 @@ export default function InboxClient({
       setComposeOpen(false);
       setAttachFile(null);
       composeRef.current?.reset();
+      setActiveFolder(null);
       setTab('sent');
     }
   };
@@ -232,7 +266,7 @@ export default function InboxClient({
     });
     if (ok) {
       setReplyTo(null);
-      if (recipientId !== currentUserId) setTab('sent');
+      if (recipientId !== currentUserId) { setActiveFolder(null); setTab('sent'); }
     }
   };
 
@@ -262,132 +296,271 @@ export default function InboxClient({
     if (ok) { setForwardDoc(null); fwdRef.current?.reset(); }
   };
 
-  const recipientName = (doc: Doc) => allUsers.find((u: any) => u.id === doc.user_id)?.name ?? 'Unknown';
+  // ── Folder actions ─────────────────────────────────────────────────────────
+  const handleCreateFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) return;
+    const { data, error } = await dbOp('inbox_folders', 'insert', { user_id: currentUserId, name });
+    if (error) { showToast(`Could not create folder: ${error}`, false); return; }
+    if (data?.[0]) setFolders(prev => [...prev, data[0] as Folder]);
+    setNewFolderName('');
+    setAddingFolder(false);
+    showToast(`Folder "${name}" created`);
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    const { error } = await dbOp('inbox_folders', 'delete', {}, { id: folderId });
+    if (error) { showToast(`Could not delete folder: ${error}`, false); return; }
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+    if (activeFolder === folderId) setActiveFolder(null);
+    showToast('Folder deleted');
+  };
+
+  const handleMoveToFolder = async (docId: any, folderId: string | null) => {
+    const { error } = await dbOp('inbox_documents', 'update', { folder_id: folderId }, { id: docId });
+    if (error) { showToast(`Move failed: ${error}`, false); return; }
+    setDocs(prev => prev.map(d => d.id === docId ? { ...d, folder_id: folderId } : d));
+    showToast(folderId ? 'Moved to folder' : 'Removed from folder');
+  };
+
+  // ── Nav helper ─────────────────────────────────────────────────────────────
+  function NavItem({
+    label, count, active, onClick, onDelete,
+  }: { label: string; count?: number; active: boolean; onClick: () => void; onDelete?: () => void }) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          display: 'flex', alignItems: 'center', padding: '7px 12px', borderRadius: 7, cursor: 'pointer', gap: 6,
+          background: active ? 'oklch(0.93 0.04 268)' : 'transparent',
+          color: active ? 'var(--accent)' : 'var(--ink-2)',
+          fontWeight: active ? 600 : 400, fontSize: 13,
+        }}
+      >
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        {count != null && count > 0 && (
+          <span style={{ background: 'var(--accent)', color: 'white', borderRadius: 10, fontSize: 10, fontWeight: 700, padding: '1px 6px', minWidth: 18, textAlign: 'center' }}>
+            {count}
+          </span>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={ev => { ev.stopPropagation(); onDelete(); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-4)', fontSize: 13, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const isEmbedDoc = (doc: Doc) => !!doc.html_content;
 
-  const buildThread = (anchor: Doc): Doc[] => {
-    const findRoot = (d: Doc): Doc => {
-      if (!d.reply_to) return d;
-      const parent = docs.find(x => x.id === d.reply_to);
-      return parent ? findRoot(parent) : d;
-    };
-    const root = findRoot(anchor);
-    const inThread = new Set<any>([root.id]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      docs.forEach(d => {
-        if (d.reply_to && inThread.has(d.reply_to) && !inThread.has(d.id)) {
-          inThread.add(d.id); changed = true;
-        }
-      });
-    }
-    return docs
-      .filter(d => !d.archived && inThread.has(d.id))
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  };
-
   return (
     <div className="page-fade">
-      <div className="card" style={{ height: 700, padding: 0, display: 'grid', gridTemplateColumns: '300px 1fr', overflow: 'hidden' }}>
+      <div className="card" style={{ height: 740, padding: 0, display: 'flex', flexDirection: 'row', overflow: 'visible' }}>
 
-        {/* ── Left panel ── */}
-        <div style={{ borderRight: '1px solid var(--line)', overflowY: 'auto', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>
-                Inbox {unread > 0 && <span className="bdg bdg-acc" style={{ marginLeft: 6 }}>{unread}</span>}
-              </div>
-              <button className="btn btn-acc btn-sm" onClick={() => { setComposeOpen(true); setAttachFile(null); }}>+ Compose</button>
+        {/* ── Col 1: Folder nav ── */}
+        <div style={{ width: 200, minWidth: 200, flexShrink: 0, borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', background: 'oklch(0.97 0.008 268)', overflow: 'hidden', borderRadius: '12px 0 0 12px' }}>
+          <div style={{ padding: '14px 12px 10px', flexShrink: 0 }}>
+            <button
+              className="btn btn-acc"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={() => { setComposeOpen(true); setAttachFile(null); }}
+            >
+              + Compose
+            </button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 4px 2px', marginTop: 4 }}>Mailbox</div>
+            <NavItem
+              label="Inbox"
+              count={unread}
+              active={!activeFolder && tab === 'inbox'}
+              onClick={() => { setActiveFolder(null); setTab('inbox'); setSelId(null); setSearchQuery(''); }}
+            />
+            <NavItem
+              label="Sent"
+              active={!activeFolder && tab === 'sent'}
+              onClick={() => { setActiveFolder(null); setTab('sent'); setSelId(null); setSearchQuery(''); }}
+            />
+
+            <div style={{ borderTop: '1px solid var(--line)', margin: '8px 4px 4px' }} />
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '4px 4px 2px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Folders</span>
+              <button
+                type="button"
+                onClick={() => { setAddingFolder(true); setTimeout(() => folderInputRef.current?.focus(), 50); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontWeight: 700, fontSize: 14, lineHeight: 1, padding: 0 }}
+                title="New folder"
+              >+</button>
             </div>
-            <div className="tabs" style={{ marginBottom: 0 }}>
-              <button className={`tab${tab === 'inbox' ? ' active' : ''}`} onClick={() => setTab('inbox')}>Inbox</button>
-              <button className={`tab${tab === 'sent' ? ' active' : ''}`} onClick={() => setTab('sent')}>Sent</button>
+
+            {folders.map(f => (
+              <NavItem
+                key={f.id}
+                label={f.name}
+                active={activeFolder === f.id}
+                onClick={() => { setActiveFolder(f.id); setSelId(null); setSearchQuery(''); }}
+                onDelete={() => handleDeleteFolder(f.id)}
+              />
+            ))}
+
+            {folders.length === 0 && !addingFolder && (
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', padding: '6px 4px', lineHeight: 1.5 }}>
+                No folders yet.<br />
+                <span
+                  style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => { setAddingFolder(true); setTimeout(() => folderInputRef.current?.focus(), 50); }}
+                >
+                  + Create one
+                </span>
+              </div>
+            )}
+
+            {addingFolder && (
+              <div style={{ padding: '6px 4px', display: 'flex', gap: 4 }}>
+                <input
+                  ref={folderInputRef}
+                  value={newFolderName}
+                  onChange={e => setNewFolderName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setAddingFolder(false); setNewFolderName(''); } }}
+                  placeholder="Folder name…"
+                  style={{ flex: 1, fontSize: 12, padding: '5px 8px', border: '1px solid var(--line)', borderRadius: 6, outline: 'none', minWidth: 0 }}
+                />
+                <button type="button" className="btn btn-acc btn-sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={handleCreateFolder}>Add</button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Col 2: Message list ── */}
+        <div style={{ width: 320, minWidth: 320, flexShrink: 0, borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'white' }}>
+          {/* Search bar */}
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--ink-4)', pointerEvents: 'none' }}>🔍</span>
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search messages…"
+                style={{
+                  width: '100%', padding: '7px 10px 7px 30px', fontSize: 12,
+                  border: '1px solid var(--line)', borderRadius: 8, outline: 'none',
+                  background: 'var(--surface-2)', boxSizing: 'border-box',
+                }}
+                onFocus={e => e.target.style.borderColor = 'var(--accent-line)'}
+                onBlur={e => e.target.style.borderColor = 'var(--line)'}
+              />
             </div>
           </div>
 
-          {visibleDocs.length === 0 && (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-              {tab === 'sent' ? 'No sent messages' : 'Inbox is empty'}
+          {/* Folder label when browsing a custom folder */}
+          {activeFolder && (
+            <div style={{ padding: '6px 14px', background: 'oklch(0.95 0.04 268)', borderBottom: '1px solid var(--line-2)', fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>
+              📁 {folders.find(f => f.id === activeFolder)?.name ?? 'Folder'}
             </div>
           )}
 
-          {visibleDocs.map((doc) => {
-            const isActive = doc.id === current?.id;
-            const isUnread = !doc.is_read && doc.user_id === currentUserId;
-            return (
-              <div key={doc.id} onClick={() => handleOpen(doc)} style={{
-                padding: '11px 14px', borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
-                background: isActive ? 'var(--accent-soft)' : (isUnread ? 'oklch(0.99 0.012 268)' : 'transparent'),
-                borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
-              }}>
-                {tab === 'sent' && (
-                  <div style={{ fontSize: 10, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginBottom: 2 }}>
-                    To: {recipientName(doc)}
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                  <span style={{ fontSize: 12, fontWeight: isUnread ? 700 : 500 }}>
-                    {tab === 'sent' ? `→ ${recipientName(doc)}` : (doc.sender ?? 'System')}
-                  </span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ink-4)' }}>
-                    {new Date(doc.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12.5, fontWeight: isUnread ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>
-                  {doc.reply_to && <span style={{ color: 'var(--ink-3)', marginRight: 4 }}>↩</span>}
-                  {doc.title ?? doc.subject ?? 'Document'}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
-                  {doc.content?.slice(0, 55) ?? '—'}
-                </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  <span className={`bdg ${TAG_COLORS[doc.type ?? ''] ?? 'bdg-gy'}`} style={{ fontSize: 9 }}>{doc.type ?? 'DOC'}</span>
-                  {doc.html_content && <span className="bdg bdg-acc" style={{ fontSize: 9 }}>📄 Embedded</span>}
-                  {doc.attachment_name && !doc.html_content && <span className="bdg bdg-gy" style={{ fontSize: 9 }}>📎</span>}
-                  {doc.requires_signature && !doc.is_signed && <span className="bdg bdg-warn" style={{ fontSize: 9 }}>Sign needed</span>}
-                  {doc.is_signed && <span className="bdg bdg-ok" style={{ fontSize: 9 }}>Signed</span>}
-                </div>
+          {/* Message rows */}
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {filteredDocs.length === 0 && (
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+                {searchQuery ? 'No results found' : activeFolder ? 'No messages in this folder' : tab === 'sent' ? 'No sent messages' : 'Inbox is empty'}
               </div>
-            );
-          })}
+            )}
+            {filteredDocs.map((doc) => {
+              const isActive = doc.id === current?.id;
+              const isUnread = !doc.is_read && doc.user_id === currentUserId;
+              const displaySender = tab === 'sent' && !activeFolder ? `To: ${recipientName(doc)}` : (doc.sender ?? 'System');
+              const assignedFolder = folders.find(f => f.id === doc.folder_id);
+              return (
+                <div
+                  key={doc.id}
+                  onClick={() => handleOpen(doc)}
+                  style={{
+                    padding: '10px 14px', borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
+                    background: isActive ? 'oklch(0.95 0.04 268)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    {isUnread && <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />}
+                    {!isUnread && <div style={{ width: 7, flexShrink: 0 }} />}
+                    <span style={{ flex: 1, fontSize: 12.5, fontWeight: isUnread ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)' }}>
+                      {displaySender}
+                    </span>
+                    <span style={{ fontSize: 10, color: 'var(--ink-4)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                      {new Date(doc.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: isUnread ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink)', paddingLeft: 13, marginBottom: 2 }}>
+                    {doc.reply_to && <span style={{ color: 'var(--ink-3)', marginRight: 4, fontSize: 11 }}>Re:</span>}
+                    {doc.title ?? doc.subject ?? 'Document'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 13, marginBottom: isActive && folders.length > 0 ? 8 : 0 }}>
+                    {doc.html_content ? '📄 Embedded document' : (doc.content?.slice(0, 60) ?? '—')}
+                    {doc.attachment_name && !doc.html_content && ' 📎'}
+                  </div>
+                  {/* Folder assignment row — shown on the selected message when folders exist */}
+                  {isActive && folders.length > 0 && (
+                    <div onClick={e => e.stopPropagation()} style={{ paddingLeft: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>📁</span>
+                      <select
+                        value={doc.folder_id ?? ''}
+                        onChange={e => handleMoveToFolder(doc.id, e.target.value || null)}
+                        style={{ fontSize: 11, padding: '3px 6px', border: '1px solid var(--line)', borderRadius: 5, color: assignedFolder ? 'var(--accent)' : 'var(--ink-4)', background: 'white', cursor: 'pointer', maxWidth: 160 }}
+                      >
+                        <option value="">Move to folder…</option>
+                        {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        {doc.folder_id && <option value="">Remove from folder</option>}
+                      </select>
+                      {assignedFolder && (
+                        <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {assignedFolder.name}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* ── Right reading pane ── */}
+        {/* ── Col 3: Reading pane ── */}
         {current ? (
-          <div style={{ display: 'flex', flexDirection: 'column', background: 'white', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'white', borderRadius: '0 12px 12px 0' }}>
+
             {/* Toolbar */}
-            <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--line-2)', display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+            <div style={{ padding: '9px 18px', borderBottom: '1px solid var(--line-2)', display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center', background: 'var(--surface-2)' }}>
               <button className="btn btn-acc btn-sm" onClick={() => { setReplyTo(current); setForwardDoc(null); }}>↩ Reply</button>
               <button className="btn btn-sec btn-sm" onClick={() => { setForwardDoc(current); setReplyTo(null); }}>→ Forward</button>
               <button className="btn btn-sec btn-sm" onClick={() => handleArchive(current)}>Archive</button>
-              {tab === 'sent' && (
-                <span style={{ fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginLeft: 'auto' }}>
-                  To: {recipientName(current)}
-                </span>
-              )}
             </div>
 
             {/* Content area */}
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-
               {isEmbedDoc(current) ? (
-                /* ── Embedded document (contract / payslip / report) ── */
+                /* ── Embedded doc (contract / payslip / report) ── */
                 <>
-                  {/* Compact meta */}
-                  <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <Avatar name={current.sender ?? 'System'} size={28} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{current.sender ?? 'System'}</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ink-3)' }}>
-                        {new Date(current.created_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
+                  <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
+                    <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 10, letterSpacing: '-0.015em' }}>
+                      {current.title ?? current.subject ?? 'Document'}
                     </div>
-                    <span className={`bdg ${TAG_COLORS[current.type ?? ''] ?? 'bdg-gy'}`}>{current.type ?? 'DOC'}</span>
+                    <table style={{ fontSize: 12, borderCollapse: 'collapse', color: 'var(--ink-2)', lineHeight: 1.8 }}>
+                      <tbody>
+                        <tr><td style={{ color: 'var(--ink-4)', paddingRight: 16, whiteSpace: 'nowrap' }}>From</td><td style={{ fontWeight: 500 }}>{current.sender ?? 'System'}</td></tr>
+                        <tr><td style={{ color: 'var(--ink-4)' }}>To</td><td style={{ fontWeight: 500 }}>{recipientName(current)}</td></tr>
+                        <tr><td style={{ color: 'var(--ink-4)' }}>Date</td><td>{new Date(current.created_at).toLocaleString([], { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td></tr>
+                        <tr><td style={{ color: 'var(--ink-4)' }}>Type</td><td><span className={`bdg ${TAG_COLORS[current.type ?? ''] ?? 'bdg-gy'}`}>{current.type ?? 'Document'}</span></td></tr>
+                      </tbody>
+                    </table>
                   </div>
 
-                  {/* Iframe — renders the full document */}
                   <div style={{ flex: 1, overflow: 'auto', padding: '0 4px' }}>
                     <iframe
                       srcDoc={current.html_content}
@@ -402,12 +575,9 @@ export default function InboxClient({
                     />
                   </div>
 
-                  {/* Signature block below the document */}
                   {current.requires_signature && !current.is_signed && current.user_id === currentUserId && (
                     <div style={{ flexShrink: 0, padding: '18px 24px', borderTop: '2px solid var(--line)', background: 'var(--surface-2)' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: 'var(--ink)' }}>
-                        ✍ Your signature is required
-                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: 'var(--ink)' }}>✍ Your signature is required</div>
                       {signName && (
                         <div style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 34, color: '#1a1f2e', marginBottom: 10, lineHeight: 1.2 }}>
                           {signName}
@@ -441,132 +611,135 @@ export default function InboxClient({
               ) : (() => {
                 const thread = buildThread(current);
                 return (
-                  /* ── Plain text message — conversation thread ── */
+                  /* ── Plain message — email thread ── */
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    {/* Subject + thread count */}
-                    <div style={{ padding: '14px 22px 10px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.018em' }}>
-                        {current.title ?? current.subject ?? 'Document'}
+                    {/* Subject */}
+                    <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
+                      <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 2, letterSpacing: '-0.015em' }}>
+                        {current.title ?? current.subject ?? 'Message'}
                       </div>
                       {thread.length > 1 && (
-                        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 3 }}>
-                          {thread.length} messages in this conversation
-                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{thread.length} messages</div>
                       )}
                     </div>
 
-                    {/* Message bubbles */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      {thread.map((msg) => {
+                    {/* Thread messages */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {thread.map((msg, idx) => {
                         const isMe = msg.sender_id === currentUserId;
                         const isCurrent = msg.id === current.id;
-                        const parentMsg = msg.reply_to ? thread.find(t => t.id === msg.reply_to) : null;
+                        const senderName = isMe ? currentUserName : (msg.sender ?? 'System');
+                        const toName = allUsers.find((u: any) => u.id === msg.user_id)?.name ?? 'Unknown';
+                        const isLast = idx === thread.length - 1;
                         return (
-                          <div key={msg.id} style={{ display: 'flex', gap: 9, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
-                            {!isMe && <Avatar name={msg.sender ?? 'System'} size={26} />}
-                            <div style={{ maxWidth: '72%', minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
-                                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)' }}>{isMe ? 'You' : (msg.sender ?? 'System')}</span>
-                                <span style={{ fontSize: 10, color: 'var(--ink-4)', fontFamily: 'var(--mono)' }}>
-                                  {new Date(msg.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                                {msg.type && msg.type !== 'Notice' && <span className={`bdg ${TAG_COLORS[msg.type] ?? 'bdg-gy'}`} style={{ fontSize: 9 }}>{msg.type}</span>}
+                          <div key={msg.id} style={{
+                            border: `1px solid ${isCurrent ? 'var(--accent-line)' : 'var(--line)'}`,
+                            borderRadius: 10,
+                            overflow: 'hidden',
+                            boxShadow: isLast ? '0 1px 6px rgba(0,0,0,0.05)' : 'none',
+                          }}>
+                            {/* Message header */}
+                            <div style={{ padding: '10px 16px', background: isCurrent ? 'oklch(0.97 0.02 268)' : 'var(--surface-2)', borderBottom: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <Avatar name={senderName} size={28} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>{isMe ? 'You' : senderName}</span>
+                                  <span style={{ fontSize: 10.5, color: 'var(--ink-4)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                                    {new Date(msg.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                                  <span style={{ marginRight: 6 }}>To: {toName}</span>
+                                  {msg.type && msg.type !== 'Notice' && <span className={`bdg ${TAG_COLORS[msg.type] ?? 'bdg-gy'}`} style={{ fontSize: 9 }}>{msg.type}</span>}
+                                </div>
                               </div>
+                            </div>
 
-                              {/* Quote of parent message */}
-                              {parentMsg && (
-                                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, padding: '4px 8px', borderLeft: '2px solid var(--line)', background: 'var(--surface-2)', borderRadius: '0 5px 5px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>
-                                  {parentMsg.sender ?? 'System'}: {parentMsg.content?.slice(0, 70) ?? '…'}{(parentMsg.content?.length ?? 0) > 70 ? '…' : ''}
-                                </div>
-                              )}
+                            {/* Message body */}
+                            <div style={{ padding: '14px 16px', fontSize: 13, lineHeight: 1.7, color: 'var(--ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                              {msg.content ?? 'No content.'}
+                            </div>
 
-                              <div
-                                onClick={() => !isCurrent ? handleOpen(msg) : undefined}
-                                style={{
-                                  padding: '10px 14px',
-                                  borderRadius: isMe ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
-                                  background: isMe ? 'var(--accent)' : 'var(--surface-2)',
-                                  color: isMe ? 'white' : 'var(--ink)',
-                                  fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap',
-                                  outline: isCurrent ? '2px solid var(--accent-line)' : 'none',
-                                  outlineOffset: 2,
-                                  cursor: isCurrent ? 'default' : 'pointer',
-                                }}>
-                                {msg.content ?? 'No content.'}
+                            {/* Attachment */}
+                            {msg.attachment_url && (
+                              <div style={{ padding: '0 16px 12px', display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid var(--line-2)', paddingTop: 10, background: 'var(--surface-2)', marginTop: 0 }}>
+                                <span style={{ fontSize: 15 }}>📎</span>
+                                <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink-2)' }}>{msg.attachment_name ?? 'Attachment'}</span>
+                                <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="btn btn-sec btn-sm">Download</a>
                               </div>
+                            )}
 
-                              {msg.attachment_url && (
-                                <div style={{ marginTop: 5, padding: '7px 11px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ fontSize: 15 }}>📎</span>
-                                  <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.attachment_name ?? 'Attachment'}</span>
-                                  <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="btn btn-sec btn-sm">↓</a>
-                                </div>
-                              )}
-
-                              {isCurrent && msg.requires_signature && !msg.is_signed && msg.user_id === currentUserId && (
-                                <div style={{ background: 'var(--warn-soft)', padding: 12, borderRadius: 9, border: '1px solid oklch(0.85 0.08 75)', marginTop: 8 }}>
-                                  <div style={{ fontSize: 12, fontWeight: 600, color: 'oklch(0.45 0.12 75)', marginBottom: 8 }}>Signature Required</div>
-                                  {signName && <div style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 26, color: '#1a1f2e', marginBottom: 6 }}>{signName}</div>}
-                                  <div style={{ display: 'flex', gap: 8 }}>
-                                    <input className="fld-input" style={{ flex: 1 }} placeholder="Type your full name to sign…"
-                                      value={signName} onChange={e => setSignName(e.target.value)} />
-                                    <button className="btn btn-acc btn-sm" disabled={!signName.trim() || sigSaving} onClick={() => handleSign(current)}>
-                                      {sigSaving ? 'Signing…' : 'Sign →'}
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-
-                              {isCurrent && msg.is_signed && (
-                                <div style={{ background: 'var(--ok-soft)', padding: '8px 12px', borderRadius: 7, fontSize: 12, color: 'oklch(0.42 0.12 155)', fontWeight: 600, marginTop: 6, border: '1px solid oklch(0.85 0.08 155)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span>✓</span>
-                                  <span style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 22, fontWeight: 400 }}>{msg.signed_by}</span>
-                                </div>
-                              )}
-
-                              {!isMe && (
-                                <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-start' }}>
-                                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 6px' }}
-                                    onClick={() => { setReplyTo(msg); setForwardDoc(null); }}>
-                                    ↩ Reply
+                            {/* Signature needed */}
+                            {isCurrent && msg.requires_signature && !msg.is_signed && msg.user_id === currentUserId && (
+                              <div style={{ padding: '14px 16px', background: 'var(--warn-soft)', borderTop: '1px solid oklch(0.88 0.08 75)' }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'oklch(0.45 0.12 75)', marginBottom: 10 }}>✍ Signature required</div>
+                                {signName && <div style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 28, color: '#1a1f2e', marginBottom: 8 }}>{signName}</div>}
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                  <input className="fld-input" style={{ flex: 1 }} placeholder="Type your full name to sign…"
+                                    value={signName} onChange={e => setSignName(e.target.value)} />
+                                  <button className="btn btn-acc btn-sm" disabled={!signName.trim() || sigSaving} onClick={() => handleSign(current)}>
+                                    {sigSaving ? 'Signing…' : 'Sign →'}
                                   </button>
                                 </div>
-                              )}
-                            </div>
+                              </div>
+                            )}
+
+                            {/* Signed confirmation */}
+                            {isCurrent && msg.is_signed && (
+                              <div style={{ padding: '10px 16px', background: 'var(--ok-soft)', borderTop: '1px solid oklch(0.85 0.08 155)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ color: 'oklch(0.42 0.12 155)' }}>✓</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'oklch(0.42 0.12 155)' }}>Signed</span>
+                                <span style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 20, color: '#1a1f2e', marginLeft: 4 }}>{msg.signed_by}</span>
+                              </div>
+                            )}
+
+                            {/* Per-message reply button (only on non-own messages) */}
+                            {!isMe && (
+                              <div style={{ padding: '6px 12px 8px', borderTop: '1px solid var(--line-2)', background: 'transparent' }}>
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ fontSize: 11 }}
+                                  onClick={() => { setReplyTo(msg); setForwardDoc(null); }}
+                                >
+                                  ↩ Reply
+                                </button>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
+
+                    {/* Inline reply form */}
+                    {replyTo && (
+                      <div style={{ borderTop: '2px solid var(--accent-soft)', padding: '14px 24px', flexShrink: 0, background: 'white' }}>
+                        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 8, padding: '5px 10px', background: 'var(--surface-2)', borderRadius: 6, borderLeft: '2px solid var(--accent-line)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          Replying to {replyTo.sender ?? 'System'}: "{replyTo.content?.slice(0, 80)}{(replyTo.content?.length ?? 0) > 80 ? '…' : ''}"
+                        </div>
+                        <form onSubmit={handleReply}>
+                          <textarea name="message" rows={3} required placeholder="Write your reply…"
+                            className="fld-input" style={{ resize: 'vertical', marginBottom: 8, display: 'block', width: '100%' }} />
+                          <div style={{ marginBottom: 8 }}>
+                            <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx" style={{ fontSize: 12 }} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button type="submit" className="btn btn-acc btn-sm" disabled={sending || uploading}>
+                              {sending || uploading ? 'Sending…' : '↩ Send Reply'}
+                            </button>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReplyTo(null)}>Cancel</button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
-
-              {/* Inline reply form */}
-              {replyTo && (
-                <div style={{ borderTop: '2px solid var(--accent-soft)', padding: '12px 20px', flexShrink: 0, background: 'white' }}>
-                  <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 8, padding: '4px 8px', background: 'var(--surface-2)', borderRadius: 5, borderLeft: '2px solid var(--line)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Replying to {replyTo.sender ?? 'System'}: "{replyTo.content?.slice(0, 80)}{(replyTo.content?.length ?? 0) > 80 ? '…' : ''}"
-                  </div>
-                  <form onSubmit={handleReply}>
-                    <textarea name="message" rows={3} required placeholder="Write your reply…"
-                      className="fld-input" style={{ resize: 'vertical', marginBottom: 8, display: 'block', width: '100%' }} />
-                    <div style={{ marginBottom: 8 }}>
-                      <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx" style={{ fontSize: 12 }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="submit" className="btn btn-acc btn-sm" disabled={sending || uploading}>
-                        {sending || uploading ? 'Sending…' : '↩ Send Reply'}
-                      </button>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReplyTo(null)}>Cancel</button>
-                    </div>
-                  </form>
-                </div>
-              )}
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-4)', fontSize: 13, background: 'var(--surface-2)' }}>
-            Select a message to read
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-4)', background: 'var(--surface-2)', gap: 8, borderRadius: '0 12px 12px 0' }}>
+            <div style={{ fontSize: 32 }}>✉</div>
+            <div style={{ fontSize: 13 }}>Select a message to read</div>
           </div>
         )}
       </div>
