@@ -19,20 +19,27 @@ export default async function ReportsPage() {
   if (!hasAccess(viewType)) redirect(`/dashboard/${profile?.role || 'sales'}`);
   const isMgmt = isAdminView(viewType);
 
-  const { data: employees } = isMgmt
-    ? await admin.from('profiles').select('id, name, role, points, score, department')
-    : { data: null };
+  const [{ data: savedReports }, { data: employees }, { data: sessions }] = await Promise.all([
+    // All management roles see all reports
+    admin.from('reports').select('*').order('created_at', { ascending: false }),
 
-  const sessQuery = admin
-    .from('coaching_sessions')
-    .select(`*, agent:profiles!coaching_sessions_agent_id_fkey(name, role, department), supervisor:profiles!coaching_sessions_supervisor_id_fkey(name)`)
-    .order('created_at', { ascending: false });
+    // Employee list for the generate form (mgmt only)
+    isMgmt
+      ? admin.from('profiles').select('id, name, role, department')
+      : Promise.resolve({ data: [] }),
 
-  const { data: sessions } = isMgmt ? await sessQuery : await sessQuery.eq('agent_id', user.id);
+    // Coaching sessions for QA evaluation linking (mgmt only)
+    isMgmt
+      ? admin.from('coaching_sessions')
+          .select('id, type, notes, action_plan, agent_id, agent:profiles!coaching_sessions_agent_id_fkey(id, name, role)')
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
 
   return (
     <ReportsClient
-      reports={sessions || []}
+      reports={savedReports || []}
+      sessions={sessions || []}
       employees={employees || []}
       isMgmt={isMgmt}
       currentUserId={user.id}

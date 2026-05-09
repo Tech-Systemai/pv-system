@@ -13,23 +13,30 @@ const REPORT_TYPES: { id: ReportType; label: string; desc: string }[] = [
 ];
 
 const TYPE_BADGE: Record<string, string> = {
-  'qa-evaluation': 'bdg bdg-acc', 'warning': 'bdg bdg-err',
-  'collective-action': 'bdg bdg-warn', 'performance-summary': 'bdg bdg-ok',
-  'Performance': 'bdg bdg-ok', 'QA Evaluation': 'bdg bdg-acc',
+  'qa-evaluation': 'bdg bdg-acc',
+  'warning': 'bdg bdg-err',
+  'collective-action': 'bdg bdg-warn',
+  'performance-summary': 'bdg bdg-ok',
 };
+
+function typeLabel(type: string) {
+  return REPORT_TYPES.find(r => r.id === type)?.label ?? type;
+}
 
 function buildReportHtml(r: any, emp: any, supervisorName: string): string {
   const date = new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const typeLabel = r.type === 'Performance' ? 'Performance Review' : r.type === 'Corrective' ? 'Corrective Action' : (r.type ?? 'QA Evaluation');
-  const nextReview = r.next_review ? `<div><span style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;display:block;margin-bottom:2px">Next Review</span><strong>${new Date(r.next_review).toLocaleDateString()}</strong></div>` : '';
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${typeLabel}</title>
+  const label = typeLabel(r.type);
+  const nextReview = r.next_review
+    ? `<div><span style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;display:block;margin-bottom:2px">Next Review</span><strong>${new Date(r.next_review).toLocaleDateString()}</strong></div>`
+    : '';
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${label}</title>
 <style>body{font-family:Inter,Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 40px;color:#1a1f2e;line-height:1.6}h2{font-size:16px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin:0 0 24px}h3{font-size:13px;font-weight:700;border-bottom:1px solid #e4e7eb;padding-bottom:8px;margin:0 0 12px}p{font-size:13px;color:#4a5568;line-height:1.8;margin:0 0 20px;white-space:pre-wrap}@media print{body{margin:0}}</style>
 </head><body>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a1f2e;padding-bottom:20px;margin-bottom:32px">
-  <div><div style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:1px">PIONEERS VENEERS</div><div style="font-size:11px;color:#6b7689;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">${typeLabel} · Official Document</div></div>
+  <div><div style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:1px">PIONEERS VENEERS</div><div style="font-size:11px;color:#6b7689;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">${label} · Official Document</div></div>
   <div style="text-align:right;font-size:12px;color:#64748b"><div>Date: ${date}</div><div>Ref: RPT-${r.id?.toString().slice(0,8).toUpperCase() ?? Date.now().toString().slice(-6)}</div></div>
 </div>
-<h2>${typeLabel}</h2>
+<h2>${label}</h2>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px;background:#f8fafc;padding:18px;border-radius:8px;font-size:12px">
   <div><span style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;display:block;margin-bottom:2px">Employee</span><strong>${emp?.name ?? '—'}</strong></div>
   <div><span style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;display:block;margin-bottom:2px">Role</span><strong>${emp?.role ?? '—'}</strong></div>
@@ -64,10 +71,16 @@ function SendConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel:
 }
 
 export default function ReportsClient({
-  reports, employees, isMgmt, currentUserName,
+  reports: initialReports, sessions, employees, isMgmt, currentUserId, currentUserName,
 }: {
-  reports: any[]; employees: any[]; isMgmt: boolean; currentUserId?: string; currentUserName: string;
+  reports: any[];
+  sessions: any[];
+  employees: any[];
+  isMgmt: boolean;
+  currentUserId?: string;
+  currentUserName: string;
 }) {
+  const [savedReports, setSavedReports] = useState<any[]>(initialReports);
   const [view, setView] = useState<'list' | 'create' | 'preview'>('list');
   const [reportType, setReportType] = useState<ReportType>('qa-evaluation');
   const [targetType, setTargetType] = useState<'individual' | 'team'>('individual');
@@ -81,12 +94,50 @@ export default function ReportsClient({
   const [showPreviewSendConfirm, setShowPreviewSendConfirm] = useState(false);
   const [sendingPreview, setSendingPreview] = useState(false);
   const [previewSent, setPreviewSent] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setGenError('');
     const emp = employees.find(e => e.id === selectedEmployee);
-    const session = reports.find(r => r.id === selectedSession);
-    setPrintData({ type: reportType, targetType, employee: emp, session, notes, generatedBy: currentUserName, generatedAt: new Date().toLocaleDateString() });
+    const session = sessions.find(s => s.id === selectedSession);
+    const html = buildReportHtml(
+      { id: Date.now(), created_at: new Date().toISOString(), type: reportType, notes, action_plan: session?.action_plan },
+      emp ?? null,
+      currentUserName,
+    );
+
+    const { data: saved, error } = await dbOp('reports', 'insert', {
+      type: reportType,
+      target_type: targetType,
+      employee_id: emp?.id ?? null,
+      employee_name: emp?.name ?? null,
+      employee_role: emp?.role ?? null,
+      notes: notes || null,
+      session_id: session?.id ?? null,
+      html_content: html,
+      created_by: currentUserId ?? null,
+      created_by_name: currentUserName,
+    }, undefined, '*');
+
+    if (error) {
+      setGenError('Failed to save report. Please try again.');
+      setGenerating(false);
+      return;
+    }
+
+    const savedReport = saved?.[0];
+    if (savedReport) setSavedReports(prev => [savedReport, ...prev]);
+
+    setPrintData({
+      type: reportType, targetType, employee: emp, session,
+      notes, generatedBy: currentUserName,
+      generatedAt: new Date().toLocaleDateString(),
+      savedId: savedReport?.id, html,
+    });
     setPreviewSent(false);
+    setGenerating(false);
     setView('preview');
   };
 
@@ -94,21 +145,15 @@ export default function ReportsClient({
     if (!printData?.employee?.id) return;
     setSendingPreview(true);
     const emp = printData.employee;
-    const typeLabel = REPORT_TYPES.find(r => r.id === printData.type)?.label ?? printData.type;
-    const syntheticRecord = {
-      id: Date.now(),
-      created_at: new Date().toISOString(),
-      type: typeLabel,
-      notes: printData.notes,
-      action_plan: printData.session?.action_plan,
-      next_review: printData.session?.next_review,
-    };
-    const html = buildReportHtml(syntheticRecord, emp, printData.generatedBy);
-    const subject = `${typeLabel} — ${printData.generatedAt}`;
+    const label = typeLabel(printData.type);
+    const subject = `${label} — ${printData.generatedAt}`;
+    const html = printData.html || buildReportHtml(
+      { id: printData.savedId ?? Date.now(), created_at: new Date().toISOString(), type: printData.type, notes: printData.notes, action_plan: printData.session?.action_plan },
+      emp, printData.generatedBy,
+    );
     await dbOp('inbox_documents', 'insert', {
       user_id: emp.id,
-      title: subject,
-      subject,
+      title: subject, subject,
       content: printData.notes || 'Please review the attached report.',
       type: 'Report',
       sender: printData.generatedBy,
@@ -118,7 +163,7 @@ export default function ReportsClient({
       is_read: false,
       html_content: html,
       doc_ref_type: 'report',
-      doc_ref_id: printData.session ? String(printData.session.id) : undefined,
+      doc_ref_id: printData.savedId ? String(printData.savedId) : undefined,
     });
     setSendingPreview(false);
     setShowPreviewSendConfirm(false);
@@ -127,23 +172,20 @@ export default function ReportsClient({
 
   const sendReportToInbox = async (r: any) => {
     setSending(true);
-    const emp = r.agent ?? employees.find((e: any) => e.id === r.agent_id);
-    const supervisorName = r.supervisor?.name ?? currentUserName;
-    if (emp?.id) {
-      const html = buildReportHtml(r, emp, supervisorName);
-      const typeLabel = r.type === 'Performance' ? 'Performance Review' : r.type === 'Corrective' ? 'Corrective Action' : (r.type ?? 'QA Evaluation');
-      const subject = `${typeLabel} — ${new Date(r.created_at).toLocaleDateString()}`;
+    if (r.employee_id) {
+      const label = typeLabel(r.type);
+      const subject = `${label} — ${new Date(r.created_at).toLocaleDateString()}`;
       await dbOp('inbox_documents', 'insert', {
-        user_id: emp.id,
+        user_id: r.employee_id,
         title: subject, subject,
         content: r.notes ?? 'Please review the attached report.',
         type: 'Report',
-        sender: supervisorName,
-        submitted_by_name: supervisorName,
+        sender: r.created_by_name,
+        submitted_by_name: r.created_by_name,
         approval_status: 'pending',
         requires_signature: true,
         is_read: false,
-        html_content: html,
+        html_content: r.html_content || '',
         doc_ref_type: 'report',
         doc_ref_id: String(r.id),
       });
@@ -153,6 +195,7 @@ export default function ReportsClient({
     setSending(false);
   };
 
+  // ── Preview ──────────────────────────────────────────────────────────────
   if (view === 'preview' && printData) {
     return (
       <div>
@@ -165,7 +208,7 @@ export default function ReportsClient({
           }
         ` }} />
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-          <button className="btn btn-sec btn-sm" onClick={() => setView('create')}>← Back</button>
+          <button className="btn btn-sec btn-sm" onClick={() => setView('list')}>← Back to Library</button>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {printData.employee?.id
               ? previewSent
@@ -179,10 +222,7 @@ export default function ReportsClient({
           </div>
         </div>
         {showPreviewSendConfirm && (
-          <SendConfirm
-            onConfirm={sendPreviewToInbox}
-            onCancel={() => setShowPreviewSendConfirm(false)}
-          />
+          <SendConfirm onConfirm={sendPreviewToInbox} onCancel={() => setShowPreviewSendConfirm(false)} />
         )}
 
         <div style={{ background: '#fff', padding: '48px', maxWidth: '800px', margin: '0 auto', boxShadow: 'var(--sh-2)', borderRadius: 8, border: '1px solid var(--line)' }}>
@@ -190,17 +230,17 @@ export default function ReportsClient({
             <div>
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', letterSpacing: 1 }}>PIONEERS VENEERS</div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>
-                {REPORT_TYPES.find(r => r.id === printData.type)?.label} · Official Document
+                {typeLabel(printData.type)} · Official Document
               </div>
             </div>
             <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--ink-3)' }}>
               <div>Date: {printData.generatedAt}</div>
-              <div>Ref: RPT-{Date.now().toString().slice(-6)}</div>
+              <div>Ref: RPT-{printData.savedId?.toString().slice(0,8).toUpperCase() ?? Date.now().toString().slice(-6)}</div>
             </div>
           </div>
 
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 24, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            {REPORT_TYPES.find(r => r.id === printData.type)?.label}
+            {typeLabel(printData.type)}
           </h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28, background: 'var(--surface-2)', padding: 18, borderRadius: 8 }}>
@@ -208,8 +248,7 @@ export default function ReportsClient({
               <>
                 <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Employee</div><div style={{ fontWeight: 600 }}>{printData.employee?.name ?? 'All Employees'}</div></div>
                 <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Role</div><div style={{ fontWeight: 600 }}>{printData.employee?.role ?? '—'}</div></div>
-                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Department</div><div style={{ fontWeight: 600 }}>{printData.employee?.department ?? '—'}</div></div>
-                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Reliability Points</div><div style={{ fontWeight: 600 }}>{printData.employee?.points ?? '—'}/7</div></div>
+                <div><div style={{ fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', fontWeight: 600 }}>Issued By</div><div style={{ fontWeight: 600 }}>{printData.generatedBy}</div></div>
               </>
             ) : (
               <>
@@ -224,8 +263,8 @@ export default function ReportsClient({
               <h3 style={{ fontSize: 13, fontWeight: 700, borderBottom: '1px solid var(--line)', paddingBottom: 8, marginBottom: 12 }}>QA Session Details</h3>
               <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.8 }}>
                 <div><strong>Session Type:</strong> {printData.session.type}</div>
-                <div><strong>Notes:</strong> {printData.session.notes}</div>
-                <div><strong>Action Plan:</strong> {printData.session.action_plan}</div>
+                {printData.session.notes && <div><strong>Notes:</strong> {printData.session.notes}</div>}
+                {printData.session.action_plan && <div><strong>Action Plan:</strong> {printData.session.action_plan}</div>}
               </div>
             </div>
           )}
@@ -260,6 +299,7 @@ export default function ReportsClient({
     );
   }
 
+  // ── Create ───────────────────────────────────────────────────────────────
   if (view === 'create' && isMgmt) {
     const selectedTypeInfo = REPORT_TYPES.find(r => r.id === reportType);
     return (
@@ -304,9 +344,14 @@ export default function ReportsClient({
                 <label>Coaching Session</label>
                 <select value={selectedSession} onChange={e => setSelectedSession(e.target.value)}>
                   <option value="">— Link to a session (optional) —</option>
-                  {reports.filter(r => !selectedEmployee || r.agent_id === selectedEmployee).map(r => (
-                    <option key={r.id} value={r.id}>{r.agent?.name} · {r.type} · {new Date(r.created_at).toLocaleDateString()}</option>
-                  ))}
+                  {sessions
+                    .filter(s => !selectedEmployee || s.agent_id === selectedEmployee)
+                    .map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.agent?.name} · {s.type} · {new Date(s.created_at ?? Date.now()).toLocaleDateString()}
+                      </option>
+                    ))
+                  }
                 </select>
               </div>
             )}
@@ -317,15 +362,27 @@ export default function ReportsClient({
                  reportType === 'collective-action' ? 'Notice Content' :
                  reportType === 'performance-summary' ? 'Summary Notes' : 'Additional Notes'}
               </label>
-              <textarea rows={5} value={notes} onChange={e => setNotes(e.target.value)} placeholder={
-                reportType === 'warning' ? 'Describe the policy violation, incident details, and expected corrective action...' :
-                reportType === 'collective-action' ? 'Write the team-wide notice or collective policy memo...' :
-                'Add observations, context, or manager commentary...'
-              } style={{ resize: 'vertical' }} />
+              <textarea
+                rows={5}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder={
+                  reportType === 'warning' ? 'Describe the policy violation, incident details, and expected corrective action...' :
+                  reportType === 'collective-action' ? 'Write the team-wide notice or collective policy memo...' :
+                  'Add observations, context, or manager commentary...'
+                }
+                style={{ resize: 'vertical' }}
+              />
             </div>
 
-            <button className="btn btn-acc" onClick={handleGenerate} disabled={targetType === 'individual' && !selectedEmployee}>
-              Generate PDF Report →
+            {genError && <div style={{ fontSize: 12, color: 'var(--err)', marginBottom: 12 }}>{genError}</div>}
+
+            <button
+              className="btn btn-acc"
+              onClick={handleGenerate}
+              disabled={generating || (targetType === 'individual' && !selectedEmployee)}
+            >
+              {generating ? 'Saving…' : 'Generate & Save Report →'}
             </button>
           </div>
         </div>
@@ -333,27 +390,26 @@ export default function ReportsClient({
     );
   }
 
-  // List / Library view
+  // ── Library ──────────────────────────────────────────────────────────────
   return (
     <div className="page-fade">
-      {/* Stat strip */}
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card" style={{ cursor: 'default' }}>
           <div className="stat-h"><div className="stat-ico ind">📊</div></div>
           <div className="stat-l">TOTAL REPORTS</div>
-          <div className="stat-v">{reports.length}</div>
-          <div className="stat-foot">In library</div>
+          <div className="stat-v">{savedReports.length}</div>
+          <div className="stat-foot">Saved in library</div>
         </div>
         <div className="stat-card" style={{ cursor: 'default' }}>
           <div className="stat-h"><div className="stat-ico wn">⚠</div></div>
           <div className="stat-l">WARNINGS</div>
-          <div className="stat-v">{reports.filter(r => r.type === 'warning' || r.type === 'Warning').length}</div>
+          <div className="stat-v">{savedReports.filter(r => r.type === 'warning').length}</div>
           <div className="stat-foot">Formal notices issued</div>
         </div>
         <div className="stat-card" style={{ cursor: 'default' }}>
           <div className="stat-h"><div className="stat-ico ok">✓</div></div>
           <div className="stat-l">QA EVALS</div>
-          <div className="stat-v">{reports.filter(r => r.type === 'qa-evaluation' || r.type === 'QA' || r.type === 'Performance').length}</div>
+          <div className="stat-v">{savedReports.filter(r => r.type === 'qa-evaluation').length}</div>
           <div className="stat-foot">Coaching & quality sessions</div>
         </div>
         <div className="stat-card" style={{ cursor: 'default' }}>
@@ -368,18 +424,21 @@ export default function ReportsClient({
         <div className="card-hdr">
           <div>
             <div className="card-title">Report Library</div>
-            <div className="card-sub">{isMgmt ? 'All reports across all employees' : 'Your performance reports'}</div>
+            <div className="card-sub">All reports shared across management</div>
           </div>
           {isMgmt && (
-            <button className="btn btn-acc btn-sm" onClick={() => { setView('create'); setNotes(''); setSelectedEmployee(''); setSelectedSession(''); }}>
+            <button
+              className="btn btn-acc btn-sm"
+              onClick={() => { setView('create'); setNotes(''); setSelectedEmployee(''); setSelectedSession(''); setGenError(''); }}
+            >
               + Generate Report
             </button>
           )}
         </div>
 
-        {reports.length === 0 ? (
+        {savedReports.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-            No reports found. {isMgmt && 'Use "Generate Report" to create your first one.'}
+            No reports yet. {isMgmt && 'Use "Generate Report" to create the first one.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -389,55 +448,53 @@ export default function ReportsClient({
                   <th>Report</th>
                   <th>Type</th>
                   <th>Employee</th>
-                  <th>Last Updated</th>
-                  <th>Status</th>
+                  <th>Created By</th>
+                  <th>Date</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {reports.map(r => (
+                {savedReports.map(r => (
                   <tr key={r.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>📊</div>
                         <div>
-                          <div style={{ fontWeight: 500, fontSize: 13 }}>{r.agent?.name || 'Team'} — {r.type ?? 'QA Evaluation'}</div>
-                          {isMgmt && r.supervisor?.name && <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>By {r.supervisor.name}</div>}
+                          <div style={{ fontWeight: 500, fontSize: 13 }}>{r.employee_name || 'Whole Team'} — {typeLabel(r.type)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>By {r.created_by_name}</div>
                         </div>
                       </div>
                     </td>
-                    <td><span className={TYPE_BADGE[r.type] ?? 'bdg bdg-gy'}>{r.type ?? 'QA'}</span></td>
-                    <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.agent?.name ?? '—'}</td>
+                    <td><span className={TYPE_BADGE[r.type] ?? 'bdg bdg-gy'}>{typeLabel(r.type)}</span></td>
+                    <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.employee_name ?? 'Team'}</td>
+                    <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.created_by_name ?? '—'}</td>
                     <td style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{new Date(r.created_at).toLocaleDateString()}</td>
-                    <td>
-                      {sentIds.has(r.id)
-                        ? <span className="bdg bdg-ok">Sent to inbox</span>
-                        : <span className="bdg bdg-gy">In library</span>}
-                    </td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <button
                           className="btn btn-sec btn-sm"
                           onClick={() => {
                             setPreviewSent(false);
-                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: { ...r.agent, id: r.agent_id }, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
+                            setPrintData({
+                              type: r.type,
+                              targetType: r.target_type,
+                              employee: r.employee_id ? { id: r.employee_id, name: r.employee_name, role: r.employee_role } : null,
+                              session: null,
+                              notes: r.notes,
+                              generatedBy: r.created_by_name,
+                              generatedAt: new Date(r.created_at).toLocaleDateString(),
+                              savedId: r.id,
+                              html: r.html_content,
+                            });
                             setView('preview');
                           }}
                         >Open</button>
-                        {isMgmt && !sentIds.has(r.id) && (
+                        {isMgmt && r.employee_id && !sentIds.has(r.id) && (
                           <button className="btn btn-sec btn-sm" onClick={() => setSendTarget(r)}>
-                            Send to inbox
+                            Send to Inbox
                           </button>
                         )}
-                        <button
-                          className="btn btn-sec btn-sm"
-                          onClick={() => {
-                            setPreviewSent(false);
-                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: { ...r.agent, id: r.agent_id }, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
-                            setView('preview');
-                            setTimeout(() => window.print(), 500);
-                          }}
-                        >Download PDF</button>
+                        {sentIds.has(r.id) && <span className="bdg bdg-ok">Sent</span>}
                       </div>
                     </td>
                   </tr>

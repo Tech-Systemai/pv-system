@@ -6,7 +6,7 @@ export type PermMatrix = Record<string, Record<string, ViewType>>;
 export const PERM_DEFAULTS: PermMatrix = {
   tasks:      { owner: 'both', admin: 'both',  supervisor: 'both',  accountant: 'none',  sales: 'agent', cx: 'agent' },
   schedule:   { owner: 'both', admin: 'admin', supervisor: 'admin', accountant: 'none',  sales: 'agent', cx: 'agent' },
-  reports:    { owner: 'both', admin: 'admin', supervisor: 'admin', accountant: 'none',  sales: 'none',  cx: 'none'  },
+  reports:    { owner: 'both', admin: 'admin', supervisor: 'admin', accountant: 'admin', sales: 'none',  cx: 'none'  },
   tickets:    { owner: 'both', admin: 'both',  supervisor: 'both',  accountant: 'none',  sales: 'agent', cx: 'agent' },
   hr:         { owner: 'both', admin: 'admin', supervisor: 'none',  accountant: 'none',  sales: 'none',  cx: 'none'  },
   contracts:  { owner: 'both', admin: 'admin', supervisor: 'none',  accountant: 'admin', sales: 'agent', cx: 'none'  },
