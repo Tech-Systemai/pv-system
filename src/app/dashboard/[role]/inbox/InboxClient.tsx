@@ -80,13 +80,11 @@ export default function InboxClient({
   }, [currentUserId]);
 
   const inboxDocs   = docs.filter(d => !d.archived && d.user_id === currentUserId);
-  const sentDocs    = docs.filter(d => !d.archived && d.sender_id === currentUserId);
-  const visibleDocs = isMgmt
-    ? (tab === 'sent' ? sentDocs : docs.filter(d => !d.archived))
-    : (tab === 'sent' ? sentDocs : inboxDocs);
+  const sentDocs    = docs.filter(d => !d.archived && d.sender_id === currentUserId && d.user_id !== currentUserId);
+  const visibleDocs = tab === 'sent' ? sentDocs : inboxDocs;
 
   const current = visibleDocs.find(d => d.id === selId) ?? visibleDocs[0] ?? null;
-  const unread  = (isMgmt ? docs.filter(d => !d.archived) : inboxDocs).filter(d => !d.is_read).length;
+  const unread  = inboxDocs.filter(d => !d.is_read).length;
 
   // ── File upload ──────────────────────────────────────────────────────────────
   const uploadAttachment = async (file: File): Promise<{ url: string; name: string } | null> => {
@@ -162,6 +160,7 @@ export default function InboxClient({
       title: subject, subject, content: message, type,
       sender: currentUserName, requires_signature: reqSig,
       is_read: false, archived: false,
+      approval_status: 'approved',
     };
     if (replyToId)    { payload.reply_to       = replyToId; }
     if (attachmentUrl){ payload.attachment_url  = attachmentUrl; payload.attachment_name = attachmentName; }
@@ -283,7 +282,7 @@ export default function InboxClient({
                 background: isActive ? 'var(--accent-soft)' : (isUnread ? 'oklch(0.99 0.012 268)' : 'transparent'),
                 borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
               }}>
-                {tab === 'inbox' && isMgmt && (
+                {tab === 'sent' && (
                   <div style={{ fontSize: 10, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginBottom: 2 }}>
                     To: {recipientName(doc)}
                   </div>
@@ -323,7 +322,7 @@ export default function InboxClient({
               <button className="btn btn-acc btn-sm" onClick={() => { setReplyTo(current); setForwardDoc(null); }}>↩ Reply</button>
               <button className="btn btn-sec btn-sm" onClick={() => { setForwardDoc(current); setReplyTo(null); }}>→ Forward</button>
               <button className="btn btn-sec btn-sm" onClick={() => handleArchive(current)}>Archive</button>
-              {isMgmt && (
+              {tab === 'sent' && (
                 <span style={{ fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginLeft: 'auto' }}>
                   To: {recipientName(current)}
                 </span>
