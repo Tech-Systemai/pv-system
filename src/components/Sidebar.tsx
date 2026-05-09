@@ -347,9 +347,9 @@ export default function Sidebar({
       })
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'notifications',
-        filter: `user_id=eq.${profile.id}`,
       }, payload => {
         const notif = payload.new as any;
+        if (notif.user_id !== profile.id) return;
         if ((notif.type as string)?.startsWith('ticket')) {
           setCounts(prev => ({ ...prev, tickets: (prev.tickets || 0) + 1 }));
         }

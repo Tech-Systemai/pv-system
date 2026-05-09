@@ -89,15 +89,23 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
     const inboxSub = supabase
       .channel(`notif-inbox-${userId}`)
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'inbox_documents', filter: `user_id=eq.${userId}` },
-        payload => { setInboxNotifs(prev => [payload.new, ...prev].slice(0, 15)); })
+        { event: 'INSERT', schema: 'public', table: 'inbox_documents' },
+        payload => {
+          const doc = payload.new as any;
+          if (doc.user_id !== userId) return;
+          setInboxNotifs(prev => [doc, ...prev].slice(0, 15));
+        })
       .subscribe();
 
     const ticketSub = supabase
       .channel(`notif-tickets-${userId}`)
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        payload => { setTicketNotifs(prev => [payload.new, ...prev].slice(0, 20)); })
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        payload => {
+          const notif = payload.new as any;
+          if (notif.user_id !== userId) return;
+          setTicketNotifs(prev => [notif, ...prev].slice(0, 20));
+        })
       .subscribe();
 
     return () => {

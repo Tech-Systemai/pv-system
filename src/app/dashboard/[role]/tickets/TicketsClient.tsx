@@ -137,9 +137,11 @@ export default function TicketsClient({
     const row = data?.[0] ?? { ...newTicket, id: `tmp-${Date.now()}`, created_at: new Date().toISOString() };
     setTickets(prev => [{ ...row, profiles: { name: nameMap[currentUserId] ?? 'Me' } }, ...prev]);
 
-    // Notify all mgmt when a new ticket is created
-    const mgmtIds = (allUsers ?? []).filter((u: any) => ['owner', 'admin', 'supervisor'].includes(u.role)).map((u: any) => u.id);
-    notify(mgmtIds, 'New ticket opened', `${currentUserName}: ${titleVal}`, 'ticket_new', row.id);
+    // Notify all mgmt when a new ticket is created (only when we have a real UUID)
+    if (row.id && !String(row.id).startsWith('tmp-')) {
+      const mgmtIds = (allUsers ?? []).filter((u: any) => ['owner', 'admin', 'supervisor'].includes(u.role)).map((u: any) => u.id);
+      notify(mgmtIds, 'New ticket opened', `${currentUserName}: ${titleVal}`, 'ticket_new', row.id);
+    }
 
     setIsSubmitting(false);
     setIsModalOpen(false);
