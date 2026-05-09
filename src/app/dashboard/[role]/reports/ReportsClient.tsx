@@ -158,7 +158,6 @@ export default function ReportsClient({
       type: 'Report',
       sender: printData.generatedBy,
       submitted_by_name: printData.generatedBy,
-      approval_status: 'pending',
       requires_signature: true,
       is_read: false,
       html_content: html,
@@ -182,7 +181,6 @@ export default function ReportsClient({
         type: 'Report',
         sender: r.created_by_name,
         submitted_by_name: r.created_by_name,
-        approval_status: 'pending',
         requires_signature: true,
         is_read: false,
         html_content: r.html_content || '',
@@ -450,6 +448,7 @@ export default function ReportsClient({
                   <th>Employee</th>
                   <th>Created By</th>
                   <th>Date</th>
+                  <th>Signature</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -469,6 +468,14 @@ export default function ReportsClient({
                     <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.employee_name ?? 'Team'}</td>
                     <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>{r.created_by_name ?? '—'}</td>
                     <td style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td>
+                      {r.employee_signature
+                        ? <span className="bdg bdg-ok" title={`Signed by ${r.employee_signature}`}>✓ Signed</span>
+                        : r.employee_id
+                          ? <span className="bdg bdg-warn">○ Awaiting</span>
+                          : <span style={{ color: 'var(--ink-4)', fontSize: 11 }}>—</span>
+                      }
+                    </td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         <button

@@ -258,7 +258,6 @@ export default function ContractsClient({
         content: `Your ${viewingContract.type} employment agreement is ready. Please review and sign below.`,
         type: 'Contract', sender: currentUserName,
         submitted_by_name: currentUserName,
-        approval_status: 'pending',
         requires_signature: true, is_read: false, archived: false,
         html_content: html,
         doc_ref_type: 'contract',

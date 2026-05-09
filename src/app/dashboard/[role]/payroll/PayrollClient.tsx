@@ -180,7 +180,6 @@ export default function PayrollClient({
       type: 'Payslip',
       sender: 'Finance / Management',
       submitted_by_name: 'Finance / Management',
-      approval_status: 'pending',
       requires_signature: true,
       is_read: false,
       html_content: html,
