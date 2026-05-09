@@ -14,7 +14,6 @@ export default async function InboxPage() {
   const [{ data: inbox }, { data: sent }] = await Promise.all([
     admin.from('inbox_documents').select('*')
       .eq('user_id', user.id)
-      .or('approval_status.neq.pending,approval_status.is.null')
       .order('created_at', { ascending: false }),
     admin.from('inbox_documents').select('*')
       .eq('sender_id', user.id)
