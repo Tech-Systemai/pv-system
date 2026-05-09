@@ -345,6 +345,15 @@ export default function Sidebar({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inbox_documents' }, () => {
         setCounts(prev => ({ ...prev, inbox: (prev.inbox || 0) + 1 }));
       })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'notifications',
+        filter: `user_id=eq.${profile.id}`,
+      }, payload => {
+        const notif = payload.new as any;
+        if ((notif.type as string)?.startsWith('ticket')) {
+          setCounts(prev => ({ ...prev, tickets: (prev.tickets || 0) + 1 }));
+        }
+      })
       .subscribe();
     return () => { supabase.removeChannel(sub); };
   }, [profile?.id]);
@@ -359,6 +368,11 @@ export default function Sidebar({
     if (currentNav === 'inbox') {
       localStorage.setItem(`inbox-last-seen-${profile.id}`, new Date().toISOString());
       setCounts(prev => ({ ...prev, inbox: 0 }));
+    }
+    if (currentNav === 'tickets') {
+      setCounts(prev => ({ ...prev, tickets: 0 }));
+      supabase.from('notifications').update({ is_read: true })
+        .eq('user_id', profile.id).like('type', 'ticket%').then(() => {});
     }
   }, [currentNav, profile?.id]);
 
@@ -383,7 +397,12 @@ export default function Sidebar({
       if (count) next.inbox = count;
     } catch { /* ignore */ }
     try {
-      const { count } = await supabase.from('tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending', 'new']);
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+        .like('type', 'ticket%');
       if (count) next.tickets = count;
     } catch { /* ignore */ }
     try {

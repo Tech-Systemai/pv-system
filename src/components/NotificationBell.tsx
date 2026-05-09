@@ -118,10 +118,15 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
 
   const markAllRead = () => {
     localStorage.setItem(`notif-last-seen-${userId}`, new Date().toISOString());
-    // Mark ticket notifications read in DB (fire and forget)
-    ticketNotifs.forEach(n => {
-      supabase.from('notifications').update({ is_read: true }).eq('id', n.id).then(() => {});
-    });
+    // Mark all unread ticket notifications read in one query
+    if (ticketNotifs.length > 0) {
+      supabase.from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+        .like('type', 'ticket%')
+        .then(() => {});
+    }
     setChatNotifs([]);
     setInboxNotifs([]);
     setTicketNotifs([]);
