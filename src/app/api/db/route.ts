@@ -39,6 +39,24 @@ export async function POST(req: NextRequest) {
     if (operation === 'insert') {
       const q = admin.from(table).insert(insertData);
       result = selectClause ? await q.select(selectClause) : await q.select();
+
+      // If inbox_documents insert fails due to missing columns (migration not yet applied),
+      // retry with only the original v3 columns so the message is always delivered.
+      if (result.error && table === 'inbox_documents') {
+        const msg = (result.error.message ?? '').toLowerCase();
+        if (msg.includes('schema cache') || msg.includes('does not exist') || msg.includes('column') || msg.includes('pgrst')) {
+          const safe = insertData.map((row: any) => ({
+            user_id:            row.user_id,
+            sender:             row.sender  || 'System',
+            subject:            row.subject || row.title || '',
+            type:               row.type    || 'Notice',
+            requires_signature: row.requires_signature ?? false,
+            is_read:            row.is_read ?? false,
+          }));
+          const q2 = admin.from(table).insert(safe);
+          result = selectClause ? await q2.select(selectClause) : await q2.select();
+        }
+      }
     } else if (operation === 'update') {
       let q = admin.from(table).update(data);
       if (filters) {

@@ -141,9 +141,12 @@ export default function ReportsClient({
     setView('preview');
   };
 
+  const [sendError, setSendError] = useState('');
+
   const sendPreviewToInbox = async () => {
     if (!printData?.employee?.id) return;
     setSendingPreview(true);
+    setSendError('');
     const emp = printData.employee;
     const label = typeLabel(printData.type);
     const subject = `${label} — ${printData.generatedAt}`;
@@ -151,7 +154,7 @@ export default function ReportsClient({
       { id: printData.savedId ?? Date.now(), created_at: new Date().toISOString(), type: printData.type, notes: printData.notes, action_plan: printData.session?.action_plan },
       emp, printData.generatedBy,
     );
-    await dbOp('inbox_documents', 'insert', {
+    const { error } = await dbOp('inbox_documents', 'insert', {
       user_id: emp.id,
       sender_id: currentUserId,
       title: subject, subject,
@@ -167,7 +170,8 @@ export default function ReportsClient({
     });
     setSendingPreview(false);
     setShowPreviewSendConfirm(false);
-    setPreviewSent(true);
+    if (error) { setSendError(`Send failed: ${error}`); }
+    else { setPreviewSent(true); }
   };
 
   const sendReportToInbox = async (r: any) => {
@@ -175,7 +179,7 @@ export default function ReportsClient({
     if (r.employee_id) {
       const label = typeLabel(r.type);
       const subject = `${label} — ${new Date(r.created_at).toLocaleDateString()}`;
-      await dbOp('inbox_documents', 'insert', {
+      const { error } = await dbOp('inbox_documents', 'insert', {
         user_id: r.employee_id,
         sender_id: r.created_by,
         title: subject, subject,
@@ -189,7 +193,7 @@ export default function ReportsClient({
         doc_ref_type: 'report',
         doc_ref_id: String(r.id),
       });
-      setSentIds(prev => new Set([...prev, r.id]));
+      if (!error) setSentIds(prev => new Set([...prev, r.id]));
     }
     setSendTarget(null);
     setSending(false);
@@ -213,9 +217,12 @@ export default function ReportsClient({
             {printData.employee?.id
               ? previewSent
                 ? <span className="bdg bdg-ok">Sent to inbox</span>
-                : <button className="btn btn-sec btn-sm" onClick={() => setShowPreviewSendConfirm(true)} disabled={sendingPreview}>
-                    📤 Send to Inbox
-                  </button>
+                : <>
+                    {sendError && <span style={{ fontSize: 11, color: 'var(--err)', maxWidth: 240 }}>{sendError}</span>}
+                    <button className="btn btn-sec btn-sm" onClick={() => setShowPreviewSendConfirm(true)} disabled={sendingPreview}>
+                      {sendingPreview ? 'Sending…' : '📤 Send to Inbox'}
+                    </button>
+                  </>
               : null
             }
             <button className="btn btn-acc btn-sm" onClick={() => window.print()}>🖨 Print / Download PDF</button>
