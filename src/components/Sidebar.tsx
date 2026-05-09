@@ -346,11 +346,22 @@ export default function Sidebar({
         setCounts(prev => ({ ...prev, inbox: (prev.inbox || 0) + 1 }));
       })
       .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'notifications',
+        event: 'INSERT', schema: 'public', table: 'tickets',
       }, payload => {
-        const notif = payload.new as any;
-        if (notif.user_id !== profile.id) return;
-        if ((notif.type as string)?.startsWith('ticket')) {
+        const t = payload.new as any;
+        const isMgmtOrCx = ['owner', 'admin', 'supervisor', 'cx'].includes(profile.role);
+        if (isMgmtOrCx || t.user_id === profile.id) {
+          setCounts(prev => ({ ...prev, tickets: (prev.tickets || 0) + 1 }));
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'tickets',
+      }, payload => {
+        const n = payload.new as any;
+        const o = payload.old as any;
+        if (o?.status !== 'Resolved' && n?.status === 'Resolved') {
+          setCounts(prev => ({ ...prev, tickets: Math.max(0, (prev.tickets || 0) - 1) }));
+        } else if (o?.status === 'Resolved' && n?.status !== 'Resolved') {
           setCounts(prev => ({ ...prev, tickets: (prev.tickets || 0) + 1 }));
         }
       })
@@ -371,8 +382,6 @@ export default function Sidebar({
     }
     if (currentNav === 'tickets') {
       setCounts(prev => ({ ...prev, tickets: 0 }));
-      supabase.from('notifications').update({ is_read: true })
-        .eq('user_id', profile.id).like('type', 'ticket%').then(() => {});
     }
   }, [currentNav, profile?.id]);
 
@@ -397,12 +406,10 @@ export default function Sidebar({
       if (count) next.inbox = count;
     } catch { /* ignore */ }
     try {
-      const { count } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_read', false)
-        .like('type', 'ticket%');
+      const isMgmtOrCx = ['owner', 'admin', 'supervisor', 'cx'].includes(userRole);
+      let q = supabase.from('tickets').select('*', { count: 'exact', head: true }).neq('status', 'Resolved');
+      if (!isMgmtOrCx) q = (q as any).eq('user_id', userId);
+      const { count } = await q;
       if (count) next.tickets = count;
     } catch { /* ignore */ }
     try {

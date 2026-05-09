@@ -28,10 +28,13 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
   const router   = useRouter();
   const ref      = useRef<HTMLDivElement>(null);
 
-  const [chatNotifs,   setChatNotifs]   = useState<any[]>([]);
-  const [inboxNotifs,  setInboxNotifs]  = useState<any[]>([]);
-  const [ticketNotifs, setTicketNotifs] = useState<any[]>([]);
+  const [chatNotifs,      setChatNotifs]      = useState<any[]>([]);
+  const [inboxNotifs,     setInboxNotifs]     = useState<any[]>([]);
+  const [ticketNotifs,    setTicketNotifs]    = useState<any[]>([]); // from notifications table
+  const [liveTicketItems, setLiveTicketItems] = useState<any[]>([]); // from direct tickets sub
   const [open, setOpen] = useState(false);
+
+  const isMgmt = ['owner', 'admin', 'supervisor'].includes(userRole);
 
   const accessibleChannelIds = Object.entries(CHANNEL_ROLES)
     .filter(([, roles]) => roles.includes(userRole))
@@ -97,6 +100,7 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
         })
       .subscribe();
 
+    // Targeted notifications from DB (reply/resolve alerts)
     const ticketSub = supabase
       .channel(`notif-tickets-${userId}`)
       .on('postgres_changes',
@@ -108,10 +112,31 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
         })
       .subscribe();
 
+    // Direct ticket inserts — shows new tickets to mgmt without needing notifications table
+    const newTicketSub = supabase
+      .channel(`notif-new-tickets-${userId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'tickets' },
+        payload => {
+          if (!isMgmt) return;
+          const t = payload.new as any;
+          if (t.user_id === userId) return; // don't notify yourself
+          setLiveTicketItems(prev => [{
+            id: `live-${t.id}`,
+            title: 'New ticket opened',
+            body: t.title || t.subject || 'A new support ticket was opened',
+            type: 'ticket_new',
+            link_id: t.id,
+            created_at: t.created_at || new Date().toISOString(),
+          }, ...prev].slice(0, 10));
+        })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(chatSub);
       supabase.removeChannel(inboxSub);
       supabase.removeChannel(ticketSub);
+      supabase.removeChannel(newTicketSub);
     };
   }, []);
 
@@ -126,7 +151,6 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
 
   const markAllRead = () => {
     localStorage.setItem(`notif-last-seen-${userId}`, new Date().toISOString());
-    // Mark all unread ticket notifications read in one query
     if (ticketNotifs.length > 0) {
       supabase.from('notifications')
         .update({ is_read: true })
@@ -138,13 +162,19 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
     setChatNotifs([]);
     setInboxNotifs([]);
     setTicketNotifs([]);
+    setLiveTicketItems([]);
     setOpen(false);
   };
+
+  // De-duplicate: hide live items already covered by the notifications table
+  const seenLinkIds = new Set(ticketNotifs.map(n => n.link_id).filter(Boolean));
+  const dedupedLive = liveTicketItems.filter(t => !seenLinkIds.has(t.link_id));
 
   const allNotifs = [
     ...chatNotifs.map(n   => ({ ...n, _kind: 'chat'   })),
     ...inboxNotifs.map(n  => ({ ...n, _kind: 'inbox'  })),
     ...ticketNotifs.map(n => ({ ...n, _kind: 'ticket' })),
+    ...dedupedLive.map(n  => ({ ...n, _kind: 'ticket' })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
    .slice(0, 25);
 
