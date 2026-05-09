@@ -62,9 +62,11 @@ export default function TicketsClient({
   const [sending, setSending]         = useState(false);
   const [resolving, setResolving]     = useState(false);
   const [claiming, setClaiming]       = useState(false);
+  const [assignOpen, setAssignOpen]   = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const threadBottomRef = useRef<HTMLDivElement>(null);
+  const assignDropRef   = useRef<HTMLDivElement>(null);
 
   const isCX = userRole === 'cx';
   const currentUserName = (allUsers ?? []).find((u: any) => u.id === currentUserId)?.name ?? 'Me';
@@ -182,6 +184,29 @@ export default function TicketsClient({
     setViewTicket((prev: any) => ({ ...prev, assigned_to: null }));
     setClaiming(false);
   };
+
+  // ── Assign to specific user ────────────────────────────────────────────────
+  const handleAssignTo = async (userId: string) => {
+    if (!viewTicket || claiming) return;
+    setAssignOpen(false);
+    setClaiming(true);
+    await dbOp('tickets', 'update', { assigned_to: userId }, { id: viewTicket.id });
+    setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, assigned_to: userId } : t));
+    setViewTicket((prev: any) => ({ ...prev, assigned_to: userId }));
+    setClaiming(false);
+  };
+
+  // Close assign dropdown on outside click
+  useEffect(() => {
+    if (!assignOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (assignDropRef.current && !assignDropRef.current.contains(e.target as Node)) {
+        setAssignOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [assignOpen]);
 
   const baseTabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'all',        label: 'All',        count: tickets.length },
@@ -379,34 +404,68 @@ export default function TicketsClient({
               </div>
               {/* Assignment row */}
               {(isMgmt || isCX) && (
-                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, flexWrap: 'wrap' }}>
                   {viewTicket.assigned_to ? (
-                    <>
-                      <span style={{ color: 'var(--ink-3)' }}>
-                        Assigned to{' '}
-                        <strong style={{ color: viewTicket.assigned_to === currentUserId ? 'var(--accent)' : 'var(--ink)' }}>
-                          {viewTicket.assigned_to === currentUserId
-                            ? 'you'
-                            : (allUsers ?? []).find((u: any) => u.id === viewTicket.assigned_to)?.name ?? 'Unknown'}
-                        </strong>
-                      </span>
-                      {viewTicket.assigned_to === currentUserId ? (
-                        <button className="btn btn-ghost btn-sm" onClick={handleRelease} disabled={claiming} style={{ fontSize: 11, padding: '2px 8px' }}>
-                          Release
-                        </button>
-                      ) : isMgmt ? (
-                        <button className="btn btn-ghost btn-sm" onClick={handleClaim} disabled={claiming} style={{ fontSize: 11, padding: '2px 8px' }}>
-                          {claiming ? '…' : 'Reassign to me'}
-                        </button>
-                      ) : null}
-                    </>
+                    <span style={{ color: 'var(--ink-3)' }}>
+                      Assigned to{' '}
+                      <strong style={{ color: viewTicket.assigned_to === currentUserId ? 'var(--accent)' : 'var(--ink)' }}>
+                        {viewTicket.assigned_to === currentUserId
+                          ? 'you'
+                          : (allUsers ?? []).find((u: any) => u.id === viewTicket.assigned_to)?.name ?? 'Unknown'}
+                      </strong>
+                    </span>
                   ) : (
-                    <>
-                      <span style={{ color: 'var(--ink-4)' }}>Unassigned</span>
-                      <button className="btn btn-acc btn-sm" onClick={handleClaim} disabled={claiming} style={{ fontSize: 11, padding: '2px 10px' }}>
-                        {claiming ? '…' : 'Claim'}
+                    <span style={{ color: 'var(--ink-4)' }}>Unassigned</span>
+                  )}
+
+                  {/* Claim (self-assign) — only when unassigned or assigned to someone else */}
+                  {viewTicket.assigned_to !== currentUserId && (
+                    <button className="btn btn-acc btn-sm" onClick={handleClaim} disabled={claiming} style={{ fontSize: 11, padding: '2px 10px' }}>
+                      {claiming ? '…' : 'Claim'}
+                    </button>
+                  )}
+
+                  {/* Release — only when assigned to self */}
+                  {viewTicket.assigned_to === currentUserId && (
+                    <button className="btn btn-ghost btn-sm" onClick={handleRelease} disabled={claiming} style={{ fontSize: 11, padding: '2px 8px' }}>
+                      Release
+                    </button>
+                  )}
+
+                  {/* Assign to… dropdown — mgmt only */}
+                  {isMgmt && (
+                    <div ref={assignDropRef} style={{ position: 'relative' }}>
+                      <button className="btn btn-sec btn-sm" onClick={() => setAssignOpen(o => !o)} disabled={claiming} style={{ fontSize: 11, padding: '2px 10px' }}>
+                        Assign to…
                       </button>
-                    </>
+                      {assignOpen && (
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50,
+                          background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 180, maxHeight: 220, overflowY: 'auto',
+                        }}>
+                          {(allUsers ?? []).map((u: any) => (
+                            <button
+                              key={u.id}
+                              onClick={() => handleAssignTo(u.id)}
+                              style={{
+                                display: 'block', width: '100%', textAlign: 'left',
+                                padding: '8px 14px', fontSize: 12, background: 'none', border: 'none',
+                                cursor: 'pointer', color: 'var(--ink)',
+                                borderBottom: '1px solid var(--line-2)',
+                                fontWeight: u.id === viewTicket.assigned_to ? 600 : 400,
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                            >
+                              {u.name}
+                              {u.id === viewTicket.assigned_to && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>✓</span>}
+                              {u.id === currentUserId && <span style={{ color: 'var(--ink-4)', marginLeft: 4, fontSize: 10 }}>(you)</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
