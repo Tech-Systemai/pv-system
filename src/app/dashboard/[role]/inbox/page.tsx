@@ -27,7 +27,6 @@ export default async function InboxPage() {
     admin.from('inbox_documents').select('*')
       .eq('sender_id', user.id)
       .neq('user_id', user.id)
-      .or('approval_status.neq.pending,approval_status.is.null')
       .order('created_at', { ascending: false }),
   ]);
   const seen = new Set<string>();

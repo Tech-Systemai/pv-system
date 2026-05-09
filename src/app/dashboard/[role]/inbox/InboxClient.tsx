@@ -306,7 +306,8 @@ export default function InboxClient({
                   <span className={`bdg ${TAG_COLORS[doc.type ?? ''] ?? 'bdg-gy'}`} style={{ fontSize: 9 }}>{doc.type ?? 'DOC'}</span>
                   {doc.html_content && <span className="bdg bdg-acc" style={{ fontSize: 9 }}>📄 Embedded</span>}
                   {doc.attachment_name && !doc.html_content && <span className="bdg bdg-gy" style={{ fontSize: 9 }}>📎</span>}
-                  {doc.requires_signature && !doc.is_signed && <span className="bdg bdg-warn" style={{ fontSize: 9 }}>Sign needed</span>}
+                  {doc.approval_status === 'pending' && tab === 'sent' && <span className="bdg bdg-warn" style={{ fontSize: 9 }}>Pending approval</span>}
+                  {doc.requires_signature && !doc.is_signed && doc.approval_status !== 'pending' && <span className="bdg bdg-warn" style={{ fontSize: 9 }}>Sign needed</span>}
                   {doc.is_signed && <span className="bdg bdg-ok" style={{ fontSize: 9 }}>Signed</span>}
                 </div>
               </div>
