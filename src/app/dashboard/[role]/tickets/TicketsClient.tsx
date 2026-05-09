@@ -61,6 +61,7 @@ export default function TicketsClient({
   const [replyText, setReplyText]     = useState('');
   const [sending, setSending]         = useState(false);
   const [resolving, setResolving]     = useState(false);
+  const [claiming, setClaiming]       = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const threadBottomRef = useRef<HTMLDivElement>(null);
@@ -162,6 +163,26 @@ export default function TicketsClient({
     setViewTicket((prev: any) => ({ ...prev, status: 'Open' }));
   };
 
+  // ── Claim ticket ───────────────────────────────────────────────────────────
+  const handleClaim = async () => {
+    if (!viewTicket || claiming) return;
+    setClaiming(true);
+    await dbOp('tickets', 'update', { assigned_to: currentUserId }, { id: viewTicket.id });
+    setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, assigned_to: currentUserId } : t));
+    setViewTicket((prev: any) => ({ ...prev, assigned_to: currentUserId }));
+    setClaiming(false);
+  };
+
+  // ── Release claim ──────────────────────────────────────────────────────────
+  const handleRelease = async () => {
+    if (!viewTicket || claiming) return;
+    setClaiming(true);
+    await dbOp('tickets', 'update', { assigned_to: null }, { id: viewTicket.id });
+    setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, assigned_to: null } : t));
+    setViewTicket((prev: any) => ({ ...prev, assigned_to: null }));
+    setClaiming(false);
+  };
+
   const baseTabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'all',        label: 'All',        count: tickets.length },
     { id: 'mine',       label: 'Mine',       count: tickets.filter(t => t.user_id === currentUserId).length },
@@ -254,7 +275,9 @@ export default function TicketsClient({
                 <tr>
                   <th>#</th><th>Title</th>
                   {(isMgmt || isCX) && <th>From</th>}
-                  <th>Type</th><th>Priority</th><th>Status</th><th>SLA</th><th>Age</th>
+                  <th>Type</th><th>Priority</th><th>Status</th>
+                  {(isMgmt || isCX) && <th>Assigned</th>}
+                  <th>SLA</th><th>Age</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,6 +296,16 @@ export default function TicketsClient({
                       <td><span className={TYPE_BADGE[tType] ?? 'bdg bdg-gy'} style={{ fontSize: 10 }}>{tType === 'customer' ? '🌐 Customer' : '👤 Employee'}</span></td>
                       <td><span className={PRIORITY_BADGE[t.priority] ?? 'bdg bdg-gy'}>{t.priority}</span></td>
                       <td><span className={STATUS_BADGE[t.status] ?? 'bdg bdg-gy'}>{t.status}</span></td>
+                      {(isMgmt || isCX) && (
+                        <td style={{ fontSize: 12 }}>
+                          {t.assigned_to
+                            ? t.assigned_to === currentUserId
+                              ? <span style={{ color: 'var(--accent)', fontWeight: 600 }}>You</span>
+                              : <span style={{ color: 'var(--ink-3)' }}>{(allUsers ?? []).find((u: any) => u.id === t.assigned_to)?.name ?? '—'}</span>
+                            : <span style={{ color: 'var(--ink-4)' }}>—</span>
+                          }
+                        </td>
+                      )}
                       <td onClick={e => e.stopPropagation()}>{t.status !== 'Resolved' && <SlaBar createdAt={t.created_at} priority={t.priority} />}</td>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-3)' }}>{ageLabel}</td>
                     </tr>
@@ -344,6 +377,39 @@ export default function TicketsClient({
                   <span className={STATUS_BADGE[viewTicket.status] ?? 'bdg bdg-gy'}>{viewTicket.status}</span>
                 </div>
               </div>
+              {/* Assignment row */}
+              {(isMgmt || isCX) && (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                  {viewTicket.assigned_to ? (
+                    <>
+                      <span style={{ color: 'var(--ink-3)' }}>
+                        Assigned to{' '}
+                        <strong style={{ color: viewTicket.assigned_to === currentUserId ? 'var(--accent)' : 'var(--ink)' }}>
+                          {viewTicket.assigned_to === currentUserId
+                            ? 'you'
+                            : (allUsers ?? []).find((u: any) => u.id === viewTicket.assigned_to)?.name ?? 'Unknown'}
+                        </strong>
+                      </span>
+                      {viewTicket.assigned_to === currentUserId ? (
+                        <button className="btn btn-ghost btn-sm" onClick={handleRelease} disabled={claiming} style={{ fontSize: 11, padding: '2px 8px' }}>
+                          Release
+                        </button>
+                      ) : isMgmt ? (
+                        <button className="btn btn-ghost btn-sm" onClick={handleClaim} disabled={claiming} style={{ fontSize: 11, padding: '2px 8px' }}>
+                          {claiming ? '…' : 'Reassign to me'}
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ color: 'var(--ink-4)' }}>Unassigned</span>
+                      <button className="btn btn-acc btn-sm" onClick={handleClaim} disabled={claiming} style={{ fontSize: 11, padding: '2px 10px' }}>
+                        {claiming ? '…' : 'Claim'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               {viewTicket.status === 'Open' && (
                 <div style={{ marginTop: 10 }}>
                   <SlaBar createdAt={viewTicket.created_at} priority={viewTicket.priority} />
