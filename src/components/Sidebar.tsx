@@ -102,9 +102,12 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'kb',         label: 'Knowledge Base',        icon: '📚', module: 'kb' },
     ]},
     { head: 'Strategy', items: [
-      { id: 'planning',   label: 'Planning',              icon: '📈', module: 'planning' },
-      { id: 'finance',    label: 'Finance',               icon: '$',  module: 'finance' },
-      { id: 'policy',     label: 'Policy Engine',         icon: '⚙',  module: 'policy' },
+      { id: 'planning',        label: 'Planning',              icon: '📈', module: 'planning' },
+      { id: 'finance',         label: 'Finance',               icon: '$',  module: 'finance' },
+      { id: 'policy',          label: 'Policy Engine',         icon: '⚙',  module: 'policy' },
+    ]},
+    { head: 'Access', items: [
+      { id: 'request-access',  label: 'Request Access',        icon: '🔑' },
     ]},
   ]},
 
@@ -141,6 +144,9 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'finance',    label: 'Finance',                icon: '$',  module: 'finance' },
       { id: 'policy',     label: 'Policy Engine',          icon: '⚙',  module: 'policy' },
     ]},
+    { head: 'Access', items: [
+      { id: 'request-access', label: 'Request Access',    icon: '🔑' },
+    ]},
   ]},
 
   accountant: { label: 'Accountant', sections: [
@@ -172,11 +178,14 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'monitoring', label: 'Live Monitoring',         icon: '◉',  module: 'monitoring' },
     ]},
     { head: 'Resources', items: [
-      { id: 'notes',      label: 'Notes',                   icon: '📝' },
-      { id: 'wise',       label: 'WISE',                    icon: '💡', module: 'wise' },
-      { id: 'kb',         label: 'Knowledge Base',          icon: '📚', module: 'kb' },
-      { id: 'planning',   label: 'Planning',                icon: '📈', module: 'planning' },
-      { id: 'policy',     label: 'Policy Engine',           icon: '⚙',  module: 'policy' },
+      { id: 'notes',          label: 'Notes',                   icon: '📝' },
+      { id: 'wise',           label: 'WISE',                    icon: '💡', module: 'wise' },
+      { id: 'kb',             label: 'Knowledge Base',          icon: '📚', module: 'kb' },
+      { id: 'planning',       label: 'Planning',                icon: '📈', module: 'planning' },
+      { id: 'policy',         label: 'Policy Engine',           icon: '⚙',  module: 'policy' },
+    ]},
+    { head: 'Access', items: [
+      { id: 'request-access', label: 'Request Access',          icon: '🔑' },
     ]},
   ]},
 
@@ -196,13 +205,16 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'kb',          label: 'Knowledge Base',         icon: '📚', module: 'kb' },
     ]},
     { head: 'Extra Access', items: [
-      { id: 'contracts',   label: 'My Contract',            icon: '📄', module: 'contracts', agentLabel: 'My Contract' },
-      { id: 'attendance',  label: 'My Attendance',          icon: '📅', module: 'attendance', agentLabel: 'My Attendance' },
-      { id: 'coaching',    label: 'Coaching',               icon: '🎯', module: 'coaching' },
-      { id: 'reports',     label: 'Reports',                icon: '📊', module: 'reports' },
-      { id: 'payroll',     label: 'Payroll',                icon: '💵', module: 'payroll' },
-      { id: 'finance',     label: 'Finance',                icon: '$',  module: 'finance' },
-      { id: 'wise',        label: 'WISE',                   icon: '💡', module: 'wise' },
+      { id: 'contracts',      label: 'My Contract',            icon: '📄', module: 'contracts', agentLabel: 'My Contract' },
+      { id: 'attendance',     label: 'My Attendance',          icon: '📅', module: 'attendance', agentLabel: 'My Attendance' },
+      { id: 'coaching',       label: 'Coaching',               icon: '🎯', module: 'coaching' },
+      { id: 'reports',        label: 'Reports',                icon: '📊', module: 'reports' },
+      { id: 'payroll',        label: 'Payroll',                icon: '💵', module: 'payroll' },
+      { id: 'finance',        label: 'Finance',                icon: '$',  module: 'finance' },
+      { id: 'wise',           label: 'WISE',                   icon: '💡', module: 'wise' },
+    ]},
+    { head: 'Access', items: [
+      { id: 'request-access', label: 'Request Access',         icon: '🔑' },
     ]},
   ]},
 
@@ -222,13 +234,16 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'kb',          label: 'Knowledge Base',         icon: '📚', module: 'kb' },
     ]},
     { head: 'Extra Access', items: [
-      { id: 'contracts',   label: 'My Contract',            icon: '📄', module: 'contracts', agentLabel: 'My Contract' },
-      { id: 'attendance',  label: 'My Attendance',          icon: '📅', module: 'attendance', agentLabel: 'My Attendance' },
-      { id: 'coaching',    label: 'Coaching',               icon: '🎯', module: 'coaching' },
-      { id: 'reports',     label: 'Reports',                icon: '📊', module: 'reports' },
-      { id: 'payroll',     label: 'Payroll',                icon: '💵', module: 'payroll' },
-      { id: 'finance',     label: 'Finance',                icon: '$',  module: 'finance' },
-      { id: 'wise',        label: 'WISE',                   icon: '💡', module: 'wise' },
+      { id: 'contracts',      label: 'My Contract',            icon: '📄', module: 'contracts', agentLabel: 'My Contract' },
+      { id: 'attendance',     label: 'My Attendance',          icon: '📅', module: 'attendance', agentLabel: 'My Attendance' },
+      { id: 'coaching',       label: 'Coaching',               icon: '🎯', module: 'coaching' },
+      { id: 'reports',        label: 'Reports',                icon: '📊', module: 'reports' },
+      { id: 'payroll',        label: 'Payroll',                icon: '💵', module: 'payroll' },
+      { id: 'finance',        label: 'Finance',                icon: '$',  module: 'finance' },
+      { id: 'wise',           label: 'WISE',                   icon: '💡', module: 'wise' },
+    ]},
+    { head: 'Access', items: [
+      { id: 'request-access', label: 'Request Access',         icon: '🔑' },
     ]},
   ]},
 };

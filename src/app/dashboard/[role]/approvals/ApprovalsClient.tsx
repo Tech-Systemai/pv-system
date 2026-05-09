@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-type ApprovalSection = 'timeoff' | 'schedules' | 'payroll' | 'documents';
+type ApprovalSection = 'timeoff' | 'schedules' | 'payroll' | 'documents' | 'access';
 
 const mono = { fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' } as const;
 const approveStyle = { background: 'oklch(0.96 0.05 145)', color: 'var(--ok)', border: '1px solid oklch(0.88 0.07 145)' } as const;
@@ -39,24 +39,42 @@ function ActionBtns({ id, busy, onApprove, onReject }: { id: string; busy: strin
   );
 }
 
+const MODULE_LABELS: Record<string, string> = {
+  tasks: 'Task Flow', schedule: 'Schedules', reports: 'Reports', tickets: 'Tickets',
+  hr: 'HR Pipeline', contracts: 'Contracts', inbox: 'Inbox', attendance: 'Attendance',
+  monitoring: 'Live Monitoring', policy: 'Policy Engine', targets: 'Targets',
+  coaching: 'Coaching + QA', planning: 'Planning', kb: 'Knowledge Base',
+  chat: 'Messages', payroll: 'Payroll', finance: 'Finance', wise: 'WISE',
+};
+const VIEW_LABELS: Record<string, string> = { agent: 'Own View', admin: 'Admin View', both: 'Full Access' };
+const VIEW_HUES:  Record<string, number>  = { agent: 75, admin: 220, both: 145 };
+
 export default function ApprovalsClient({
   initialTimeoff,
   initialSchedules,
   initialPayrolls,
   initialDocs,
+  initialAccessRequests = [],
+  initialMatrix = {},
+  isOwner = false,
 }: {
   initialTimeoff: any[];
   initialSchedules: any[];
   initialPayrolls: any[];
   initialDocs: any[];
+  initialAccessRequests?: any[];
+  initialMatrix?: Record<string, any>;
+  isOwner?: boolean;
 }) {
-  const [timeoff,   setTimeoff]   = useState(initialTimeoff);
-  const [schedules, setSchedules] = useState(initialSchedules);
-  const [payrolls,  setPayrolls]  = useState(initialPayrolls);
-  const [docs,      setDocs]      = useState(initialDocs);
-  const [busy,      setBusy]      = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<ApprovalSection>('timeoff');
-  const [expandedDoc,   setExpandedDoc]   = useState<string | null>(null);
+  const [timeoff,        setTimeoff]        = useState(initialTimeoff);
+  const [schedules,      setSchedules]      = useState(initialSchedules);
+  const [payrolls,       setPayrolls]       = useState(initialPayrolls);
+  const [docs,           setDocs]           = useState(initialDocs);
+  const [accessReqs,     setAccessReqs]     = useState(initialAccessRequests);
+  const [matrix,         setMatrix]         = useState<Record<string, any>>(initialMatrix);
+  const [busy,           setBusy]           = useState<string | null>(null);
+  const [activeSection,  setActiveSection]  = useState<ApprovalSection>('timeoff');
+  const [expandedDoc,    setExpandedDoc]    = useState<string | null>(null);
   const [log, setLog] = useState<{ id: string; name: string; action: string; time: string }[]>([]);
 
   const addLog = (name: string, action: string) =>
@@ -97,6 +115,22 @@ export default function ApprovalsClient({
     setBusy(null);
   };
 
+  const handleAccessAction = async (req: any, action: 'approved' | 'denied') => {
+    setBusy(req.id);
+    await dbOp('access_requests', 'update', { status: action }, { id: req.id });
+    if (action === 'approved') {
+      // Merge new permission into local matrix copy and upsert
+      const updated = { ...matrix };
+      if (!updated[req.module]) updated[req.module] = {};
+      updated[req.module] = { ...(updated[req.module] ?? {}), [req.user_role]: req.requested_view };
+      setMatrix(updated);
+      await dbOp('permissions', 'upsert', { id: 'main', matrix: updated });
+    }
+    setAccessReqs(prev => prev.filter((r: any) => r.id !== req.id));
+    addLog(`${MODULE_LABELS[req.module] ?? req.module} for ${req.user_name}`, action === 'approved' ? 'Approved' : 'Denied');
+    setBusy(null);
+  };
+
   // ─── Schedule grouping ───────────────────────────────────────────────────────
   const scheduleWeeks = schedules.reduce((acc: Record<string, any[]>, s) => {
     const wk = s.week ?? 'Unknown';
@@ -106,13 +140,14 @@ export default function ApprovalsClient({
   }, {});
 
   const weekCount = Object.keys(scheduleWeeks).length;
-  const totalPending = timeoff.length + weekCount + payrolls.length + docs.length;
+  const totalPending = timeoff.length + weekCount + payrolls.length + docs.length + accessReqs.length;
 
-  const SECTIONS = [
-    { id: 'timeoff'   as const, label: 'Time-Off',  count: timeoff.length,  hue: 75  },
-    { id: 'schedules' as const, label: 'Schedules', count: weekCount,        hue: 268 },
-    { id: 'payroll'   as const, label: 'Payroll',   count: payrolls.length,  hue: 145 },
-    { id: 'documents' as const, label: 'Documents', count: docs.length,      hue: 220 },
+  const SECTIONS: { id: ApprovalSection; label: string; count: number; hue: number }[] = [
+    { id: 'timeoff',   label: 'Time-Off',        count: timeoff.length,    hue: 75  },
+    { id: 'schedules', label: 'Schedules',        count: weekCount,         hue: 268 },
+    { id: 'payroll',   label: 'Payroll',          count: payrolls.length,   hue: 145 },
+    { id: 'documents', label: 'Documents',        count: docs.length,       hue: 220 },
+    ...(isOwner ? [{ id: 'access' as const, label: 'Access Requests', count: accessReqs.length, hue: 310 }] : []),
   ];
 
   return (
@@ -328,6 +363,50 @@ export default function ApprovalsClient({
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )
+            )}
+
+            {/* ─── Access Requests ─────────────────────────────────────────────── */}
+            {activeSection === 'access' && (
+              accessReqs.length === 0
+                ? <EmptyState label="No pending access requests" />
+                : (
+                  <div style={{ padding: '0 18px 18px' }}>
+                    {accessReqs.map((req: any) => {
+                      const hue     = ((req.user_name ?? 'U').charCodeAt(0) * 13) % 360;
+                      const vhue    = VIEW_HUES[req.requested_view] ?? 268;
+                      const vlabel  = VIEW_LABELS[req.requested_view] ?? req.requested_view;
+                      return (
+                        <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px', marginBottom: 10, border: '1px solid var(--line)', borderRadius: 10 }}>
+                          <div style={{ width: 38, height: 38, borderRadius: 9, background: `oklch(0.94 0.05 310)`, color: `oklch(0.38 0.14 310)`, display: 'grid', placeItems: 'center', fontSize: 18, flexShrink: 0 }}>🔑</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                              <AvCell name={req.user_name ?? 'Unknown'} hue={hue} />
+                              <span className="bdg bdg-gy" style={{ fontSize: 10, textTransform: 'capitalize' }}>{req.user_role}</span>
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>
+                              {MODULE_LABELS[req.module] ?? req.module}
+                              <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: `oklch(0.94 0.05 ${vhue})`, color: `oklch(0.38 0.14 ${vhue})` }}>
+                                {vlabel}
+                              </span>
+                            </div>
+                            {req.reason && (
+                              <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3, fontStyle: 'italic' }}>"{req.reason}"</div>
+                            )}
+                            <div style={{ fontSize: 10, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginTop: 3 }}>
+                              {new Date(req.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <ActionBtns
+                            id={req.id}
+                            busy={busy}
+                            onApprove={() => handleAccessAction(req, 'approved')}
+                            onReject={() => handleAccessAction(req, 'denied')}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 )
             )}

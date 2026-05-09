@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import ApprovalsClient from './ApprovalsClient';
 import { redirect } from 'next/navigation';
+import { getPermMatrix } from '@/utils/getPermissions';
 
 export default async function ApprovalsPage() {
   const supabase = await createClient();
@@ -14,30 +15,30 @@ export default async function ApprovalsPage() {
     redirect(`/dashboard/${profile?.role || 'sales'}`);
   }
 
+  const isOwner = profile?.role === 'owner';
+
   const [
     { data: timeoff },
     { data: schedules },
     { data: payrolls },
     { data: docs },
   ] = await Promise.all([
-    admin
-      .from('time_off_requests')
-      .select('*, profiles!time_off_requests_user_id_fkey(name)')
-      .eq('status', 'Pending'),
-    admin
-      .from('schedules')
-      .select('*, profiles!schedules_user_id_fkey(name, role)')
-      .eq('status', 'Pending'),
-    admin
-      .from('payrolls')
-      .select('*, profiles!payrolls_user_id_fkey(name)')
-      .eq('status', 'Pending'),
-    admin
-      .from('inbox_documents')
-      .select('*, profiles!inbox_documents_user_id_fkey(name)')
-      .eq('approval_status', 'pending')
-      .order('created_at', { ascending: false }),
+    admin.from('time_off_requests').select('*, profiles!time_off_requests_user_id_fkey(name)').eq('status', 'Pending'),
+    admin.from('schedules').select('*, profiles!schedules_user_id_fkey(name, role)').eq('status', 'Pending'),
+    admin.from('payrolls').select('*, profiles!payrolls_user_id_fkey(name)').eq('status', 'Pending'),
+    admin.from('inbox_documents').select('*, profiles!inbox_documents_user_id_fkey(name)').eq('approval_status', 'pending').order('created_at', { ascending: false }),
   ]);
+
+  let accessRequests: any[] = [];
+  let matrix: any = {};
+  if (isOwner) {
+    const [{ data: reqs }, mat] = await Promise.all([
+      admin.from('access_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
+      getPermMatrix(),
+    ]);
+    accessRequests = reqs ?? [];
+    matrix = mat;
+  }
 
   return (
     <ApprovalsClient
@@ -45,6 +46,9 @@ export default async function ApprovalsPage() {
       initialSchedules={schedules || []}
       initialPayrolls={payrolls || []}
       initialDocs={docs || []}
+      initialAccessRequests={accessRequests}
+      initialMatrix={matrix}
+      isOwner={isOwner}
     />
   );
 }
