@@ -160,7 +160,6 @@ export default function InboxClient({
       title: subject, subject, content: message, type,
       sender: currentUserName, requires_signature: reqSig,
       is_read: false, archived: false,
-      approval_status: 'approved',
     };
     if (replyToId)    { payload.reply_to       = replyToId; }
     if (attachmentUrl){ payload.attachment_url  = attachmentUrl; payload.attachment_name = attachmentName; }
