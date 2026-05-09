@@ -17,13 +17,20 @@ const TYPE_ICON: Record<string, string> = {
   Notice: '📢', Coaching: '🎯', HR: '📋', 'Action Plan': '📝',
 };
 
+const TICKET_ICON: Record<string, string> = {
+  ticket_new:      '🎫',
+  ticket_reply:    '💬',
+  ticket_resolved: '✅',
+};
+
 export default function NotificationBell({ userId, userRole }: { userId: string; userRole: string }) {
   const supabase = createClient();
   const router   = useRouter();
   const ref      = useRef<HTMLDivElement>(null);
 
-  const [chatNotifs,  setChatNotifs]  = useState<any[]>([]);
-  const [inboxNotifs, setInboxNotifs] = useState<any[]>([]);
+  const [chatNotifs,   setChatNotifs]   = useState<any[]>([]);
+  const [inboxNotifs,  setInboxNotifs]  = useState<any[]>([]);
+  const [ticketNotifs, setTicketNotifs] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
 
   const accessibleChannelIds = Object.entries(CHANNEL_ROLES)
@@ -34,7 +41,6 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
   useEffect(() => {
     const lastSeen = localStorage.getItem(`notif-last-seen-${userId}`) || new Date(0).toISOString();
 
-    // Chat messages
     supabase
       .from('messages')
       .select('id, content, channel, sender_name, sender_role, file_type, created_at, receiver_id')
@@ -45,7 +51,6 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
       .limit(15)
       .then(({ data }) => { if (data) setChatNotifs(data); });
 
-    // Inbox messages
     supabase
       .from('inbox_documents')
       .select('id, subject, title, sender, type, created_at')
@@ -55,11 +60,19 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
       .order('created_at', { ascending: false })
       .limit(15)
       .then(({ data }) => { if (data) setInboxNotifs(data); });
+
+    supabase
+      .from('notifications')
+      .select('id, title, body, type, link_id, is_read, created_at')
+      .eq('user_id', userId)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => { if (data) setTicketNotifs(data); });
   }, []);
 
   // ── Realtime ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Chat realtime
     const chatSub = supabase
       .channel('notif-chat-feed')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
@@ -73,19 +86,24 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
       })
       .subscribe();
 
-    // Inbox realtime
     const inboxSub = supabase
       .channel(`notif-inbox-${userId}`)
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'inbox_documents', filter: `user_id=eq.${userId}` },
-        payload => {
-          setInboxNotifs(prev => [payload.new, ...prev].slice(0, 15));
-        })
+        payload => { setInboxNotifs(prev => [payload.new, ...prev].slice(0, 15)); })
+      .subscribe();
+
+    const ticketSub = supabase
+      .channel(`notif-tickets-${userId}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        payload => { setTicketNotifs(prev => [payload.new, ...prev].slice(0, 20)); })
       .subscribe();
 
     return () => {
       supabase.removeChannel(chatSub);
       supabase.removeChannel(inboxSub);
+      supabase.removeChannel(ticketSub);
     };
   }, []);
 
@@ -100,22 +118,29 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
 
   const markAllRead = () => {
     localStorage.setItem(`notif-last-seen-${userId}`, new Date().toISOString());
+    // Mark ticket notifications read in DB (fire and forget)
+    ticketNotifs.forEach(n => {
+      supabase.from('notifications').update({ is_read: true }).eq('id', n.id).then(() => {});
+    });
     setChatNotifs([]);
     setInboxNotifs([]);
+    setTicketNotifs([]);
     setOpen(false);
   };
 
-  // Merge and sort by time
   const allNotifs = [
-    ...chatNotifs.map(n  => ({ ...n, _kind: 'chat'  })),
-    ...inboxNotifs.map(n => ({ ...n, _kind: 'inbox' })),
+    ...chatNotifs.map(n   => ({ ...n, _kind: 'chat'   })),
+    ...inboxNotifs.map(n  => ({ ...n, _kind: 'inbox'  })),
+    ...ticketNotifs.map(n => ({ ...n, _kind: 'ticket' })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-   .slice(0, 20);
+   .slice(0, 25);
 
   const count = allNotifs.length;
 
   const navigate = (n: any) => {
-    if (n._kind === 'inbox') {
+    if (n._kind === 'ticket') {
+      router.push(`/dashboard/${userRole}/tickets`);
+    } else if (n._kind === 'inbox') {
       router.push(`/dashboard/${userRole}/inbox`);
     } else {
       router.push(`/dashboard/${userRole}/chat`);
@@ -151,7 +176,6 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
           boxShadow: '0 8px 32px rgba(0,0,0,0.16)', border: '1px solid #e4e7eb',
           zIndex: 2000, overflow: 'hidden',
         }}>
-          {/* Header */}
           <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid #e4e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 700, fontSize: '14px', color: '#1a1f2e' }}>Notifications</span>
             {count > 0 && (
@@ -161,7 +185,6 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
             )}
           </div>
 
-          {/* List */}
           <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
             {allNotifs.length === 0 ? (
               <div style={{ padding: '28px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
@@ -176,9 +199,12 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
               >
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-
-                  {/* Avatar / icon */}
-                  {n._kind === 'inbox' ? (
+                  {/* Icon */}
+                  {n._kind === 'ticket' ? (
+                    <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 }}>
+                      {TICKET_ICON[n.type] ?? '🎫'}
+                    </div>
+                  ) : n._kind === 'inbox' ? (
                     <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 }}>
                       {TYPE_ICON[n.type ?? ''] ?? '✉️'}
                     </div>
@@ -190,11 +216,15 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
 
                   {/* Text */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {n._kind === 'inbox' ? (
+                    {n._kind === 'ticket' ? (
+                      <>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e' }}>{n.title}</div>
+                        {n.body && <div style={{ fontSize: '11px', color: '#6b7689', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.body}</div>}
+                      </>
+                    ) : n._kind === 'inbox' ? (
                       <>
                         <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e' }}>
-                          {n.sender ?? 'System'}
-                          <span style={{ fontWeight: 400, color: '#6b7689' }}> → your inbox</span>
+                          {n.sender ?? 'System'}<span style={{ fontWeight: 400, color: '#6b7689' }}> → your inbox</span>
                         </div>
                         <div style={{ fontSize: '11px', color: '#6b7689', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {n.title ?? n.subject ?? 'New document'}
@@ -203,10 +233,7 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
                     ) : (
                       <>
                         <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e' }}>
-                          {n.sender_name}
-                          <span style={{ fontWeight: 400, color: '#6b7689' }}>
-                            {' '}{n.receiver_id === userId ? '→ you (DM)' : `in #${n.channel}`}
-                          </span>
+                          {n.sender_name}<span style={{ fontWeight: 400, color: '#6b7689' }}>{' '}{n.receiver_id === userId ? '→ you (DM)' : `in #${n.channel}`}</span>
                         </div>
                         <div style={{ fontSize: '11px', color: '#6b7689', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {n.content || (n.file_type === 'image' ? '📷 Image' : n.file_type === 'video' ? '🎥 Video' : '📎 File')}
@@ -222,16 +249,15 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
             ))}
           </div>
 
-          {/* Footer */}
           {count > 0 && (
             <div style={{ padding: '10px 16px', borderTop: '1px solid #f0f2f5', display: 'flex', justifyContent: 'center', gap: 16 }}>
-              <button onClick={() => { router.push(`/dashboard/${userRole}/inbox`); markAllRead(); }}
+              <button onClick={() => { router.push(`/dashboard/${userRole}/tickets`); markAllRead(); }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#4f46e5', fontWeight: 600 }}>
-                Open Inbox →
+                Open Tickets →
               </button>
-              <button onClick={() => { router.push(`/dashboard/${userRole}/chat`); markAllRead(); }}
+              <button onClick={() => { router.push(`/dashboard/${userRole}/inbox`); markAllRead(); }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#6b7689', fontWeight: 500 }}>
-                Open Chat →
+                Open Inbox →
               </button>
             </div>
           )}

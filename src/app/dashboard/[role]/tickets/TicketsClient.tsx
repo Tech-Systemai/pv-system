@@ -136,6 +136,11 @@ export default function TicketsClient({
     const nameMap = Object.fromEntries((allUsers ?? []).map((u: any) => [u.id, u.name]));
     const row = data?.[0] ?? { ...newTicket, id: `tmp-${Date.now()}`, created_at: new Date().toISOString() };
     setTickets(prev => [{ ...row, profiles: { name: nameMap[currentUserId] ?? 'Me' } }, ...prev]);
+
+    // Notify all mgmt when a new ticket is created
+    const mgmtIds = (allUsers ?? []).filter((u: any) => ['owner', 'admin', 'supervisor'].includes(u.role)).map((u: any) => u.id);
+    notify(mgmtIds, 'New ticket opened', `${currentUserName}: ${titleVal}`, 'ticket_new', row.id);
+
     setIsSubmitting(false);
     setIsModalOpen(false);
     (e.target as HTMLFormElement).reset();
@@ -157,6 +162,15 @@ export default function TicketsClient({
     setReplies(prev => [...prev, saved]);
     setReplyText('');
     setSending(false);
+
+    // Notify ticket owner + assigned agent of new reply
+    notify(
+      [viewTicket.user_id, viewTicket.assigned_to],
+      'New reply on your ticket',
+      `${currentUserName}: ${replyText.trim().slice(0, 80)}`,
+      'ticket_reply',
+      viewTicket.id,
+    );
   };
 
   // ── Resolve ticket ─────────────────────────────────────────────────────────
@@ -167,6 +181,15 @@ export default function TicketsClient({
     setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, status: 'Resolved' } : t));
     setViewTicket((prev: any) => ({ ...prev, status: 'Resolved' }));
     setResolving(false);
+
+    // Notify ticket owner that their ticket was resolved
+    notify(
+      [viewTicket.user_id],
+      'Ticket resolved',
+      `Your ticket "${viewTicket.title ?? viewTicket.subject}" has been resolved.`,
+      'ticket_resolved',
+      viewTicket.id,
+    );
   };
 
   // ── Reopen ticket ──────────────────────────────────────────────────────────
@@ -175,6 +198,21 @@ export default function TicketsClient({
     await dbOp('tickets', 'update', { status: 'Open' }, { id: viewTicket.id });
     setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, status: 'Open' } : t));
     setViewTicket((prev: any) => ({ ...prev, status: 'Open' }));
+  };
+
+  // ── Send in-app notifications ──────────────────────────────────────────────
+  // Inserts one notification row per recipient, skipping the actor themselves.
+  const notify = async (
+    recipientIds: (string | null | undefined)[],
+    title: string,
+    body: string,
+    type: string,
+    linkId: string,
+  ) => {
+    const rows = [...new Set(recipientIds)]
+      .filter((id): id is string => !!id && id !== currentUserId)
+      .map(user_id => ({ user_id, title, body, type, link_id: linkId, is_read: false }));
+    if (rows.length > 0) await dbOp('notifications', 'insert', rows);
   };
 
   // ── Assign ticket to a user (or null to unassign) — works on any row ───────
