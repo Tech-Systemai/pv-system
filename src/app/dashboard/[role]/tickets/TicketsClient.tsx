@@ -61,12 +61,12 @@ export default function TicketsClient({
   const [replyText, setReplyText]     = useState('');
   const [sending, setSending]         = useState(false);
   const [resolving, setResolving]     = useState(false);
-  const [claiming, setClaiming]       = useState(false);
-  const [assignOpen, setAssignOpen]   = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  // assignPopover tracks which row's dropdown is open and where to render it
+  const [assignPopover, setAssignPopover] = useState<{ ticketId: string; top: number; left: number } | null>(null);
   const threadBottomRef = useRef<HTMLDivElement>(null);
-  const assignDropRef   = useRef<HTMLDivElement>(null);
+  const popoverRef      = useRef<HTMLDivElement>(null);
 
   const isCX = userRole === 'cx';
   const currentUserName = (allUsers ?? []).find((u: any) => u.id === currentUserId)?.name ?? 'Me';
@@ -86,6 +86,18 @@ export default function TicketsClient({
   useEffect(() => {
     threadBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [replies]);
+
+  // Close assign popover on outside click
+  useEffect(() => {
+    if (!assignPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setAssignPopover(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [assignPopover]);
 
   const filtered = (() => {
     switch (filterTab) {
@@ -165,48 +177,22 @@ export default function TicketsClient({
     setViewTicket((prev: any) => ({ ...prev, status: 'Open' }));
   };
 
-  // ── Claim ticket ───────────────────────────────────────────────────────────
-  const handleClaim = async () => {
-    if (!viewTicket || claiming) return;
-    setClaiming(true);
-    await dbOp('tickets', 'update', { assigned_to: currentUserId }, { id: viewTicket.id });
-    setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, assigned_to: currentUserId } : t));
-    setViewTicket((prev: any) => ({ ...prev, assigned_to: currentUserId }));
-    setClaiming(false);
+  // ── Assign ticket to a user (or null to unassign) — works on any row ───────
+  const handleRowAssign = async (ticketId: string, userId: string | null) => {
+    setAssignPopover(null);
+    await dbOp('tickets', 'update', { assigned_to: userId }, { id: ticketId });
+    setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, assigned_to: userId } : t));
+    if (viewTicket?.id === ticketId) {
+      setViewTicket((prev: any) => ({ ...prev, assigned_to: userId }));
+    }
   };
 
-  // ── Release claim ──────────────────────────────────────────────────────────
-  const handleRelease = async () => {
-    if (!viewTicket || claiming) return;
-    setClaiming(true);
-    await dbOp('tickets', 'update', { assigned_to: null }, { id: viewTicket.id });
-    setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, assigned_to: null } : t));
-    setViewTicket((prev: any) => ({ ...prev, assigned_to: null }));
-    setClaiming(false);
+  // Open the assign popover anchored to the clicked button
+  const openAssignPopover = (e: React.MouseEvent<HTMLButtonElement>, ticketId: string) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setAssignPopover({ ticketId, top: rect.bottom + 6, left: rect.left });
   };
-
-  // ── Assign to specific user ────────────────────────────────────────────────
-  const handleAssignTo = async (userId: string) => {
-    if (!viewTicket || claiming) return;
-    setAssignOpen(false);
-    setClaiming(true);
-    await dbOp('tickets', 'update', { assigned_to: userId }, { id: viewTicket.id });
-    setTickets(prev => prev.map(t => t.id === viewTicket.id ? { ...t, assigned_to: userId } : t));
-    setViewTicket((prev: any) => ({ ...prev, assigned_to: userId }));
-    setClaiming(false);
-  };
-
-  // Close assign dropdown on outside click
-  useEffect(() => {
-    if (!assignOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (assignDropRef.current && !assignDropRef.current.contains(e.target as Node)) {
-        setAssignOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [assignOpen]);
 
   const baseTabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'all',        label: 'All',        count: tickets.length },
@@ -223,6 +209,9 @@ export default function TicketsClient({
     : baseTabs;
 
   const defaultType = isCX ? 'customer' : 'employee';
+
+  // The ticket whose assign popover is open
+  const popoverTicket = assignPopover ? tickets.find(t => t.id === assignPopover.ticketId) : null;
 
   return (
     <div className="page-fade">
@@ -310,6 +299,11 @@ export default function TicketsClient({
                   const ageH     = (Date.now() - new Date(t.created_at).getTime()) / 3_600_000;
                   const ageLabel = ageH < 1 ? `${Math.round(ageH * 60)}m` : ageH < 24 ? `${ageH.toFixed(1)}h` : `${Math.floor(ageH / 24)}d`;
                   const tType    = t.ticket_type ?? 'employee';
+                  const assigneeName = t.assigned_to
+                    ? t.assigned_to === currentUserId
+                      ? 'You'
+                      : (allUsers ?? []).find((u: any) => u.id === t.assigned_to)?.name ?? '—'
+                    : null;
                   return (
                     <tr key={t.id} onClick={() => { setViewTicket(t); setReplyText(''); }} style={{ cursor: 'pointer' }}>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>#{(1000 + i).toString(16).toUpperCase()}</td>
@@ -322,13 +316,21 @@ export default function TicketsClient({
                       <td><span className={PRIORITY_BADGE[t.priority] ?? 'bdg bdg-gy'}>{t.priority}</span></td>
                       <td><span className={STATUS_BADGE[t.status] ?? 'bdg bdg-gy'}>{t.status}</span></td>
                       {(isMgmt || isCX) && (
-                        <td style={{ fontSize: 12 }}>
-                          {t.assigned_to
-                            ? t.assigned_to === currentUserId
-                              ? <span style={{ color: 'var(--accent)', fontWeight: 600 }}>You</span>
-                              : <span style={{ color: 'var(--ink-3)' }}>{(allUsers ?? []).find((u: any) => u.id === t.assigned_to)?.name ?? '—'}</span>
-                            : <span style={{ color: 'var(--ink-4)' }}>—</span>
-                          }
+                        <td onClick={e => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
+                          <button
+                            onClick={e => openAssignPopover(e, t.id)}
+                            style={{
+                              background: assigneeName ? (t.assigned_to === currentUserId ? 'oklch(0.95 0.04 268)' : 'var(--surface-2)') : 'none',
+                              border: `1px solid ${assigneeName ? 'var(--line)' : 'var(--line-2)'}`,
+                              borderRadius: 6, padding: '2px 8px', fontSize: 11, cursor: 'pointer',
+                              color: t.assigned_to === currentUserId ? 'var(--accent)' : 'var(--ink-3)',
+                              fontWeight: t.assigned_to === currentUserId ? 600 : 400,
+                              display: 'flex', alignItems: 'center', gap: 4,
+                            }}
+                          >
+                            {assigneeName ?? <span style={{ color: 'var(--ink-4)' }}>Assign…</span>}
+                            <span style={{ fontSize: 9, opacity: 0.5 }}>▾</span>
+                          </button>
                         </td>
                       )}
                       <td onClick={e => e.stopPropagation()}>{t.status !== 'Resolved' && <SlaBar createdAt={t.created_at} priority={t.priority} />}</td>
@@ -341,6 +343,72 @@ export default function TicketsClient({
           </div>
         )}
       </div>
+
+      {/* ── Assign popover (fixed, avoids table overflow clipping) ── */}
+      {assignPopover && (
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'fixed', top: assignPopover.top, left: assignPopover.left, zIndex: 200,
+            background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10,
+            boxShadow: '0 6px 24px rgba(0,0,0,0.14)', minWidth: 200, maxHeight: 260, overflowY: 'auto',
+          }}
+        >
+          {/* Claim self shortcut */}
+          {popoverTicket?.assigned_to !== currentUserId && (
+            <button
+              onClick={() => handleRowAssign(assignPopover.ticketId, currentUserId)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '9px 14px', fontSize: 12, background: 'none', border: 'none',
+                borderBottom: '1px solid var(--line)', cursor: 'pointer',
+                color: 'var(--accent)', fontWeight: 600,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.96 0.04 268)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              ✋ Claim (assign to me)
+            </button>
+          )}
+          {/* All users */}
+          {(allUsers ?? []).map((u: any) => (
+            <button
+              key={u.id}
+              onClick={() => handleRowAssign(assignPopover.ticketId, u.id)}
+              style={{
+                display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 14px', fontSize: 12, background: 'none', border: 'none',
+                borderBottom: '1px solid var(--line-2)', cursor: 'pointer',
+                color: 'var(--ink)',
+                fontWeight: u.id === popoverTicket?.assigned_to ? 600 : 400,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              <span>
+                {u.name}
+                {u.id === currentUserId && <span style={{ color: 'var(--ink-4)', marginLeft: 4, fontSize: 10 }}>(you)</span>}
+              </span>
+              {u.id === popoverTicket?.assigned_to && <span style={{ color: 'var(--accent)' }}>✓</span>}
+            </button>
+          ))}
+          {/* Unassign */}
+          {popoverTicket?.assigned_to && (
+            <button
+              onClick={() => handleRowAssign(assignPopover.ticketId, null)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '8px 14px', fontSize: 12, background: 'none', border: 'none',
+                cursor: 'pointer', color: 'var(--ink-4)',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            >
+              ✕ Unassign
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Create ticket modal ── */}
       {isModalOpen && (
@@ -389,9 +457,19 @@ export default function TicketsClient({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{viewTicket.title ?? viewTicket.subject}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                    {(isMgmt || isCX) && viewTicket.profiles?.name && <span>Opened by {viewTicket.profiles.name} · </span>}
-                    {new Date(viewTicket.created_at).toLocaleString()}
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {(isMgmt || isCX) && viewTicket.profiles?.name && <span>Opened by {viewTicket.profiles.name}</span>}
+                    <span>{new Date(viewTicket.created_at).toLocaleString()}</span>
+                    {(isMgmt || isCX) && (
+                      <span>
+                        {viewTicket.assigned_to
+                          ? <>Assigned to <strong style={{ color: viewTicket.assigned_to === currentUserId ? 'var(--accent)' : 'var(--ink-2)' }}>
+                              {viewTicket.assigned_to === currentUserId ? 'you' : (allUsers ?? []).find((u: any) => u.id === viewTicket.assigned_to)?.name ?? '—'}
+                            </strong></>
+                          : <span style={{ color: 'var(--ink-4)' }}>Unassigned</span>
+                        }
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -402,73 +480,6 @@ export default function TicketsClient({
                   <span className={STATUS_BADGE[viewTicket.status] ?? 'bdg bdg-gy'}>{viewTicket.status}</span>
                 </div>
               </div>
-              {/* Assignment row */}
-              {(isMgmt || isCX) && (
-                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, flexWrap: 'wrap' }}>
-                  {viewTicket.assigned_to ? (
-                    <span style={{ color: 'var(--ink-3)' }}>
-                      Assigned to{' '}
-                      <strong style={{ color: viewTicket.assigned_to === currentUserId ? 'var(--accent)' : 'var(--ink)' }}>
-                        {viewTicket.assigned_to === currentUserId
-                          ? 'you'
-                          : (allUsers ?? []).find((u: any) => u.id === viewTicket.assigned_to)?.name ?? 'Unknown'}
-                      </strong>
-                    </span>
-                  ) : (
-                    <span style={{ color: 'var(--ink-4)' }}>Unassigned</span>
-                  )}
-
-                  {/* Claim (self-assign) — only when unassigned or assigned to someone else */}
-                  {viewTicket.assigned_to !== currentUserId && (
-                    <button className="btn btn-acc btn-sm" onClick={handleClaim} disabled={claiming} style={{ fontSize: 11, padding: '2px 10px' }}>
-                      {claiming ? '…' : 'Claim'}
-                    </button>
-                  )}
-
-                  {/* Release — only when assigned to self */}
-                  {viewTicket.assigned_to === currentUserId && (
-                    <button className="btn btn-ghost btn-sm" onClick={handleRelease} disabled={claiming} style={{ fontSize: 11, padding: '2px 8px' }}>
-                      Release
-                    </button>
-                  )}
-
-                  {/* Assign to… dropdown — mgmt only */}
-                  {isMgmt && (
-                    <div ref={assignDropRef} style={{ position: 'relative' }}>
-                      <button className="btn btn-sec btn-sm" onClick={() => setAssignOpen(o => !o)} disabled={claiming} style={{ fontSize: 11, padding: '2px 10px' }}>
-                        Assign to…
-                      </button>
-                      {assignOpen && (
-                        <div style={{
-                          position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50,
-                          background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8,
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 180, maxHeight: 220, overflowY: 'auto',
-                        }}>
-                          {(allUsers ?? []).map((u: any) => (
-                            <button
-                              key={u.id}
-                              onClick={() => handleAssignTo(u.id)}
-                              style={{
-                                display: 'block', width: '100%', textAlign: 'left',
-                                padding: '8px 14px', fontSize: 12, background: 'none', border: 'none',
-                                cursor: 'pointer', color: 'var(--ink)',
-                                borderBottom: '1px solid var(--line-2)',
-                                fontWeight: u.id === viewTicket.assigned_to ? 600 : 400,
-                              }}
-                              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-                              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                            >
-                              {u.name}
-                              {u.id === viewTicket.assigned_to && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>✓</span>}
-                              {u.id === currentUserId && <span style={{ color: 'var(--ink-4)', marginLeft: 4, fontSize: 10 }}>(you)</span>}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
               {viewTicket.status === 'Open' && (
                 <div style={{ marginTop: 10 }}>
                   <SlaBar createdAt={viewTicket.created_at} priority={viewTicket.priority} />
@@ -524,7 +535,7 @@ export default function TicketsClient({
               <div ref={threadBottomRef} />
             </div>
 
-            {/* Reply input + actions — always visible */}
+            {/* Reply input + actions */}
             <div style={{ borderTop: '2px solid var(--line)', padding: '14px 20px', flexShrink: 0, background: 'white' }}>
               {viewTicket.status === 'Open' ? (
                 <>
