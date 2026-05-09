@@ -78,12 +78,51 @@ export default function ReportsClient({
   const [sendTarget, setSendTarget] = useState<any>(null);
   const [sending, setSending] = useState(false);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const [showPreviewSendConfirm, setShowPreviewSendConfirm] = useState(false);
+  const [sendingPreview, setSendingPreview] = useState(false);
+  const [previewSent, setPreviewSent] = useState(false);
 
   const handleGenerate = () => {
     const emp = employees.find(e => e.id === selectedEmployee);
     const session = reports.find(r => r.id === selectedSession);
     setPrintData({ type: reportType, targetType, employee: emp, session, notes, generatedBy: currentUserName, generatedAt: new Date().toLocaleDateString() });
+    setPreviewSent(false);
     setView('preview');
+  };
+
+  const sendPreviewToInbox = async () => {
+    if (!printData?.employee?.id) return;
+    setSendingPreview(true);
+    const emp = printData.employee;
+    const typeLabel = REPORT_TYPES.find(r => r.id === printData.type)?.label ?? printData.type;
+    const syntheticRecord = {
+      id: Date.now(),
+      created_at: new Date().toISOString(),
+      type: typeLabel,
+      notes: printData.notes,
+      action_plan: printData.session?.action_plan,
+      next_review: printData.session?.next_review,
+    };
+    const html = buildReportHtml(syntheticRecord, emp, printData.generatedBy);
+    const subject = `${typeLabel} — ${printData.generatedAt}`;
+    await dbOp('inbox_documents', 'insert', {
+      user_id: emp.id,
+      title: subject,
+      subject,
+      content: printData.notes || 'Please review the attached report.',
+      type: 'Report',
+      sender: printData.generatedBy,
+      submitted_by_name: printData.generatedBy,
+      approval_status: 'pending',
+      requires_signature: true,
+      is_read: false,
+      html_content: html,
+      doc_ref_type: 'report',
+      doc_ref_id: printData.session ? String(printData.session.id) : undefined,
+    });
+    setSendingPreview(false);
+    setShowPreviewSendConfirm(false);
+    setPreviewSent(true);
   };
 
   const sendReportToInbox = async (r: any) => {
@@ -127,8 +166,24 @@ export default function ReportsClient({
         ` }} />
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
           <button className="btn btn-sec btn-sm" onClick={() => setView('create')}>← Back</button>
-          <button className="btn btn-acc btn-sm" onClick={() => window.print()}>🖨 Print / Download PDF</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {printData.employee?.id
+              ? previewSent
+                ? <span className="bdg bdg-ok">Sent to inbox</span>
+                : <button className="btn btn-sec btn-sm" onClick={() => setShowPreviewSendConfirm(true)} disabled={sendingPreview}>
+                    📤 Send to Inbox
+                  </button>
+              : null
+            }
+            <button className="btn btn-acc btn-sm" onClick={() => window.print()}>🖨 Print / Download PDF</button>
+          </div>
         </div>
+        {showPreviewSendConfirm && (
+          <SendConfirm
+            onConfirm={sendPreviewToInbox}
+            onCancel={() => setShowPreviewSendConfirm(false)}
+          />
+        )}
 
         <div style={{ background: '#fff', padding: '48px', maxWidth: '800px', margin: '0 auto', boxShadow: 'var(--sh-2)', borderRadius: 8, border: '1px solid var(--line)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--ink)', paddingBottom: 20, marginBottom: 32 }}>
@@ -364,7 +419,8 @@ export default function ReportsClient({
                         <button
                           className="btn btn-sec btn-sm"
                           onClick={() => {
-                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: r.agent, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
+                            setPreviewSent(false);
+                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: { ...r.agent, id: r.agent_id }, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
                             setView('preview');
                           }}
                         >Open</button>
@@ -376,7 +432,8 @@ export default function ReportsClient({
                         <button
                           className="btn btn-sec btn-sm"
                           onClick={() => {
-                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: r.agent, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
+                            setPreviewSent(false);
+                            setPrintData({ type: 'qa-evaluation', targetType: 'individual', employee: { ...r.agent, id: r.agent_id }, session: r, notes: r.notes, generatedBy: r.supervisor?.name ?? currentUserName, generatedAt: new Date(r.created_at).toLocaleDateString() });
                             setView('preview');
                             setTimeout(() => window.print(), 500);
                           }}

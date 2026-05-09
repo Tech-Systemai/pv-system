@@ -87,7 +87,7 @@ export default function PermissionsClient({
   const counts = { none: 0, agent: 0, admin: 0, both: 0 };
   for (const cat of categories) {
     for (const role of roles) {
-      const v = role === 'owner' ? 'both' : (matrix[cat]?.[role] ?? 'none');
+      const v = role === 'owner' ? 'admin' : (matrix[cat]?.[role] ?? 'none');
       counts[v]++;
     }
   }
@@ -142,7 +142,7 @@ export default function PermissionsClient({
         <div className="card-hdr">
           <div>
             <div className="card-title">Role Permissions Matrix</div>
-            <div className="card-sub">Owner always has full access — click cells to cycle through view types</div>
+            <div className="card-sub">Owner always has full admin view — click cells to cycle through view types</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {error && <span style={{ fontSize: 12, color: 'var(--err)' }}>{error}</span>}
@@ -193,7 +193,7 @@ export default function PermissionsClient({
                     </td>
                     {roles.map(role => {
                       const isOwner = role === 'owner';
-                      const view: ViewType = isOwner ? 'both' : (matrix[cat]?.[role] ?? 'none');
+                      const view: ViewType = isOwner ? 'admin' : (matrix[cat]?.[role] ?? 'none');
                       return (
                         <td key={role} style={{ textAlign: 'center' }}>
                           <CellButton view={view} locked={isOwner} onClick={() => cycle(cat, role)} />
@@ -223,7 +223,7 @@ function CellButton({ view, locked, onClick }: { view: ViewType; locked: boolean
     <button
       onClick={onClick}
       disabled={locked}
-      title={locked ? 'Owner always has full access' : `${cfg.label} — click to change`}
+      title={locked ? 'Owner always has full admin view' : `${cfg.label} — click to change`}
       style={{
         width: 52, height: 28, borderRadius: 7,
         border, background: bg, color,
