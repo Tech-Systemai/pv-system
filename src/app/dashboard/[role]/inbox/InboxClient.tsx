@@ -174,7 +174,10 @@ export default function InboxClient({
     const { data, error } = await dbOp('inbox_documents', 'insert', payload);
     setSending(false);
     if (error) { showToast(`Send failed: ${error}`, false); return false; }
-    if (data?.[0]) setDocs(prev => [data[0], ...prev]);
+    if (data?.[0]) {
+      setDocs(prev => [data[0], ...prev]);
+      setSelId(data[0].id);
+    }
     showToast('Message sent');
     return true;
   };
@@ -197,7 +200,12 @@ export default function InboxClient({
       reqSig: fd.get('req_sig') === 'on',
       attachmentUrl, attachmentName,
     });
-    if (ok) { setComposeOpen(false); setAttachFile(null); composeRef.current?.reset(); }
+    if (ok) {
+      setComposeOpen(false);
+      setAttachFile(null);
+      composeRef.current?.reset();
+      setTab('sent');
+    }
   };
 
   const handleReply = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -221,7 +229,10 @@ export default function InboxClient({
       type: 'Notice', reqSig: false,
       replyToId: replyTo.id, attachmentUrl, attachmentName,
     });
-    if (ok) setReplyTo(null);
+    if (ok) {
+      setReplyTo(null);
+      if (recipientId !== currentUserId) setTab('sent');
+    }
   };
 
   const handleForward = async (e: React.FormEvent<HTMLFormElement>) => {
