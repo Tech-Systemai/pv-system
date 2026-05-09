@@ -1,4 +1,4 @@
-type DbOperation = 'insert' | 'update' | 'delete' | 'upsert';
+type DbOperation = 'insert' | 'update' | 'delete' | 'upsert' | 'select';
 
 export async function dbOp(
   table: string,

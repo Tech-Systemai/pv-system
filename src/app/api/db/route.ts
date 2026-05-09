@@ -7,7 +7,7 @@ const ALLOWED_TABLES = [
   'knowledge_base', 'messages', 'inbox_documents', 'schedules',
   'contracts', 'payrolls', 'sales_logs', 'attendance_logs',
   'profiles', 'hr_applicants', 'policies', 'audit_logs',
-  'brand_settings', 'targets', 'finance_entries', 'permissions', 'planning_documents', 'notes', 'channel_memberships', 'channels', 'violations', 'access_requests', 'reports', 'inbox_folders',
+  'brand_settings', 'targets', 'finance_entries', 'permissions', 'planning_documents', 'notes', 'channel_memberships', 'channels', 'violations', 'access_requests', 'reports', 'inbox_folders', 'ticket_replies',
 ];
 
 export async function POST(req: NextRequest) {
@@ -68,6 +68,14 @@ export async function POST(req: NextRequest) {
     } else if (operation === 'upsert') {
       const q = admin.from(table).upsert(Array.isArray(data) ? data : [data]);
       result = selectClause ? await q.select(selectClause) : await q.select();
+    } else if (operation === 'select') {
+      let q = admin.from(table).select(selectClause ?? '*');
+      if (filters) {
+        for (const [col, val] of Object.entries(filters)) {
+          q = (q as any).eq(col, val);
+        }
+      }
+      result = await q.order('created_at', { ascending: true });
     } else if (operation === 'delete') {
       let q = admin.from(table).delete();
       if (filters) {
