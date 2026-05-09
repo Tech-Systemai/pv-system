@@ -35,6 +35,7 @@ export default async function PayrollPage() {
       initialPayrolls={payrolls || []}
       attendanceLogs={attendance || []}
       violations={violations || []}
+      currentUserId={user.id}
     />
   );
 }

@@ -153,6 +153,7 @@ export default function ReportsClient({
     );
     await dbOp('inbox_documents', 'insert', {
       user_id: emp.id,
+      sender_id: currentUserId,
       title: subject, subject,
       content: printData.notes || 'Please review the attached report.',
       type: 'Report',
@@ -176,6 +177,7 @@ export default function ReportsClient({
       const subject = `${label} — ${new Date(r.created_at).toLocaleDateString()}`;
       await dbOp('inbox_documents', 'insert', {
         user_id: r.employee_id,
+        sender_id: r.created_by,
         title: subject, subject,
         content: r.notes ?? 'Please review the attached report.',
         type: 'Report',

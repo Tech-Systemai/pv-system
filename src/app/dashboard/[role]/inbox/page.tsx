@@ -1,7 +1,6 @@
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import InboxClient from './InboxClient';
-import { getPermMatrix, resolveViewType, isAdminView } from '@/utils/getPermissions';
 
 export default async function InboxPage() {
   const supabase = await createClient();
@@ -9,13 +8,6 @@ export default async function InboxPage() {
   if (!user) return null;
 
   const admin = createAdminClient();
-  const [{ data: profile }, matrix] = await Promise.all([
-    admin.from('profiles').select('role, name').eq('id', user.id).single(),
-    getPermMatrix(),
-  ]);
-
-  const viewType = resolveViewType(matrix, 'inbox', profile?.role ?? '');
-  const isMgmt = isAdminView(viewType);
 
   // Inbox = received by me; Sent = sent by me to others
   // Pending approval_status docs live only in Approvals section
@@ -41,7 +33,6 @@ export default async function InboxPage() {
       initialDocs={documents || []}
       allUsers={users || []}
       currentUserId={user.id}
-      isMgmt={isMgmt}
     />
   );
 }

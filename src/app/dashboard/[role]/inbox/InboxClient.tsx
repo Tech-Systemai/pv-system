@@ -34,9 +34,9 @@ type Doc = {
 };
 
 export default function InboxClient({
-  initialDocs, allUsers, currentUserId, isMgmt,
+  initialDocs, allUsers, currentUserId,
 }: {
-  initialDocs: any[]; allUsers: any[]; currentUserId: string; isMgmt: boolean;
+  initialDocs: any[]; allUsers: any[]; currentUserId: string;
 }) {
   const [docs, setDocs]               = useState<Doc[]>(initialDocs);
   const [selId, setSelId]             = useState<any>(initialDocs[0]?.id ?? null);
@@ -254,6 +254,28 @@ export default function InboxClient({
 
   const isEmbedDoc = (doc: Doc) => !!doc.html_content;
 
+  const buildThread = (anchor: Doc): Doc[] => {
+    const findRoot = (d: Doc): Doc => {
+      if (!d.reply_to) return d;
+      const parent = docs.find(x => x.id === d.reply_to);
+      return parent ? findRoot(parent) : d;
+    };
+    const root = findRoot(anchor);
+    const inThread = new Set<any>([root.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      docs.forEach(d => {
+        if (d.reply_to && inThread.has(d.reply_to) && !inThread.has(d.id)) {
+          inThread.add(d.id); changed = true;
+        }
+      });
+    }
+    return docs
+      .filter(d => !d.archived && inThread.has(d.id))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  };
+
   return (
     <div className="page-fade">
       <div className="card" style={{ height: 700, padding: 0, display: 'grid', gridTemplateColumns: '300px 1fr', overflow: 'hidden' }}>
@@ -404,80 +426,119 @@ export default function InboxClient({
                     </div>
                   )}
                 </>
-              ) : (
-                /* ── Plain text message ── */
-                <div style={{ flex: 1, padding: '20px 28px', overflowY: 'auto' }}>
-                  <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.018em', marginBottom: 12 }}>
-                    {current.title ?? current.subject ?? 'Document'}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 16, borderBottom: '1px solid var(--line-2)', marginBottom: 16 }}>
-                    <Avatar name={current.sender ?? 'System'} size={32} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{current.sender ?? 'System'}</div>
-                      <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                        {new Date(current.created_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              ) : (() => {
+                const thread = buildThread(current);
+                return (
+                  /* ── Plain text message — conversation thread ── */
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    {/* Subject + thread count */}
+                    <div style={{ padding: '14px 22px 10px', borderBottom: '1px solid var(--line-2)', flexShrink: 0 }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.018em' }}>
+                        {current.title ?? current.subject ?? 'Document'}
                       </div>
-                    </div>
-                    <span className={`bdg ${TAG_COLORS[current.type ?? ''] ?? 'bdg-gy'}`}>{current.type ?? 'DOC'}</span>
-                  </div>
-
-                  {current.reply_to && (
-                    <div style={{ background: 'var(--surface-2)', padding: '8px 12px', borderRadius: 7, fontSize: 11, color: 'var(--ink-3)', marginBottom: 14, borderLeft: '3px solid var(--line)' }}>
-                      ↩ Reply to earlier message
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>
-                    {current.content ?? 'No content.'}
-                  </div>
-
-                  {current.attachment_url && (
-                    <div style={{ marginTop: 20, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 9, border: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 20 }}>📎</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{current.attachment_name ?? 'Attachment'}</div>
-                      </div>
-                      <a href={current.attachment_url} target="_blank" rel="noopener noreferrer" className="btn btn-sec btn-sm">Download</a>
-                    </div>
-                  )}
-
-                  {current.requires_signature && !current.is_signed && current.user_id === currentUserId && (
-                    <div style={{ background: 'var(--warn-soft)', padding: 14, borderRadius: 9, border: '1px solid oklch(0.85 0.08 75)', marginTop: 20 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'oklch(0.45 0.12 75)', marginBottom: 10 }}>Signature Required</div>
-                      {signName && (
-                        <div style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 28, color: '#1a1f2e', marginBottom: 8 }}>{signName}</div>
+                      {thread.length > 1 && (
+                        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 3 }}>
+                          {thread.length} messages in this conversation
+                        </div>
                       )}
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input className="fld-input" style={{ flex: 1 }} placeholder="Type your full name to sign…"
-                          value={signName} onChange={e => setSignName(e.target.value)} />
-                        <button className="btn btn-acc btn-sm" disabled={!signName.trim() || sigSaving} onClick={() => handleSign(current)}>
-                          {sigSaving ? 'Signing…' : 'Sign →'}
-                        </button>
-                      </div>
                     </div>
-                  )}
 
-                  {current.is_signed && (
-                    <div style={{ background: 'var(--ok-soft)', padding: '10px 14px', borderRadius: 8, fontSize: 12, color: 'oklch(0.42 0.12 155)', fontWeight: 600, marginTop: 16, border: '1px solid oklch(0.85 0.08 155)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>✓ Signed by {current.signed_by}</span>
-                      <span style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 22, fontWeight: 400 }}>{current.signed_by}</span>
+                    {/* Message bubbles */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {thread.map((msg) => {
+                        const isMe = msg.sender_id === currentUserId;
+                        const isCurrent = msg.id === current.id;
+                        const parentMsg = msg.reply_to ? thread.find(t => t.id === msg.reply_to) : null;
+                        return (
+                          <div key={msg.id} style={{ display: 'flex', gap: 9, flexDirection: isMe ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+                            {!isMe && <Avatar name={msg.sender ?? 'System'} size={26} />}
+                            <div style={{ maxWidth: '72%', minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)' }}>{isMe ? 'You' : (msg.sender ?? 'System')}</span>
+                                <span style={{ fontSize: 10, color: 'var(--ink-4)', fontFamily: 'var(--mono)' }}>
+                                  {new Date(msg.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {msg.type && msg.type !== 'Notice' && <span className={`bdg ${TAG_COLORS[msg.type] ?? 'bdg-gy'}`} style={{ fontSize: 9 }}>{msg.type}</span>}
+                              </div>
+
+                              {/* Quote of parent message */}
+                              {parentMsg && (
+                                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 4, padding: '4px 8px', borderLeft: '2px solid var(--line)', background: 'var(--surface-2)', borderRadius: '0 5px 5px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>
+                                  {parentMsg.sender ?? 'System'}: {parentMsg.content?.slice(0, 70) ?? '…'}{(parentMsg.content?.length ?? 0) > 70 ? '…' : ''}
+                                </div>
+                              )}
+
+                              <div
+                                onClick={() => !isCurrent ? handleOpen(msg) : undefined}
+                                style={{
+                                  padding: '10px 14px',
+                                  borderRadius: isMe ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+                                  background: isMe ? 'var(--accent)' : 'var(--surface-2)',
+                                  color: isMe ? 'white' : 'var(--ink)',
+                                  fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap',
+                                  outline: isCurrent ? '2px solid var(--accent-line)' : 'none',
+                                  outlineOffset: 2,
+                                  cursor: isCurrent ? 'default' : 'pointer',
+                                }}>
+                                {msg.content ?? 'No content.'}
+                              </div>
+
+                              {msg.attachment_url && (
+                                <div style={{ marginTop: 5, padding: '7px 11px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 15 }}>📎</span>
+                                  <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg.attachment_name ?? 'Attachment'}</span>
+                                  <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer" className="btn btn-sec btn-sm">↓</a>
+                                </div>
+                              )}
+
+                              {isCurrent && msg.requires_signature && !msg.is_signed && msg.user_id === currentUserId && (
+                                <div style={{ background: 'var(--warn-soft)', padding: 12, borderRadius: 9, border: '1px solid oklch(0.85 0.08 75)', marginTop: 8 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: 'oklch(0.45 0.12 75)', marginBottom: 8 }}>Signature Required</div>
+                                  {signName && <div style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 26, color: '#1a1f2e', marginBottom: 6 }}>{signName}</div>}
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <input className="fld-input" style={{ flex: 1 }} placeholder="Type your full name to sign…"
+                                      value={signName} onChange={e => setSignName(e.target.value)} />
+                                    <button className="btn btn-acc btn-sm" disabled={!signName.trim() || sigSaving} onClick={() => handleSign(current)}>
+                                      {sigSaving ? 'Signing…' : 'Sign →'}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+
+                              {isCurrent && msg.is_signed && (
+                                <div style={{ background: 'var(--ok-soft)', padding: '8px 12px', borderRadius: 7, fontSize: 12, color: 'oklch(0.42 0.12 155)', fontWeight: 600, marginTop: 6, border: '1px solid oklch(0.85 0.08 155)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span>✓</span>
+                                  <span style={{ fontFamily: "'Brush Script MT','Apple Chancery',cursive", fontSize: 22, fontWeight: 400 }}>{msg.signed_by}</span>
+                                </div>
+                              )}
+
+                              {!isMe && (
+                                <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-start' }}>
+                                  <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 6px' }}
+                                    onClick={() => { setReplyTo(msg); setForwardDoc(null); }}>
+                                    ↩ Reply
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
 
               {/* Inline reply form */}
-              {replyTo?.id === current.id && (
-                <div style={{ borderTop: '1px solid var(--line-2)', padding: '14px 20px', flexShrink: 0 }}>
+              {replyTo && (
+                <div style={{ borderTop: '2px solid var(--accent-soft)', padding: '12px 20px', flexShrink: 0, background: 'white' }}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 8, padding: '4px 8px', background: 'var(--surface-2)', borderRadius: 5, borderLeft: '2px solid var(--line)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Replying to {replyTo.sender ?? 'System'}: "{replyTo.content?.slice(0, 80)}{(replyTo.content?.length ?? 0) > 80 ? '…' : ''}"
+                  </div>
                   <form onSubmit={handleReply}>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--ink-3)' }}>
-                      Replying to {current.sender ?? 'System'}
-                    </div>
                     <textarea name="message" rows={3} required placeholder="Write your reply…"
                       className="fld-input" style={{ resize: 'vertical', marginBottom: 8, display: 'block', width: '100%' }} />
                     <div style={{ marginBottom: 8 }}>
-                      <label style={{ fontSize: 12, color: 'var(--ink-3)', display: 'block', marginBottom: 4 }}>Attach file (optional)</label>
                       <input type="file" name="attachment" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx" style={{ fontSize: 12 }} />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>

@@ -75,11 +75,13 @@ export default function PayrollClient({
   initialPayrolls,
   attendanceLogs,
   violations,
+  currentUserId,
 }: {
   employees: any[];
   initialPayrolls: any[];
   attendanceLogs: any[];
   violations: any[];
+  currentUserId: string;
 }) {
   const [payrolls, setPayrolls] = useState(initialPayrolls);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -179,6 +181,7 @@ export default function PayrollClient({
       content: `Your payslip for ${PERIOD} is ready. Net pay: $${item.net.toLocaleString()}. Please review and sign below.`,
       type: 'Payslip',
       sender: 'Finance / Management',
+      sender_id: currentUserId,
       submitted_by_name: 'Finance / Management',
       requires_signature: true,
       is_read: false,
