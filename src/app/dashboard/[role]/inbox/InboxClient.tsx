@@ -139,6 +139,7 @@ export default function InboxClient({
       await dbOp('contracts', 'update', {
         employee_signature: signName.trim(),
         employee_signed_at: now,
+        status: 'Signed',
       }, { id: doc.doc_ref_id });
     }
     if (doc.doc_ref_type === 'report' && doc.doc_ref_id) {
