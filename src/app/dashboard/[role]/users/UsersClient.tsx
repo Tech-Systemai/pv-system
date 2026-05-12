@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { dbOp } from '@/utils/db';
 import { createClient } from '@/utils/supabase/client';
-import { createEmployeeAccount, deleteEmployee } from './actions';
+import { createEmployeeAccount, deleteEmployee, resetUserPassword } from './actions';
 import { useRouter } from 'next/navigation';
 
 const BUCKET = 'employee-docs';
@@ -50,6 +50,10 @@ export default function UsersClient({
   const [viewHours, setViewHours] = useState<number | null>(null);
   const [viewUploading, setViewUploading] = useState<'contract' | 'id' | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [resetTarget, setResetTarget] = useState<any>(null);
+  const [resetPw, setResetPw] = useState('');
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetMsg, setResetMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const contractRef = useRef<HTMLInputElement>(null);
   const idRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -126,6 +130,20 @@ export default function UsersClient({
       setEditUser(null);
     }
     setEditSaving(false);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    setResetSaving(true);
+    setResetMsg(null);
+    const result = await resetUserPassword(resetTarget.id, resetPw);
+    if (result.error) {
+      setResetMsg({ text: result.error, ok: false });
+    } else {
+      setResetMsg({ text: 'Password updated successfully.', ok: true });
+      setResetPw('');
+    }
+    setResetSaving(false);
   };
 
   const handleDelete = async () => {
@@ -404,16 +422,66 @@ export default function UsersClient({
                 <button className="btn btn-pri btn-sm" onClick={() => setEditUser(viewUser)}>Edit Details</button>
               )}
               {canAdd && (
-                <button
-                  className="btn btn-sm"
-                  style={{ background: 'oklch(0.97 0.01 25)', color: 'oklch(0.50 0.18 25)', border: '1px solid oklch(0.88 0.06 25)' }}
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  {deleting ? 'Deleting…' : 'Delete Employee'}
-                </button>
+                <>
+                  <button
+                    className="btn btn-sec btn-sm"
+                    onClick={() => { setResetTarget(viewUser); setResetPw(''); setResetMsg(null); }}
+                  >
+                    Reset Password
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: 'oklch(0.97 0.01 25)', color: 'oklch(0.50 0.18 25)', border: '1px solid oklch(0.88 0.06 25)' }}
+                    onClick={handleDelete}
+                    disabled={deleting}
+                  >
+                    {deleting ? 'Deleting…' : 'Delete Employee'}
+                  </button>
+                </>
               )}
               <button className="btn btn-sec btn-sm" onClick={() => setViewUser(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetTarget && (
+        <div className="mb">
+          <div className="md" style={{ width: 380 }}>
+            <div className="md-t">Reset Password — {resetTarget.name}</div>
+            <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--ink-3)' }}>
+              Set a new password directly. The user can change it again after signing in.
+            </div>
+            {resetMsg && (
+              <div style={{
+                padding: '10px 12px', borderRadius: 8, fontSize: 12, marginBottom: 12,
+                background: resetMsg.ok ? 'oklch(0.97 0.04 145)' : 'oklch(0.97 0.03 25)',
+                color: resetMsg.ok ? 'var(--ok)' : 'var(--err)',
+                border: `1px solid ${resetMsg.ok ? 'oklch(0.88 0.07 145)' : 'oklch(0.90 0.06 25)'}`,
+              }}>
+                {resetMsg.text}
+              </div>
+            )}
+            <div className="pv-fld">
+              <label>New Password</label>
+              <input
+                type="text"
+                value={resetPw}
+                onChange={e => setResetPw(e.target.value)}
+                placeholder="Min. 6 characters"
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-acc"
+                disabled={resetSaving || resetPw.length < 6}
+                onClick={handleResetPassword}
+              >
+                {resetSaving ? 'Saving…' : 'Set Password'}
+              </button>
+              <button className="btn btn-sec" onClick={() => { setResetTarget(null); setResetMsg(null); }}>Cancel</button>
             </div>
           </div>
         </div>

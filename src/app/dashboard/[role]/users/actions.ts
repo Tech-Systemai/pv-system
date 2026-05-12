@@ -59,3 +59,14 @@ export async function deleteEmployee(userId: string) {
   if (error) return { error: error.message };
   return { success: true };
 }
+
+export async function resetUserPassword(userId: string, newPassword: string) {
+  if (newPassword.length < 6) return { error: 'Password must be at least 6 characters.' };
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
+  if (error) return { error: error.message };
+  return { success: true };
+}
