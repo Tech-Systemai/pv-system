@@ -503,7 +503,7 @@ export default function TicketsClient({
             <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
               {/* Original request */}
-              <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
                 <div style={{ padding: '8px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--line-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 12, fontWeight: 600 }}>{viewTicket.profiles?.name ?? 'Employee'}</span>
                   <span style={{ fontSize: 10, color: 'var(--ink-4)', fontFamily: 'var(--mono)' }}>{new Date(viewTicket.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
@@ -522,7 +522,7 @@ export default function TicketsClient({
                   return (
                     <div key={r.id} style={{
                       border: `1px solid ${isMe ? 'var(--accent-line)' : 'var(--line)'}`,
-                      borderRadius: 10, overflow: 'hidden',
+                      borderRadius: 10, overflow: 'hidden', flexShrink: 0,
                       marginLeft: isMe ? 32 : 0,
                       marginRight: isMe ? 0 : 32,
                     }}>
