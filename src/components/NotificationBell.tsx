@@ -18,10 +18,11 @@ const TYPE_ICON: Record<string, string> = {
 };
 
 const TICKET_ICON: Record<string, string> = {
-  ticket_new:      '🎫',
-  ticket_reply:    '💬',
-  ticket_resolved: '✅',
-  task_assigned:   '☑',
+  ticket_new:       '🎫',
+  ticket_reply:     '💬',
+  ticket_resolved:  '✅',
+  task_assigned:    '☑',
+  timeoff_request:  '🏖',
 };
 
 export default function NotificationBell({ userId, userRole }: { userId: string; userRole: string }) {
@@ -191,6 +192,8 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
   const navigate = (n: any) => {
     if (n.type === 'task_assigned') {
       router.push(`/dashboard/${userRole}/tasks`);
+    } else if (n.type === 'timeoff_request') {
+      router.push(`/dashboard/${userRole}/approvals`);
     } else if (n._kind === 'ticket') {
       router.push(`/dashboard/${userRole}/tickets`);
     } else if (n._kind === 'inbox') {
