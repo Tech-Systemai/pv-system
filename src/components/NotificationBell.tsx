@@ -40,8 +40,8 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
     .filter(([, roles]) => roles.includes(userRole))
     .map(([id]) => id);
 
-  // ── Initial load ────────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Fetch all notification counts ────────────────────────────────────────
+  const fetchAll = () => {
     const lastSeen = localStorage.getItem(`notif-last-seen-${userId}`) || new Date(0).toISOString();
 
     supabase
@@ -72,6 +72,13 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => { if (data) setTicketNotifs(data); });
+  };
+
+  // ── Initial load + 30-second polling fallback ────────────────────────────
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
   // ── Realtime ─────────────────────────────────────────────────────────────

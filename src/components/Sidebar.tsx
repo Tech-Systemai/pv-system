@@ -330,6 +330,7 @@ export default function Sidebar({
   useEffect(() => {
     if (!profile?.id) return;
     fetchCounts(profile.id, profile.role);
+    const pollId = setInterval(() => fetchCounts(profile.id, profile.role), 30_000);
     const sub = supabase
       .channel('sidebar-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
@@ -366,7 +367,7 @@ export default function Sidebar({
         }
       })
       .subscribe();
-    return () => { supabase.removeChannel(sub); };
+    return () => { clearInterval(pollId); supabase.removeChannel(sub); };
   }, [profile?.id]);
 
   const currentNav = pathname.split('/').pop();

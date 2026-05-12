@@ -61,6 +61,8 @@ export default function TicketsClient({
   const [replyText, setReplyText]     = useState('');
   const [sending, setSending]         = useState(false);
   const [resolving, setResolving]     = useState(false);
+  const [deleting, setDeleting]       = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   // assignPopover tracks which row's dropdown is open and where to render it
@@ -187,6 +189,16 @@ export default function TicketsClient({
     }
   };
 
+  const handleDelete = async () => {
+    if (!viewTicket || deleting) return;
+    setDeleting(true);
+    await dbOp('tickets', 'delete', undefined, { id: viewTicket.id });
+    setTickets(prev => prev.filter(t => t.id !== viewTicket.id));
+    setViewTicket(null);
+    setConfirmDelete(false);
+    setDeleting(false);
+  };
+
   // Open the assign popover anchored to the clicked button
   const openAssignPopover = (e: React.MouseEvent<HTMLButtonElement>, ticketId: string) => {
     e.stopPropagation();
@@ -305,7 +317,7 @@ export default function TicketsClient({
                       : (allUsers ?? []).find((u: any) => u.id === t.assigned_to)?.name ?? '—'
                     : null;
                   return (
-                    <tr key={t.id} onClick={() => { setViewTicket(t); setReplyText(''); }} style={{ cursor: 'pointer' }}>
+                    <tr key={t.id} onClick={() => { setViewTicket(t); setReplyText(''); setConfirmDelete(false); }} style={{ cursor: 'pointer' }}>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>#{(1000 + i).toString(16).toUpperCase()}</td>
                       <td>
                         <div style={{ fontWeight: 500 }}>{t.title ?? t.subject}</div>
@@ -559,7 +571,16 @@ export default function TicketsClient({
                         {resolving ? 'Resolving…' : '✓ Mark Resolved'}
                       </button>
                     )}
-                    <button className="btn btn-ghost" onClick={() => setViewTicket(null)} style={{ marginLeft: isMgmt ? 0 : 'auto' }}>Close</button>
+                    {userRole === 'owner' && (
+                      confirmDelete
+                        ? <button className="btn btn-err btn-sm" disabled={deleting} onClick={handleDelete} style={{ marginLeft: isMgmt ? 0 : 'auto' }}>
+                            {deleting ? 'Deleting…' : 'Confirm Delete'}
+                          </button>
+                        : <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(true)} style={{ color: 'var(--err)', marginLeft: isMgmt ? 0 : 'auto' }}>
+                            🗑 Delete
+                          </button>
+                    )}
+                    <button className="btn btn-ghost" onClick={() => { setViewTicket(null); setConfirmDelete(false); }} style={{ marginLeft: (isMgmt || userRole === 'owner') ? 0 : 'auto' }}>Close</button>
                   </div>
                 </>
               ) : (
@@ -568,7 +589,16 @@ export default function TicketsClient({
                   {isMgmt && (
                     <button className="btn btn-sec btn-sm" onClick={handleReopen}>Reopen</button>
                   )}
-                  <button className="btn btn-ghost btn-sm" onClick={() => setViewTicket(null)}>Close</button>
+                  {userRole === 'owner' && (
+                    confirmDelete
+                      ? <button className="btn btn-err btn-sm" disabled={deleting} onClick={handleDelete}>
+                          {deleting ? 'Deleting…' : 'Confirm Delete'}
+                        </button>
+                      : <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(true)} style={{ color: 'var(--err)' }}>
+                          🗑 Delete
+                        </button>
+                  )}
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setViewTicket(null); setConfirmDelete(false); }}>Close</button>
                 </div>
               )}
             </div>
