@@ -130,8 +130,8 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
           if (t.user_id === userId) return; // don't notify yourself
           setLiveTicketItems(prev => [{
             id: `live-${t.id}`,
-            title: 'New ticket opened',
-            body: t.title || t.subject || 'A new support ticket was opened',
+            title: 'New claim opened',
+            body: t.title || t.subject || 'A new support claim was opened',
             type: 'ticket_new',
             link_id: t.id,
             created_at: t.created_at || new Date().toISOString(),

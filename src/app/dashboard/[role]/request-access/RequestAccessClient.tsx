@@ -7,7 +7,7 @@ const MODULE_META: Record<string, { label: string; icon: string; desc: string }>
   tasks:      { label: 'Task Flow',       icon: '✓',  desc: 'Create and manage tasks' },
   schedule:   { label: 'Schedules',       icon: '⏱',  desc: 'View and manage shift schedules' },
   reports:    { label: 'Reports',         icon: '📊', desc: 'Performance and sales reports' },
-  tickets:    { label: 'Tickets',         icon: '🎫', desc: 'Support and issue tickets' },
+  tickets:    { label: 'Claims',          icon: '🎫', desc: 'Support and issue claims' },
   hr:         { label: 'HR Pipeline',     icon: '📋', desc: 'Applicant tracking and hiring' },
   contracts:  { label: 'Contracts',       icon: '📄', desc: 'Employee contracts and documents' },
   inbox:      { label: 'Inbox',           icon: '✉',  desc: 'Document inbox and signed files' },

@@ -40,7 +40,7 @@ function ActionBtns({ id, busy, onApprove, onReject }: { id: string; busy: strin
 }
 
 const MODULE_LABELS: Record<string, string> = {
-  tasks: 'Task Flow', schedule: 'Schedules', reports: 'Reports', tickets: 'Tickets',
+  tasks: 'Task Flow', schedule: 'Schedules', reports: 'Reports', tickets: 'Claims',
   hr: 'HR Pipeline', contracts: 'Contracts', inbox: 'Inbox', attendance: 'Attendance',
   monitoring: 'Live Monitoring', policy: 'Policy Engine', targets: 'Targets',
   coaching: 'Coaching + QA', planning: 'Planning', kb: 'Knowledge Base',

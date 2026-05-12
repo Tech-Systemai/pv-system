@@ -19,7 +19,7 @@ const MODULE_META: Record<string, { label: string; icon: string }> = {
   tasks:      { label: 'Task Flow',       icon: '✓'  },
   schedule:   { label: 'Schedules',       icon: '⏱'  },
   reports:    { label: 'Reports',         icon: '📊' },
-  tickets:    { label: 'Tickets',         icon: '🎫' },
+  tickets:    { label: 'Claims',          icon: '🎫' },
   hr:         { label: 'HR Pipeline',     icon: '📋' },
   contracts:  { label: 'Contracts',       icon: '📄' },
   inbox:      { label: 'Inbox',           icon: '✉'  },

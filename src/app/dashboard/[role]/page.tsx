@@ -66,7 +66,7 @@ export default async function DashboardPage() {
           <strong>{activeUsers ?? 0} employees</strong> clocked in right now and{' '}
           <strong>{pendingTasks ?? 0} tasks</strong> pending across all teams.
           {(openTickets ?? 0) > 0 && (
-            <> There are <strong>{openTickets} open tickets</strong> that may need attention.</>
+            <> There are <strong>{openTickets} open claims</strong> that may need attention.</>
           )}
         </div>
         <div className="briefing-actions">
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
             <button className="btn btn-pri btn-sm">Review approvals →</button>
           </Link>
           <Link href="tickets">
-            <button className="btn btn-sec btn-sm">Open tickets</button>
+            <button className="btn btn-sec btn-sm">Open claims</button>
           </Link>
           <Link href="audit">
             <button className="btn btn-ghost btn-sm">Audit log</button>

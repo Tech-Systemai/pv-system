@@ -19,7 +19,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   tasks:       { title: 'Task Flow',           sub: 'Assigned tasks across all teams' },
   reports:     { title: 'Reports',             sub: 'Build, schedule and export' },
   contracts:   { title: 'Contracts',           sub: 'Active contracts and pending renewals' },
-  tickets:     { title: 'Tickets',             sub: 'Open issues and SLA tracking' },
+  tickets:     { title: 'Claims',              sub: 'Open claims and SLA tracking' },
   coaching:    { title: 'Coaching + QA',       sub: 'Call reviews and performance coaching' },
   planning:    { title: 'Planning',            sub: 'Q2 strategic roadmap' },
   notes:       { title: 'Notes',              sub: 'Internal notes and documents' },

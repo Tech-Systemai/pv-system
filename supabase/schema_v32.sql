@@ -1,7 +1,5 @@
--- v30: Database triggers for in-app notifications (reliable, server-side)
---      Replaces fragile client-side notify() calls.
+-- v32: Rename "ticket" → "claim" in notification trigger messages
 
--- ── New ticket → notify all mgmt ────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.fn_notify_ticket_created()
 RETURNS TRIGGER SECURITY DEFINER LANGUAGE plpgsql AS $$
 BEGIN
@@ -19,12 +17,6 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_ticket_created ON public.tickets;
-CREATE TRIGGER trg_ticket_created
-  AFTER INSERT ON public.tickets
-  FOR EACH ROW EXECUTE FUNCTION public.fn_notify_ticket_created();
-
--- ── New reply → notify ticket owner + assigned agent ───────────────────────
 CREATE OR REPLACE FUNCTION public.fn_notify_ticket_reply()
 RETURNS TRIGGER SECURITY DEFINER LANGUAGE plpgsql AS $$
 DECLARE v_ticket public.tickets%ROWTYPE;
@@ -32,7 +24,6 @@ BEGIN
   SELECT * INTO v_ticket FROM public.tickets WHERE id = NEW.ticket_id;
   IF v_ticket IS NULL THEN RETURN NEW; END IF;
 
-  -- Notify owner (skip if they're the one replying)
   IF v_ticket.user_id IS NOT NULL AND v_ticket.user_id <> NEW.user_id THEN
     INSERT INTO public.notifications (user_id, title, body, type, link_id, is_read)
     VALUES (
@@ -43,7 +34,6 @@ BEGIN
     );
   END IF;
 
-  -- Notify assigned agent if different from owner and replier
   IF v_ticket.assigned_to IS NOT NULL
     AND v_ticket.assigned_to <> NEW.user_id
     AND v_ticket.assigned_to <> v_ticket.user_id
@@ -60,12 +50,6 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_ticket_reply ON public.ticket_replies;
-CREATE TRIGGER trg_ticket_reply
-  AFTER INSERT ON public.ticket_replies
-  FOR EACH ROW EXECUTE FUNCTION public.fn_notify_ticket_reply();
-
--- ── Ticket resolved → notify owner ─────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.fn_notify_ticket_resolved()
 RETURNS TRIGGER SECURITY DEFINER LANGUAGE plpgsql AS $$
 BEGIN
@@ -81,8 +65,3 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
-DROP TRIGGER IF EXISTS trg_ticket_resolved ON public.tickets;
-CREATE TRIGGER trg_ticket_resolved
-  AFTER UPDATE ON public.tickets
-  FOR EACH ROW EXECUTE FUNCTION public.fn_notify_ticket_resolved();

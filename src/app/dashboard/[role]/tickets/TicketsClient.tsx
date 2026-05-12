@@ -231,14 +231,14 @@ export default function TicketsClient({
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card" style={{ cursor: 'default' }}>
           <div className="stat-h"><div className="stat-ico ind">🎫</div></div>
-          <div className="stat-l">OPEN TICKETS</div>
+          <div className="stat-l">OPEN CLAIMS</div>
           <div className="stat-v">{open.length}</div>
           <div className="stat-foot">Awaiting resolution</div>
         </div>
         {isMgmt && (
           <div className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className="stat-ico ind">👤</div></div>
-            <div className="stat-l">EMPLOYEE TICKETS</div>
+            <div className="stat-l">EMPLOYEE CLAIMS</div>
             <div className="stat-v">{tickets.filter(t => (t.ticket_type ?? 'employee') === 'employee').length}</div>
             <div className="stat-foot">Internal · Private</div>
           </div>
@@ -246,7 +246,7 @@ export default function TicketsClient({
         {isMgmt && (
           <div className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className="stat-ico ok">🌐</div></div>
-            <div className="stat-l">CUSTOMER TICKETS</div>
+            <div className="stat-l">CUSTOMER CLAIMS</div>
             <div className="stat-v">{tickets.filter(t => t.ticket_type === 'customer').length}</div>
             <div className="stat-foot">CX · Shared</div>
           </div>
@@ -276,10 +276,10 @@ export default function TicketsClient({
       <div className="card" style={{ overflow: 'hidden' }}>
         <div className="card-hdr">
           <div>
-            <div className="card-title">Support Tickets</div>
+            <div className="card-title">Support Claims</div>
             <div className="card-sub">{open.length} open · shared across all portals</div>
           </div>
-          <button className="btn btn-acc btn-sm" onClick={() => setIsModalOpen(true)}>+ New Ticket</button>
+          <button className="btn btn-acc btn-sm" onClick={() => setIsModalOpen(true)}>+ New Claim</button>
         </div>
 
         <div style={{ padding: '0 18px 12px' }}>
@@ -293,7 +293,7 @@ export default function TicketsClient({
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No tickets in this view.</div>
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No claims in this view.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="tbl">
@@ -426,7 +426,7 @@ export default function TicketsClient({
       {isModalOpen && (
         <div className="mb">
           <div className="md" style={{ width: 440 }}>
-            <div className="md-t">Create Support Ticket</div>
+            <div className="md-t">Create Support Claim</div>
             <form onSubmit={handleCreate}>
               <div className="pv-fld"><label>Issue Title</label><input type="text" name="subject" required /></div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -451,7 +451,7 @@ export default function TicketsClient({
                 <div style={{ background: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)', padding: '10px 12px', borderRadius: 6, fontSize: 12, marginBottom: 8 }}>{submitError}</div>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="btn btn-acc" disabled={isSubmitting}>{isSubmitting ? 'Submitting…' : 'Submit Ticket'}</button>
+                <button type="submit" className="btn btn-acc" disabled={isSubmitting}>{isSubmitting ? 'Submitting…' : 'Submit Claim'}</button>
                 <button type="button" className="btn btn-sec" onClick={() => { setIsModalOpen(false); setSubmitError(''); }}>Cancel</button>
               </div>
             </form>
@@ -540,7 +540,7 @@ export default function TicketsClient({
 
               {viewTicket.status === 'Resolved' && (
                 <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 12, color: 'oklch(0.42 0.12 155)', fontWeight: 600 }}>
-                  ✓ Ticket resolved
+                  ✓ Claim resolved
                 </div>
               )}
 
@@ -585,7 +585,7 @@ export default function TicketsClient({
                 </>
               ) : (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <div style={{ fontSize: 13, color: 'var(--ink-3)', flex: 1 }}>This ticket is resolved.</div>
+                  <div style={{ fontSize: 13, color: 'var(--ink-3)', flex: 1 }}>This claim is resolved.</div>
                   {isMgmt && (
                     <button className="btn btn-sec btn-sm" onClick={handleReopen}>Reopen</button>
                   )}
