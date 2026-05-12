@@ -19,18 +19,15 @@ export default function ResetPasswordPage() {
     // picks them up automatically when the page loads and fires an
     // INITIAL_SESSION / PASSWORD_RECOVERY event.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
         setStage('form');
-      } else if (event === 'SIGNED_IN' && stage === 'loading') {
-        // Already signed in — redirect
-        router.replace('/');
       }
     });
 
-    // Fallback: if no event fires within 3s the link is invalid/expired
+    // Fallback: if no event fires within 4s the link is invalid/expired
     const timer = setTimeout(() => {
       setStage(s => s === 'loading' ? 'invalid' : s);
-    }, 3000);
+    }, 4000);
 
     return () => {
       subscription.unsubscribe();

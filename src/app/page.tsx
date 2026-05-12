@@ -62,7 +62,7 @@ export default function LoginPage() {
     setLoading(true);
     setMsg(null);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://portal.pioneersveneers.com/reset-password',
+      redirectTo: 'https://portal.pioneersveneers.com/auth/callback?next=/reset-password',
     });
     if (error) {
       setMsg({ text: error.message, type: 'error' });
