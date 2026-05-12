@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-const DEFAULT_TARGET = 50;
-
 type Agent = { id: string; name: string; role: string; department: string };
 type SalesLog = { user_id: string; amount: number };
-type Target = { id?: string; user_id: string; period: string; sales_count_target: number; revenue_target?: number };
+type Target = { id?: string; user_id: string; period: string; sales_count_target: number; collection_amount_target?: number };
+type CxBonus = { amount: number; threshold: number };
 
 const COMMISSION_TIERS = [
   { range: '1–10 sales', rate: '$10 / sale', min: 1, max: 10 },
@@ -21,204 +20,408 @@ function barColor(pct: number) {
   return pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--accent)' : 'var(--warn)';
 }
 
+function AgentRow({
+  agent, count, revenue, targetCount, pct, isMgmt, editingId, editValue, saving,
+  setEditValue, onStartEdit, onSave, onCancel,
+}: {
+  agent: Agent; count: number; revenue: number; targetCount: number; pct: number;
+  isMgmt: boolean; editingId: string | null; editValue: string; saving: boolean;
+  setEditValue: (v: string) => void;
+  onStartEdit: () => void; onSave: () => void; onCancel: () => void;
+}) {
+  const hue = (agent.name.charCodeAt(0) * 13) % 360;
+  return (
+    <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line-2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="av-circle" style={{ width: 34, height: 34, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+            {agent.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{agent.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{agent.role} · ${revenue.toLocaleString()} revenue</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', fontWeight: 600 }}>Sales / Target</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontWeight: 700, color: barColor(pct), fontSize: 14 }}>{count}</span>
+              <span style={{ color: 'var(--ink-4)' }}>/</span>
+              {isMgmt && editingId === agent.id ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="number" value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    style={{ width: 54, fontSize: 12, textAlign: 'center', border: '1px solid var(--accent)', borderRadius: 5, padding: '2px 4px' }}
+                    min={1} autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') onSave(); if (e.key === 'Escape') onCancel(); }}
+                  />
+                  <button className="btn btn-acc btn-sm" style={{ padding: '3px 8px' }} disabled={saving} onClick={onSave}>✓</button>
+                  <button className="btn btn-sec btn-sm" style={{ padding: '3px 8px' }} onClick={onCancel}>✕</button>
+                </span>
+              ) : (
+                <span
+                  style={{ fontWeight: 600, color: 'var(--ink-3)', fontSize: 13, cursor: isMgmt ? 'pointer' : 'default', borderBottom: isMgmt ? '1px dashed var(--line)' : 'none' }}
+                  onClick={() => isMgmt && onStartEdit()}
+                >{targetCount}</span>
+              )}
+            </div>
+          </div>
+          <span className={`bdg ${pct >= 100 ? 'bdg-ok' : pct >= 50 ? 'bdg-acc' : 'bdg-warn'}`}>{pct}%</span>
+        </div>
+      </div>
+      <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: barColor(pct), borderRadius: 3, transition: 'width .5s' }} />
+      </div>
+    </div>
+  );
+}
+
+function CxRow({
+  agent, collected, targetAmt, cxBonus, isMgmt, editingId, editValue, saving,
+  setEditValue, onStartEdit, onSave, onCancel,
+}: {
+  agent: Agent; collected: number; targetAmt: number; cxBonus: CxBonus;
+  isMgmt: boolean; editingId: string | null; editValue: string; saving: boolean;
+  setEditValue: (v: string) => void;
+  onStartEdit: () => void; onSave: () => void; onCancel: () => void;
+}) {
+  const pct = targetAmt > 0 ? Math.min(Math.round((collected / targetAmt) * 100), 100) : 0;
+  const bonus = Math.floor(collected / cxBonus.threshold) * cxBonus.amount;
+  const hue = (agent.name.charCodeAt(0) * 13) % 360;
+  return (
+    <div style={{ padding: '14px 0', borderBottom: '1px solid var(--line-2)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: targetAmt > 0 ? 8 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="av-circle" style={{ width: 34, height: 34, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+            {agent.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{agent.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              CX · Bonus: <span style={{ color: 'var(--ok)', fontWeight: 700 }}>${bonus}</span>
+              <span style={{ color: 'var(--ink-4)' }}> ({Math.floor(collected / cxBonus.threshold)} × ${cxBonus.amount})</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', fontWeight: 600 }}>Collected / Target</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontWeight: 700, color: barColor(pct), fontSize: 14 }}>${collected.toLocaleString()}</span>
+              <span style={{ color: 'var(--ink-4)' }}>/</span>
+              {isMgmt && editingId === agent.id ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="number" value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    style={{ width: 80, fontSize: 12, textAlign: 'center', border: '1px solid var(--accent)', borderRadius: 5, padding: '2px 4px' }}
+                    min={0} autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') onSave(); if (e.key === 'Escape') onCancel(); }}
+                  />
+                  <button className="btn btn-acc btn-sm" style={{ padding: '3px 8px' }} disabled={saving} onClick={onSave}>✓</button>
+                  <button className="btn btn-sec btn-sm" style={{ padding: '3px 8px' }} onClick={onCancel}>✕</button>
+                </span>
+              ) : (
+                <span
+                  style={{ fontWeight: 600, color: 'var(--ink-3)', fontSize: 13, cursor: isMgmt ? 'pointer' : 'default', borderBottom: isMgmt ? '1px dashed var(--line)' : 'none' }}
+                  onClick={() => isMgmt && onStartEdit()}
+                >${targetAmt.toLocaleString()}</span>
+              )}
+            </div>
+          </div>
+          {targetAmt > 0 && (
+            <span className={`bdg ${pct >= 100 ? 'bdg-ok' : pct >= 50 ? 'bdg-acc' : 'bdg-warn'}`}>{pct}%</span>
+          )}
+        </div>
+      </div>
+      {targetAmt > 0 && (
+        <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: barColor(pct), borderRadius: 3, transition: 'width .5s' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TargetsClient({
   agents,
   salesLogs,
+  collectionLogs,
   targets: initialTargets,
   period,
   isMgmt,
   currentUserId,
+  currentUserRole,
+  cxBonus,
 }: {
   agents: Agent[];
   salesLogs: SalesLog[];
+  collectionLogs: SalesLog[];
   targets: Target[];
   period: string;
   isMgmt: boolean;
   currentUserId: string;
+  currentUserRole: string;
+  cxBonus: CxBonus;
 }) {
   const [targets, setTargets] = useState<Target[]>(initialTargets);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<'sales' | 'cx'>('sales');
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
 
   const getTarget = (userId: string) => targets.find(t => t.user_id === userId);
-  const getCount = (userId: string) => salesLogs.filter(s => s.user_id === userId).length;
-  const getRevenue = (userId: string) => salesLogs.filter(s => s.user_id === userId).reduce((s, l) => s + Number(l.amount), 0);
+  const getSalesCount = (userId: string) => salesLogs.filter(s => s.user_id === userId).length;
+  const getSalesRevenue = (userId: string) => salesLogs.filter(s => s.user_id === userId).reduce((s, l) => s + Number(l.amount), 0);
+  const getCollected = (userId: string) => collectionLogs.filter(c => c.user_id === userId).reduce((s, c) => s + Number(c.amount), 0);
 
-  const startEdit = (agent: Agent) => {
+  const startSalesEdit = (agent: Agent) => {
     const t = getTarget(agent.id);
-    setEditValue(String(t?.sales_count_target ?? DEFAULT_TARGET));
+    setEditValue(String(t?.sales_count_target ?? 50));
+    setEditType('sales');
+    setEditingId(agent.id);
+  };
+
+  const startCxEdit = (agent: Agent) => {
+    const t = getTarget(agent.id);
+    setEditValue(String(t?.collection_amount_target ?? 0));
+    setEditType('cx');
     setEditingId(agent.id);
   };
 
   const saveTarget = async (agent: Agent) => {
-    const newCount = Math.max(1, parseInt(editValue) || DEFAULT_TARGET);
+    const val = parseFloat(editValue) || 0;
+    const patch = editType === 'sales'
+      ? { sales_count_target: Math.max(1, val) }
+      : { collection_amount_target: Math.max(0, val) };
     setSaving(true);
     const existing = getTarget(agent.id);
     if (existing?.id) {
-      await dbOp('targets', 'update', { sales_count_target: newCount }, { id: existing.id });
-      setTargets(targets.map(t => t.id === existing.id ? { ...t, sales_count_target: newCount } : t));
+      await dbOp('targets', 'update', patch, { id: existing.id });
+      setTargets(prev => prev.map(t => t.id === existing.id ? { ...t, ...patch } : t));
     } else {
-      const { data } = await dbOp('targets', 'insert', { user_id: agent.id, period, sales_count_target: newCount });
-      if (data?.[0]) setTargets([...targets, data[0]]);
+      const { data } = await dbOp('targets', 'insert', { user_id: agent.id, period, sales_count_target: 0, collection_amount_target: 0, ...patch });
+      if (data?.[0]) setTargets(prev => [...prev, data[0]]);
     }
     setEditingId(null);
     setSaving(false);
   };
 
-  const rows = agents.map(a => {
-    const t = getTarget(a.id);
-    const targetCount = t?.sales_count_target ?? DEFAULT_TARGET;
-    const count = getCount(a.id);
-    const revenue = getRevenue(a.id);
-    const pct = Math.min(Math.round((count / targetCount) * 100), 100);
-    return { agent: a, targetCount, count, revenue, pct };
-  });
+  const salesAgents = agents.filter(a => a.role === 'sales');
+  const cxAgents = agents.filter(a => a.role === 'cx');
 
-  const teamSales = rows.reduce((s, r) => s + r.count, 0);
-  const teamTarget = rows.reduce((s, r) => s + r.targetCount, 0);
-  const teamPct = teamTarget > 0 ? Math.min(Math.round((teamSales / teamTarget) * 100), 100) : 0;
-  const teamRevenue = rows.reduce((s, r) => s + r.revenue, 0);
-  const myCount = rows.find(r => r.agent.id === currentUserId)?.count ?? 0;
+  // Team/personal summary numbers
+  const teamSalesCount = salesAgents.reduce((s, a) => s + getSalesCount(a.id), 0);
+  const teamSalesTarget = salesAgents.reduce((s, a) => s + (getTarget(a.id)?.sales_count_target ?? 50), 0);
+  const teamSalesPct = teamSalesTarget > 0 ? Math.min(Math.round((teamSalesCount / teamSalesTarget) * 100), 100) : 0;
+  const teamRevenue = salesAgents.reduce((s, a) => s + getSalesRevenue(a.id), 0);
+  const teamCollections = cxAgents.reduce((s, a) => s + getCollected(a.id), 0);
+  const teamCxBonus = cxAgents.reduce((s, a) => s + Math.floor(getCollected(a.id) / cxBonus.threshold) * cxBonus.amount, 0);
+
+  // Personal agent numbers (non-mgmt)
+  const myAgent = agents.find(a => a.id === currentUserId);
+  const isCxAgent = currentUserRole === 'cx';
 
   return (
     <div className="page-fade">
-      {/* Team summary stat cards */}
-      <div className="stat-grid" style={{ marginBottom: 20 }}>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
-          <div className="stat-l">TEAM COMPLETION</div>
-          <div className="stat-v" style={{ color: barColor(teamPct) }}>{teamPct}%</div>
-          <div className="stat-foot">{teamSales} / {teamTarget} sales</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico ok">$</div></div>
-          <div className="stat-l">TEAM REVENUE</div>
-          <div className="stat-v">${teamRevenue.toLocaleString()}</div>
-          <div className="stat-foot">{period}</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico acc">↑</div></div>
-          <div className="stat-l">TOP PERFORMER</div>
-          <div className="stat-v" style={{ fontSize: 16 }}>
-            {rows.sort((a, b) => b.pct - a.pct)[0]?.agent.name?.split(' ')[0] ?? '—'}
+      {/* Summary stat cards */}
+      {isMgmt ? (
+        <div className="stat-grid" style={{ marginBottom: 20 }}>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
+            <div className="stat-l">SALES COMPLETION</div>
+            <div className="stat-v" style={{ color: barColor(teamSalesPct) }}>{teamSalesPct}%</div>
+            <div className="stat-foot">{teamSalesCount} / {teamSalesTarget} sales</div>
           </div>
-          <div className="stat-foot">{rows[0]?.pct ?? 0}% completion</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico ok">✓</div></div>
-          <div className="stat-l">ON TARGET</div>
-          <div className="stat-v">{rows.filter(r => r.pct >= 80).length}</div>
-          <div className="stat-foot">≥ 80% complete</div>
-        </div>
-      </div>
-
-      {/* Team progress bar */}
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="card-body" style={{ padding: '18px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Team Progress — {period}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--ink-3)' }}>{teamSales} / {teamTarget}</div>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ok">$</div></div>
+            <div className="stat-l">SALES REVENUE</div>
+            <div className="stat-v">${teamRevenue.toLocaleString()}</div>
+            <div className="stat-foot">{period}</div>
           </div>
-          <div style={{ height: 12, background: 'var(--surface-3)', borderRadius: 6, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${teamPct}%`, background: barColor(teamPct), borderRadius: 6, transition: 'width .6s' }} />
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico acc">💰</div></div>
+            <div className="stat-l">CX COLLECTIONS</div>
+            <div className="stat-v">${teamCollections.toLocaleString()}</div>
+            <div className="stat-foot">{period}</div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 11, color: 'var(--ink-4)' }}>
-            <span>0%</span>
-            <span style={{ color: barColor(teamPct), fontWeight: 700 }}>{teamPct}%</span>
-            <span>100%</span>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico ok">🎁</div></div>
+            <div className="stat-l">CX BONUSES</div>
+            <div className="stat-v" style={{ color: 'var(--ok)' }}>${teamCxBonus}</div>
+            <div className="stat-foot">Total earned</div>
           </div>
         </div>
-      </div>
-
-      {/* Per-agent breakdown */}
-      <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
-        <div className="card-hdr">
-          <div>
-            <div className="card-title">{isMgmt ? 'Agent Breakdown' : 'My Progress'}</div>
-            <div className="card-sub">{isMgmt ? 'Click target number to edit' : 'Your sales progress this month'}</div>
-          </div>
-        </div>
-        <div style={{ padding: '0 18px 18px' }}>
-          {rows.sort((a, b) => b.pct - a.pct).map(({ agent, targetCount, count, revenue, pct }) => {
-            const hue = (agent.name.charCodeAt(0) * 13) % 360;
+      ) : (
+        <div className="stat-grid" style={{ marginBottom: 20 }}>
+          {isCxAgent ? (() => {
+            const collected = getCollected(currentUserId);
+            const targetAmt = getTarget(currentUserId)?.collection_amount_target ?? 0;
+            const pct = targetAmt > 0 ? Math.min(Math.round((collected / targetAmt) * 100), 100) : 0;
+            const bonus = Math.floor(collected / cxBonus.threshold) * cxBonus.amount;
             return (
-              <div key={agent.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--line-2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div className="av-circle" style={{ width: 34, height: 34, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
-                      {agent.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{agent.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{agent.role} · {agent.department || '—'}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', fontWeight: 600 }}>Revenue</div>
-                      <div style={{ fontWeight: 600, color: 'var(--ok)', fontSize: 13 }}>${revenue.toLocaleString()}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', fontWeight: 600 }}>Sales / Target</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ fontWeight: 700, color: barColor(pct), fontSize: 14 }}>{count}</span>
-                        <span style={{ color: 'var(--ink-4)' }}>/</span>
-                        {isMgmt && editingId === agent.id ? (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <input
-                              type="number" value={editValue}
-                              onChange={e => setEditValue(e.target.value)}
-                              style={{ width: 54, fontSize: 12, textAlign: 'center', border: '1px solid var(--accent)', borderRadius: 5, padding: '2px 4px' }}
-                              min={1} autoFocus
-                              onKeyDown={e => { if (e.key === 'Enter') saveTarget(agent); if (e.key === 'Escape') setEditingId(null); }}
-                            />
-                            <button className="btn btn-acc btn-sm" style={{ padding: '3px 8px' }} disabled={saving} onClick={() => saveTarget(agent)}>✓</button>
-                            <button className="btn btn-sec btn-sm" style={{ padding: '3px 8px' }} onClick={() => setEditingId(null)}>✕</button>
-                          </span>
-                        ) : (
-                          <span
-                            style={{ fontWeight: 600, color: 'var(--ink-3)', fontSize: 13, cursor: isMgmt ? 'pointer' : 'default', borderBottom: isMgmt ? '1px dashed var(--line)' : 'none' }}
-                            onClick={() => isMgmt && startEdit(agent)}
-                          >{targetCount}</span>
-                        )}
-                      </div>
-                    </div>
-                    <span className={`bdg ${pct >= 100 ? 'bdg-ok' : pct >= 50 ? 'bdg-acc' : 'bdg-warn'}`}>{pct}%</span>
-                  </div>
+              <>
+                <div className="stat-card" style={{ cursor: 'default' }}>
+                  <div className="stat-h"><div className="stat-ico ok">$</div></div>
+                  <div className="stat-l">COLLECTED</div>
+                  <div className="stat-v" style={{ color: 'var(--ok)' }}>${collected.toLocaleString()}</div>
+                  <div className="stat-foot">{period}</div>
                 </div>
-                <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: barColor(pct), borderRadius: 3, transition: 'width .5s' }} />
+                <div className="stat-card" style={{ cursor: 'default' }}>
+                  <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
+                  <div className="stat-l">TARGET</div>
+                  <div className="stat-v">{targetAmt > 0 ? `$${targetAmt.toLocaleString()}` : 'Not set'}</div>
+                  <div className="stat-foot">{targetAmt > 0 ? `${pct}% complete` : 'Ask your manager'}</div>
                 </div>
-              </div>
+                <div className="stat-card" style={{ cursor: 'default' }}>
+                  <div className="stat-h"><div className="stat-ico ok">🎁</div></div>
+                  <div className="stat-l">BONUS EARNED</div>
+                  <div className="stat-v" style={{ color: 'var(--ok)' }}>${bonus}</div>
+                  <div className="stat-foot">{Math.floor(collected / cxBonus.threshold)} × ${cxBonus.amount}</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'default' }}>
+                  <div className="stat-h"><div className="stat-ico acc">➡</div></div>
+                  <div className="stat-l">NEXT BONUS</div>
+                  <div className="stat-v">${cxBonus.threshold - (collected % cxBonus.threshold) < cxBonus.threshold ? (cxBonus.threshold - Math.floor(collected % cxBonus.threshold)).toLocaleString() : '0'}</div>
+                  <div className="stat-foot">More to collect</div>
+                </div>
+              </>
             );
-          })}
-        </div>
-      </div>
-
-      {/* Commission ladder */}
-      <div className="card">
-        <div className="card-hdr">
-          <div className="card-title">Commission Ladder</div>
-        </div>
-        <div style={{ padding: '0 18px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-          {COMMISSION_TIERS.map(tier => {
-            const active = myCount >= tier.min;
-            const current = myCount >= tier.min && (tier.max === Infinity || myCount <= tier.max);
+          })() : (() => {
+            const count = getSalesCount(currentUserId);
+            const targetCount = getTarget(currentUserId)?.sales_count_target ?? 50;
+            const pct = Math.min(Math.round((count / targetCount) * 100), 100);
             return (
-              <div key={tier.range} style={{
-                padding: '14px 16px', borderRadius: 10,
-                background: current ? 'oklch(0.96 0.05 145)' : active ? 'oklch(0.97 0.02 145)' : 'var(--surface-2)',
-                border: `1.5px solid ${current ? 'oklch(0.85 0.08 145)' : active ? 'oklch(0.90 0.04 145)' : 'var(--line)'}`,
-              }}>
-                <div style={{ fontSize: 11, color: current ? 'var(--ok)' : 'var(--ink-3)', fontWeight: 700, marginBottom: 6 }}>{tier.range}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: current ? 'var(--ok)' : active ? 'oklch(0.48 0.10 145)' : 'var(--ink-3)' }}>{tier.rate}</div>
-                {current && <div style={{ fontSize: 10, color: 'var(--ok)', marginTop: 6, fontWeight: 600 }}>● Current tier</div>}
-              </div>
+              <>
+                <div className="stat-card" style={{ cursor: 'default' }}>
+                  <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
+                  <div className="stat-l">MY COMPLETION</div>
+                  <div className="stat-v" style={{ color: barColor(pct) }}>{pct}%</div>
+                  <div className="stat-foot">{count} / {targetCount} sales</div>
+                </div>
+                <div className="stat-card" style={{ cursor: 'default' }}>
+                  <div className="stat-h"><div className="stat-ico ok">$</div></div>
+                  <div className="stat-l">MY REVENUE</div>
+                  <div className="stat-v">${getSalesRevenue(currentUserId).toLocaleString()}</div>
+                  <div className="stat-foot">{period}</div>
+                </div>
+              </>
             );
-          })}
+          })()}
         </div>
-      </div>
+      )}
+
+      {/* Sales agent section */}
+      {(isMgmt || !isCxAgent) && salesAgents.length > 0 && (
+        <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">{isMgmt ? 'Sales Agent Progress' : 'My Progress'}</div>
+              <div className="card-sub">{isMgmt ? 'Click target to edit' : `Your sales this month · ${period}`}</div>
+            </div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            {salesAgents.map(agent => {
+              const count = getSalesCount(agent.id);
+              const revenue = getSalesRevenue(agent.id);
+              const targetCount = getTarget(agent.id)?.sales_count_target ?? 50;
+              const pct = Math.min(Math.round((count / targetCount) * 100), 100);
+              return (
+                <AgentRow
+                  key={agent.id}
+                  agent={agent} count={count} revenue={revenue} targetCount={targetCount} pct={pct}
+                  isMgmt={isMgmt} editingId={editingId} editValue={editValue} saving={saving}
+                  setEditValue={setEditValue}
+                  onStartEdit={() => startSalesEdit(agent)}
+                  onSave={() => saveTarget(agent)}
+                  onCancel={() => setEditingId(null)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* CX agent section */}
+      {(isMgmt || isCxAgent) && cxAgents.length > 0 && (
+        <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">{isMgmt ? 'CX Collection Progress' : 'My Collection Progress'}</div>
+              <div className="card-sub">
+                ${cxBonus.amount} bonus per ${cxBonus.threshold.toLocaleString()} collected
+                {isMgmt && ' · Click target to edit'}
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            {cxAgents.map(agent => {
+              const collected = getCollected(agent.id);
+              const targetAmt = getTarget(agent.id)?.collection_amount_target ?? 0;
+              return (
+                <CxRow
+                  key={agent.id}
+                  agent={agent} collected={collected} targetAmt={targetAmt} cxBonus={cxBonus}
+                  isMgmt={isMgmt} editingId={editingId} editValue={editValue} saving={saving}
+                  setEditValue={setEditValue}
+                  onStartEdit={() => startCxEdit(agent)}
+                  onSave={() => saveTarget(agent)}
+                  onCancel={() => setEditingId(null)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Commission ladder — only for sales agents */}
+      {(!isCxAgent) && (
+        <div className="card">
+          <div className="card-hdr">
+            <div className="card-title">Commission Ladder</div>
+          </div>
+          <div style={{ padding: '0 18px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {COMMISSION_TIERS.map(tier => {
+              const myCount = getSalesCount(currentUserId);
+              const active = myCount >= tier.min;
+              const current = myCount >= tier.min && (tier.max === Infinity || myCount <= tier.max);
+              return (
+                <div key={tier.range} style={{
+                  padding: '14px 16px', borderRadius: 10,
+                  background: current ? 'oklch(0.96 0.05 145)' : active ? 'oklch(0.97 0.02 145)' : 'var(--surface-2)',
+                  border: `1.5px solid ${current ? 'oklch(0.85 0.08 145)' : active ? 'oklch(0.90 0.04 145)' : 'var(--line)'}`,
+                }}>
+                  <div style={{ fontSize: 11, color: current ? 'var(--ok)' : 'var(--ink-3)', fontWeight: 700, marginBottom: 6 }}>{tier.range}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: current ? 'var(--ok)' : active ? 'oklch(0.48 0.10 145)' : 'var(--ink-3)' }}>{tier.rate}</div>
+                  {current && <div style={{ fontSize: 10, color: 'var(--ok)', marginTop: 6, fontWeight: 600 }}>● Current tier</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* CX bonus reference — only for CX agents viewing their own page */}
+      {isCxAgent && !isMgmt && (
+        <div className="card">
+          <div className="card-hdr">
+            <div className="card-title">Your Bonus Structure</div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ padding: '12px 18px', borderRadius: 10, background: 'oklch(0.96 0.04 145)', border: '1px solid oklch(0.88 0.07 145)', fontSize: 16, fontWeight: 800, color: 'var(--ok)' }}>
+                ${cxBonus.amount} bonus
+              </div>
+              <div style={{ color: 'var(--ink-4)', fontSize: 14, fontWeight: 500 }}>for every</div>
+              <div style={{ padding: '12px 18px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line)', fontSize: 16, fontWeight: 800 }}>
+                ${cxBonus.threshold.toLocaleString()} collected
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

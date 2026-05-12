@@ -1,13 +1,56 @@
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import RevenueClient from './RevenueClient';
 
 export default async function RevenuePage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
   if (!user) return null;
 
-  // Fetch sales logs for the user
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+  const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
+
+  if (isMgmt) {
+    const period = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [
+      { data: salesAgents },
+      { data: cxAgents },
+      { data: targets },
+      { data: salesLogs },
+      { data: collectionLogs },
+      { data: settingsRow },
+    ] = await Promise.all([
+      admin.from('profiles').select('id, name, role').eq('role', 'sales').order('name'),
+      admin.from('profiles').select('id, name, role').eq('role', 'cx').order('name'),
+      admin.from('targets').select('*').eq('period', period),
+      admin.from('sales_logs').select('user_id, amount').eq('type', 'Sale').gte('created_at', startOfMonth.toISOString()),
+      admin.from('sales_logs').select('user_id, amount').eq('type', 'Collection').gte('created_at', startOfMonth.toISOString()),
+      admin.from('global_settings').select('value').eq('key', 'cx_bonus').maybeSingle(),
+    ]);
+
+    const cxBonus = (settingsRow?.value as any) ?? { amount: 3, threshold: 600 };
+
+    return (
+      <RevenueClient
+        isMgmt={true}
+        initialSales={[]}
+        currentUserId={user.id}
+        salesAgents={salesAgents ?? []}
+        cxAgents={cxAgents ?? []}
+        targets={targets ?? []}
+        salesLogs={salesLogs ?? []}
+        collectionLogs={collectionLogs ?? []}
+        period={period}
+        cxBonus={cxBonus}
+      />
+    );
+  }
+
   const { data: sales } = await supabase
     .from('sales_logs')
     .select('*')
@@ -16,6 +59,10 @@ export default async function RevenuePage() {
     .order('created_at', { ascending: false });
 
   return (
-    <RevenueClient initialSales={sales || []} currentUserId={user.id} />
+    <RevenueClient
+      isMgmt={false}
+      initialSales={sales || []}
+      currentUserId={user.id}
+    />
   );
 }

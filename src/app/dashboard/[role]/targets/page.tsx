@@ -23,7 +23,7 @@ export default async function TargetsPage() {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [{ data: agents }, { data: salesLogs }, { data: targets }] = await Promise.all([
+  const [{ data: agents }, { data: salesLogs }, { data: collectionLogs }, { data: targets }, { data: cxBonusRow }] = await Promise.all([
     isMgmt
       ? admin.from('profiles').select('id, name, role, department').in('role', ['sales', 'cx']).order('name')
       : admin.from('profiles').select('id, name, role, department').eq('id', user.id),
@@ -33,19 +33,34 @@ export default async function TargetsPage() {
       .eq('type', 'Sale')
       .gte('created_at', startOfMonth.toISOString()),
     admin
+      .from('sales_logs')
+      .select('user_id, amount')
+      .eq('type', 'Collection')
+      .gte('created_at', startOfMonth.toISOString()),
+    admin
       .from('targets')
       .select('*')
       .eq('period', period),
+    admin
+      .from('global_settings')
+      .select('value')
+      .eq('key', 'cx_bonus')
+      .maybeSingle(),
   ]);
+
+  const cxBonus = (cxBonusRow?.value as any) ?? { amount: 3, threshold: 600 };
 
   return (
     <TargetsClient
       agents={agents ?? []}
       salesLogs={salesLogs ?? []}
+      collectionLogs={collectionLogs ?? []}
       targets={targets ?? []}
       period={period}
       isMgmt={isMgmt}
       currentUserId={user.id}
+      currentUserRole={profile?.role ?? ''}
+      cxBonus={cxBonus}
     />
   );
 }

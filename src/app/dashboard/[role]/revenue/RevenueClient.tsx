@@ -3,7 +3,323 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-export default function RevenueClient({ initialSales, currentUserId }: { initialSales: any[], currentUserId: string }) {
+type Agent = { id: string; name: string; role: string };
+type Target = { id?: string; user_id: string; period: string; sales_count_target: number; collection_amount_target?: number };
+type CxBonus = { amount: number; threshold: number };
+
+function barColor(pct: number) {
+  return pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--accent)' : 'var(--warn)';
+}
+
+// ---------- Management view ----------
+
+function MgmtRevenueView({
+  salesAgents, cxAgents, targets: initTargets, salesLogs, collectionLogs, period, cxBonus: initBonus,
+}: {
+  salesAgents: Agent[]; cxAgents: Agent[];
+  targets: Target[]; salesLogs: any[]; collectionLogs: any[];
+  period: string; cxBonus: CxBonus;
+}) {
+  const [tab, setTab] = useState<'sales' | 'cx'>('sales');
+  const [targets, setTargets] = useState<Target[]>(initTargets);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editField, setEditField] = useState<'sales' | 'cx'>('sales');
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [cxBonus, setCxBonus] = useState<CxBonus>(initBonus);
+  const [editBonus, setEditBonus] = useState(false);
+  const [bonusDraft, setBonusDraft] = useState({ amount: String(initBonus.amount), threshold: String(initBonus.threshold) });
+  const [savingBonus, setSavingBonus] = useState(false);
+
+  const getTarget = (userId: string) => targets.find(t => t.user_id === userId);
+  const getSalesCount = (userId: string) => salesLogs.filter(s => s.user_id === userId).length;
+  const getSalesRevenue = (userId: string) => salesLogs.filter(s => s.user_id === userId).reduce((s, l) => s + Number(l.amount), 0);
+  const getCollected = (userId: string) => collectionLogs.filter(c => c.user_id === userId).reduce((s, c) => s + Number(c.amount), 0);
+
+  const startEdit = (agentId: string, field: 'sales' | 'cx') => {
+    const t = getTarget(agentId);
+    setEditValue(field === 'sales' ? String(t?.sales_count_target ?? 50) : String(t?.collection_amount_target ?? 0));
+    setEditField(field);
+    setEditingId(agentId);
+  };
+
+  const saveTarget = async (agent: Agent) => {
+    const val = parseFloat(editValue) || 0;
+    const patch = editField === 'sales'
+      ? { sales_count_target: Math.max(1, val) }
+      : { collection_amount_target: Math.max(0, val) };
+    setSaving(true);
+    const existing = getTarget(agent.id);
+    if (existing?.id) {
+      await dbOp('targets', 'update', patch, { id: existing.id });
+      setTargets(prev => prev.map(t => t.id === existing.id ? { ...t, ...patch } : t));
+    } else {
+      const { data } = await dbOp('targets', 'insert', { user_id: agent.id, period, sales_count_target: 0, collection_amount_target: 0, ...patch });
+      if (data?.[0]) setTargets(prev => [...prev, data[0]]);
+    }
+    setEditingId(null);
+    setSaving(false);
+  };
+
+  const saveBonus = async () => {
+    setSavingBonus(true);
+    const newBonus: CxBonus = {
+      amount: parseFloat(bonusDraft.amount) || 3,
+      threshold: parseFloat(bonusDraft.threshold) || 600,
+    };
+    await dbOp('global_settings', 'upsert', { key: 'cx_bonus', value: newBonus });
+    setCxBonus(newBonus);
+    setEditBonus(false);
+    setSavingBonus(false);
+  };
+
+  const totalSalesRevenue = salesLogs.reduce((s, l) => s + Number(l.amount), 0);
+  const totalSalesCount = salesLogs.length;
+  const totalCollections = collectionLogs.reduce((s, c) => s + Number(c.amount), 0);
+  const totalCxBonus = cxAgents.reduce((s, a) => s + Math.floor(getCollected(a.id) / cxBonus.threshold) * cxBonus.amount, 0);
+
+  const InlineEdit = ({ agentId, field, currentVal, fmt }: { agentId: string; field: 'sales' | 'cx'; currentVal: number; fmt?: (n: number) => string }) => {
+    const display = fmt ? fmt(currentVal) : String(currentVal);
+    if (editingId === agentId && editField === field) {
+      return (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <input
+            type="number" value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            style={{ width: field === 'cx' ? 80 : 54, fontSize: 12, textAlign: 'center', border: '1px solid var(--accent)', borderRadius: 5, padding: '2px 4px' }}
+            min={0} autoFocus
+            onKeyDown={e => {
+              if (e.key === 'Enter') saveTarget({ id: agentId, name: '', role: '' });
+              if (e.key === 'Escape') setEditingId(null);
+            }}
+          />
+          <button className="btn btn-acc btn-sm" style={{ padding: '3px 8px' }} disabled={saving} onClick={() => saveTarget({ id: agentId, name: '', role: '' })}>✓</button>
+          <button className="btn btn-sec btn-sm" style={{ padding: '3px 8px' }} onClick={() => setEditingId(null)}>✕</button>
+        </span>
+      );
+    }
+    return (
+      <span
+        style={{ fontWeight: 600, color: 'var(--ink-3)', fontSize: 13, cursor: 'pointer', borderBottom: '1px dashed var(--line)' }}
+        onClick={() => startEdit(agentId, field)}
+      >{display}</span>
+    );
+  };
+
+  return (
+    <div className="page-fade">
+      {/* Summary stats */}
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">$</div></div>
+          <div className="stat-l">SALES REVENUE</div>
+          <div className="stat-v" style={{ color: 'var(--ok)' }}>${totalSalesRevenue.toLocaleString()}</div>
+          <div className="stat-foot">{period}</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico acc">📊</div></div>
+          <div className="stat-l">TOTAL SALES</div>
+          <div className="stat-v">{totalSalesCount}</div>
+          <div className="stat-foot">{salesAgents.length} sales agents</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">💰</div></div>
+          <div className="stat-l">CX COLLECTIONS</div>
+          <div className="stat-v">${totalCollections.toLocaleString()}</div>
+          <div className="stat-foot">{period}</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">🎁</div></div>
+          <div className="stat-l">CX BONUSES</div>
+          <div className="stat-v" style={{ color: 'var(--ok)' }}>${totalCxBonus}</div>
+          <div className="stat-foot">Total earned this period</div>
+        </div>
+      </div>
+
+      {/* Tab selector */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {(['sales', 'cx'] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => { setTab(t); setEditingId(null); }}
+            style={{
+              padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13,
+              background: tab === t ? 'var(--accent)' : 'var(--surface-2)',
+              color: tab === t ? '#fff' : 'var(--ink-3)',
+              transition: 'all .2s',
+            }}
+          >
+            {t === 'sales' ? '📈 Sales Targets' : '📋 CX Collection Targets'}
+          </button>
+        ))}
+      </div>
+
+      {/* Sales targets */}
+      {tab === 'sales' && (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">Sales Team Targets</div>
+              <div className="card-sub">Click target number to edit · {period}</div>
+            </div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            {salesAgents.length === 0 && (
+              <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No sales agents found.</div>
+            )}
+            {salesAgents.map(agent => {
+              const count = getSalesCount(agent.id);
+              const revenue = getSalesRevenue(agent.id);
+              const targetCount = getTarget(agent.id)?.sales_count_target ?? 50;
+              const pct = Math.min(Math.round((count / targetCount) * 100), 100);
+              const hue = (agent.name.charCodeAt(0) * 13) % 360;
+              return (
+                <div key={agent.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--line-2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div className="av-circle" style={{ width: 34, height: 34, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                        {agent.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{agent.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Revenue: <span style={{ color: 'var(--ok)', fontWeight: 700 }}>${revenue.toLocaleString()}</span></div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', fontWeight: 600 }}>Sales / Target</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontWeight: 700, color: barColor(pct), fontSize: 14 }}>{count}</span>
+                          <span style={{ color: 'var(--ink-4)' }}>/</span>
+                          <InlineEdit agentId={agent.id} field="sales" currentVal={targetCount} />
+                        </div>
+                      </div>
+                      <span className={`bdg ${pct >= 100 ? 'bdg-ok' : pct >= 50 ? 'bdg-acc' : 'bdg-warn'}`}>{pct}%</span>
+                    </div>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: barColor(pct), borderRadius: 3, transition: 'width .5s' }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* CX collection targets */}
+      {tab === 'cx' && (
+        <>
+          {/* CX bonus settings */}
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card-hdr">
+              <div className="card-title">CX Bonus Structure</div>
+              {!editBonus && (
+                <button
+                  className="btn btn-sec btn-sm"
+                  onClick={() => {
+                    setBonusDraft({ amount: String(cxBonus.amount), threshold: String(cxBonus.threshold) });
+                    setEditBonus(true);
+                  }}
+                >Edit</button>
+              )}
+            </div>
+            <div style={{ padding: '0 18px 18px' }}>
+              {editBonus ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>Every</span>
+                  <div className="pv-fld" style={{ margin: 0, width: 100 }}>
+                    <label>Threshold ($)</label>
+                    <input type="number" value={bonusDraft.threshold} min={1} step={1} onChange={e => setBonusDraft(b => ({ ...b, threshold: e.target.value }))} />
+                  </div>
+                  <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>collected earns</span>
+                  <div className="pv-fld" style={{ margin: 0, width: 100 }}>
+                    <label>Bonus ($)</label>
+                    <input type="number" value={bonusDraft.amount} min={0} step={0.5} onChange={e => setBonusDraft(b => ({ ...b, amount: e.target.value }))} />
+                  </div>
+                  <button className="btn btn-acc btn-sm" disabled={savingBonus} onClick={saveBonus}>{savingBonus ? 'Saving…' : 'Save'}</button>
+                  <button className="btn btn-sec btn-sm" onClick={() => setEditBonus(false)}>Cancel</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ padding: '10px 16px', borderRadius: 10, background: 'oklch(0.96 0.04 145)', border: '1px solid oklch(0.88 0.07 145)', fontSize: 15, fontWeight: 800, color: 'var(--ok)' }}>
+                    ${cxBonus.amount} bonus
+                  </div>
+                  <div style={{ color: 'var(--ink-4)', fontSize: 13, fontWeight: 500 }}>for every</div>
+                  <div style={{ padding: '10px 16px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line)', fontSize: 15, fontWeight: 800 }}>
+                    ${cxBonus.threshold.toLocaleString()} collected
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* CX agent list */}
+          <div className="card" style={{ overflow: 'hidden' }}>
+            <div className="card-hdr">
+              <div>
+                <div className="card-title">CX Collection Targets</div>
+                <div className="card-sub">Click target amount to edit · {period}</div>
+              </div>
+            </div>
+            <div style={{ padding: '0 18px 18px' }}>
+              {cxAgents.length === 0 && (
+                <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No CX agents found.</div>
+              )}
+              {cxAgents.map(agent => {
+                const collected = getCollected(agent.id);
+                const targetAmt = getTarget(agent.id)?.collection_amount_target ?? 0;
+                const pct = targetAmt > 0 ? Math.min(Math.round((collected / targetAmt) * 100), 100) : 0;
+                const bonus = Math.floor(collected / cxBonus.threshold) * cxBonus.amount;
+                const hue = (agent.name.charCodeAt(0) * 13) % 360;
+                return (
+                  <div key={agent.id} style={{ padding: '14px 0', borderBottom: '1px solid var(--line-2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: targetAmt > 0 ? 8 : 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="av-circle" style={{ width: 34, height: 34, fontSize: 11, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                          {agent.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) ?? 'U'}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{agent.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                            Bonus earned: <span style={{ color: 'var(--ok)', fontWeight: 700 }}>${bonus}</span>
+                            {' '}· {Math.floor(collected / cxBonus.threshold)} × ${cxBonus.amount}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 9.5, color: 'var(--ink-4)', textTransform: 'uppercase', fontWeight: 600 }}>Collected / Target</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontWeight: 700, color: barColor(pct), fontSize: 14 }}>${collected.toLocaleString()}</span>
+                            <span style={{ color: 'var(--ink-4)' }}>/</span>
+                            <InlineEdit agentId={agent.id} field="cx" currentVal={targetAmt} fmt={n => `$${n.toLocaleString()}`} />
+                          </div>
+                        </div>
+                        {targetAmt > 0 && (
+                          <span className={`bdg ${pct >= 100 ? 'bdg-ok' : pct >= 50 ? 'bdg-acc' : 'bdg-warn'}`}>{pct}%</span>
+                        )}
+                      </div>
+                    </div>
+                    {targetAmt > 0 && (
+                      <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: barColor(pct), borderRadius: 3, transition: 'width .5s' }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------- Agent revenue view ----------
+
+function AgentRevenueView({ initialSales, currentUserId }: { initialSales: any[]; currentUserId: string }) {
   const [sales, setSales] = useState(initialSales);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -161,4 +477,45 @@ export default function RevenueClient({ initialSales, currentUserId }: { initial
       </div>
     </div>
   );
+}
+
+// ---------- Root export ----------
+
+export default function RevenueClient({
+  isMgmt = false,
+  initialSales,
+  currentUserId,
+  salesAgents,
+  cxAgents,
+  targets,
+  salesLogs,
+  collectionLogs,
+  period,
+  cxBonus,
+}: {
+  isMgmt?: boolean;
+  initialSales: any[];
+  currentUserId: string;
+  salesAgents?: any[];
+  cxAgents?: any[];
+  targets?: any[];
+  salesLogs?: any[];
+  collectionLogs?: any[];
+  period?: string;
+  cxBonus?: CxBonus;
+}) {
+  if (isMgmt) {
+    return (
+      <MgmtRevenueView
+        salesAgents={salesAgents ?? []}
+        cxAgents={cxAgents ?? []}
+        targets={targets ?? []}
+        salesLogs={salesLogs ?? []}
+        collectionLogs={collectionLogs ?? []}
+        period={period ?? ''}
+        cxBonus={cxBonus ?? { amount: 3, threshold: 600 }}
+      />
+    );
+  }
+  return <AgentRevenueView initialSales={initialSales} currentUserId={currentUserId} />;
 }
