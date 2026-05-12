@@ -19,13 +19,23 @@ export default async function SchedulePage() {
   if (!hasAccess(viewType)) redirect(`/dashboard/${profile?.role || 'sales'}`);
   const isMgmt = isAdminView(viewType);
 
-  const { data: users } = await admin.from('profiles').select('id, name, role').in('role', ['sales', 'cx', 'supervisor']);
-  const { data: schedules } = await admin.from('schedules').select('*').order('created_at', { ascending: false });
+  const [{ data: users }, { data: schedules }] = await Promise.all([
+    admin.from('profiles').select('id, name, role').in('role', ['sales', 'cx', 'supervisor']),
+    isMgmt
+      ? admin.from('schedules').select('*').order('created_at', { ascending: false })
+      : admin.from('schedules').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+  ]);
+
+  // Ensure the current user is always in the users list (guards against role edge-cases)
+  const usersBase = users ?? [];
+  const finalUsers = usersBase.some((u: any) => u.id === user.id)
+    ? usersBase
+    : [...usersBase, { id: user.id, name: profile?.name ?? '', role: profile?.role ?? '' }];
 
   return (
     <ScheduleClient
       initialSchedules={schedules || []}
-      users={users || []}
+      users={finalUsers}
       isMgmt={isMgmt}
       currentUserId={user.id}
       currentUserName={profile?.name ?? ''}
