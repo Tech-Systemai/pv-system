@@ -17,20 +17,27 @@ const TYPE_HUES: Record<string, number> = {
 
 export default function NotesClient({
   initialNotes,
+  sharedNotes,
+  users,
   currentUserId,
 }: {
   initialNotes: any[];
+  sharedNotes: any[];
+  users: any[];
   currentUserId: string;
 }) {
-  const [notes, setNotes] = useState(initialNotes);
+  const [notes,      setNotes]      = useState(initialNotes);
   const [filterType, setFilterType] = useState<string>('All');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editNote, setEditNote] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [formTitle, setFormTitle] = useState('');
-  const [formContent, setFormContent] = useState('');
-  const [formType, setFormType] = useState('General');
+  const [isModalOpen,  setIsModalOpen]  = useState(false);
+  const [editNote,     setEditNote]     = useState<any>(null);
+  const [viewShared,   setViewShared]   = useState<any>(null);
+  const [saving,       setSaving]       = useState(false);
+  const [deleting,     setDeleting]     = useState<string | null>(null);
+  const [formTitle,    setFormTitle]    = useState('');
+  const [formContent,  setFormContent]  = useState('');
+  const [formType,     setFormType]     = useState('General');
+  const [formSharedWith, setFormSharedWith] = useState<string[]>([]);
+  const [userSearch,   setUserSearch]   = useState('');
 
   const filtered = filterType === 'All' ? notes : notes.filter(n => n.type === filterType);
 
@@ -39,6 +46,8 @@ export default function NotesClient({
     setFormTitle('');
     setFormContent('');
     setFormType('General');
+    setFormSharedWith([]);
+    setUserSearch('');
     setIsModalOpen(true);
   };
 
@@ -47,17 +56,32 @@ export default function NotesClient({
     setFormTitle(note.title ?? '');
     setFormContent(note.content ?? '');
     setFormType(note.type ?? 'General');
+    setFormSharedWith(note.shared_with ?? []);
+    setUserSearch('');
     setIsModalOpen(true);
+  };
+
+  const toggleShareUser = (userId: string) => {
+    setFormSharedWith(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
   };
 
   const handleSave = async () => {
     if (!formTitle.trim()) return;
     setSaving(true);
     if (editNote) {
-      const { error } = await dbOp('notes', 'update', { title: formTitle, content: formContent, type: formType, updated_at: new Date().toISOString() }, { id: editNote.id });
-      if (!error) setNotes(prev => prev.map(n => n.id === editNote.id ? { ...n, title: formTitle, content: formContent, type: formType } : n));
+      const { error } = await dbOp('notes', 'update',
+        { title: formTitle, content: formContent, type: formType, shared_with: formSharedWith, updated_at: new Date().toISOString() },
+        { id: editNote.id }
+      );
+      if (!error) setNotes(prev => prev.map(n =>
+        n.id === editNote.id ? { ...n, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith } : n
+      ));
     } else {
-      const { data } = await dbOp('notes', 'insert', { user_id: currentUserId, title: formTitle, content: formContent, type: formType });
+      const { data } = await dbOp('notes', 'insert',
+        { user_id: currentUserId, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith }
+      );
       if (data?.[0]) setNotes(prev => [data[0], ...prev]);
     }
     setSaving(false);
@@ -70,6 +94,11 @@ export default function NotesClient({
     setNotes(prev => prev.filter(n => n.id !== id));
     setDeleting(null);
   };
+
+  const filteredUsers = users.filter(u =>
+    u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.role?.toLowerCase().includes(userSearch.toLowerCase())
+  );
 
   return (
     <div className="page-fade">
@@ -129,17 +158,21 @@ export default function NotesClient({
         </div>
       </div>
 
-      {/* Notes grid */}
+      {/* My notes grid */}
       {filtered.length === 0 ? (
-        <div className="card">
+        <div className="card" style={{ marginBottom: 20 }}>
           <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
             No notes yet. Click "+ New Note" to get started.
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14, marginBottom: 24 }}>
           {filtered.map(note => {
             const hue = TYPE_HUES[note.type] ?? 220;
+            const shareCount = (note.shared_with ?? []).length;
+            const sharedNames = (note.shared_with ?? [])
+              .map((id: string) => users.find(u => u.id === id)?.name)
+              .filter(Boolean);
             return (
               <div
                 key={note.id}
@@ -172,8 +205,18 @@ export default function NotesClient({
                     {note.content}
                   </div>
                 )}
-                <div style={{ fontSize: 10, color: `oklch(0.65 0.06 ${hue})`, marginTop: 12 }}>
-                  {new Date(note.updated_at ?? note.created_at).toLocaleDateString()}
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ fontSize: 10, color: `oklch(0.65 0.06 ${hue})` }}>
+                    {new Date(note.updated_at ?? note.created_at).toLocaleDateString()}
+                  </div>
+                  {shareCount > 0 && (
+                    <div
+                      title={sharedNames.join(', ')}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: `oklch(0.40 0.14 ${hue})`, background: `oklch(0.90 0.06 ${hue})`, padding: '2px 8px', borderRadius: 20 }}
+                    >
+                      👥 {shareCount === 1 ? sharedNames[0] : `${shareCount} people`}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -181,10 +224,97 @@ export default function NotesClient({
         </div>
       )}
 
+      {/* Shared with me section */}
+      {sharedNotes.length > 0 && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-2)' }}>Shared with me</div>
+            <span className="bdg bdg-acc">{sharedNotes.length}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+            {sharedNotes.map(note => {
+              const hue = TYPE_HUES[note.type] ?? 220;
+              return (
+                <div
+                  key={note.id}
+                  onClick={() => setViewShared(note)}
+                  style={{
+                    background: `linear-gradient(160deg, oklch(0.97 0.03 ${hue}), oklch(0.99 0.01 ${hue + 20}))`,
+                    border: `1px solid oklch(0.90 0.05 ${hue})`,
+                    borderRadius: 14, padding: '18px 16px', cursor: 'pointer',
+                    transition: 'transform .12s, box-shadow .12s',
+                    position: 'relative',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = ''; }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: `oklch(0.88 0.08 ${hue})`, color: `oklch(0.35 0.14 ${hue})`, padding: '3px 8px', borderRadius: 20 }}>
+                      {note.type ?? 'General'}
+                    </span>
+                    <span style={{ fontSize: 10, color: `oklch(0.50 0.08 ${hue})` }}>👁 view only</span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: `oklch(0.25 0.10 ${hue})`, marginBottom: 8, lineHeight: 1.3 }}>
+                    {note.title}
+                  </div>
+                  {note.content && (
+                    <div style={{ fontSize: 12, color: `oklch(0.45 0.08 ${hue})`, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as any}>
+                      {note.content}
+                    </div>
+                  )}
+                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 10, color: `oklch(0.65 0.06 ${hue})` }}>
+                      {new Date(note.updated_at ?? note.created_at).toLocaleDateString()}
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: `oklch(0.40 0.14 ${hue})`, background: `oklch(0.90 0.06 ${hue})`, padding: '2px 8px', borderRadius: 20 }}>
+                      from {note.owner_name}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Read-only shared note viewer */}
+      {viewShared && (
+        <div className="mb" onClick={e => { if (e.target === e.currentTarget) setViewShared(null); }}>
+          <div className="md" style={{ width: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.4 }}>{viewShared.title}</div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {(() => { const hue = TYPE_HUES[viewShared.type] ?? 220; return (
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: `oklch(0.88 0.08 ${hue})`, color: `oklch(0.35 0.14 ${hue})`, padding: '3px 8px', borderRadius: 20 }}>
+                      {viewShared.type ?? 'General'}
+                    </span>
+                  ); })()}
+                  <span className="bdg bdg-gy" style={{ fontSize: 10 }}>Shared by {viewShared.owner_name}</span>
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setViewShared(null)}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
+              {viewShared.content
+                ? <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{viewShared.content}</div>
+                : <div style={{ fontSize: 13, color: 'var(--ink-4)' }}>No content.</div>
+              }
+            </div>
+            <div style={{ borderTop: '1px solid var(--line)', padding: '12px 20px', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                Last updated {new Date(viewShared.updated_at ?? viewShared.created_at).toLocaleDateString()}
+              </span>
+              <button className="btn btn-sec btn-sm" onClick={() => setViewShared(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create / Edit modal */}
       {isModalOpen && (
         <div className="mb">
-          <div className="md" style={{ width: 560, maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="md" style={{ width: 580, maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="md-t">{editNote ? 'Edit Note' : 'New Note'}</div>
             <div className="pv-fld">
               <label>Title</label>
@@ -198,8 +328,77 @@ export default function NotesClient({
             </div>
             <div className="pv-fld">
               <label>Content</label>
-              <textarea rows={10} value={formContent} onChange={e => setFormContent(e.target.value)} placeholder="Write your note here…" style={{ resize: 'vertical' }} />
+              <textarea rows={8} value={formContent} onChange={e => setFormContent(e.target.value)} placeholder="Write your note here…" style={{ resize: 'vertical' }} />
             </div>
+
+            {/* Share with picker */}
+            {users.length > 0 && (
+              <div className="pv-fld">
+                <label>
+                  Share with
+                  {formSharedWith.length > 0 && (
+                    <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'oklch(0.93 0.05 268)', color: 'oklch(0.38 0.14 268)' }}>
+                      {formSharedWith.length} selected
+                    </span>
+                  )}
+                </label>
+                {users.length > 5 && (
+                  <input
+                    type="text"
+                    placeholder="Search people…"
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    style={{ marginBottom: 8 }}
+                  />
+                )}
+                <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: '6px 0' }}>
+                  {filteredUsers.length === 0 ? (
+                    <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ink-4)' }}>No people found</div>
+                  ) : filteredUsers.map(u => {
+                    const selected = formSharedWith.includes(u.id);
+                    const hue = ((u.name ?? '').charCodeAt(0) * 13) % 360;
+                    return (
+                      <div
+                        key={u.id}
+                        onClick={() => toggleShareUser(u.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', cursor: 'pointer',
+                          background: selected ? 'oklch(0.95 0.04 268)' : 'transparent',
+                          transition: 'background .1s',
+                        }}
+                        onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-2)'; }}
+                        onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+                      >
+                        <div style={{
+                          width: 18, height: 18, borderRadius: 4, border: selected ? 'none' : '1.5px solid var(--line)',
+                          background: selected ? 'oklch(0.45 0.20 268)' : 'var(--surface)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 11, color: '#fff', fontWeight: 700, flexShrink: 0,
+                        }}>
+                          {selected ? '✓' : ''}
+                        </div>
+                        <div className="av-circle" style={{ width: 26, height: 26, fontSize: 9, flexShrink: 0, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                          {(u.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600 }}>{u.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--ink-4)', textTransform: 'capitalize' }}>{u.role}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {formSharedWith.length > 0 && (
+                  <button
+                    style={{ marginTop: 6, background: 'none', border: 'none', fontSize: 11, color: 'var(--err)', cursor: 'pointer', padding: 0 }}
+                    onClick={() => setFormSharedWith([])}
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-acc" onClick={handleSave} disabled={saving || !formTitle.trim()}>
                 {saving ? 'Saving…' : editNote ? 'Update Note' : 'Save Note'}
