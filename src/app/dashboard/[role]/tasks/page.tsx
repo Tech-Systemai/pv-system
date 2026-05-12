@@ -26,6 +26,7 @@ export default async function TasksPage() {
       users={users || []}
       isMgmt={isMgmt}
       currentUserId={user.id}
+      userRole={profile?.role ?? ''}
     />
   );
 }

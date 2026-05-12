@@ -16,16 +16,28 @@ export default function TasksClient({
   users,
   isMgmt,
   currentUserId,
+  userRole,
 }: {
   initialTasks: any[];
   users: any[];
   isMgmt: boolean;
   currentUserId: string;
+  userRole: string;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteTask = async (taskId: string) => {
+    setDeletingId(taskId);
+    await dbOp('tasks', 'delete', undefined, { id: taskId });
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    setConfirmDeleteId(null);
+    setDeletingId(null);
+  };
 
   const toggleTask = async (task: any) => {
     const completed = !task.completed;
@@ -178,6 +190,34 @@ export default function TasksClient({
                   </div>
 
                   <span className={PRIORITY_BADGE[t.priority] ?? 'bdg bdg-gy'}>{t.priority ?? 'Normal'}</span>
+
+                  {userRole === 'owner' && (
+                    confirmDeleteId === t.id
+                      ? <>
+                          <button
+                            className="btn btn-err btn-sm"
+                            disabled={deletingId === t.id}
+                            onClick={() => handleDeleteTask(t.id)}
+                            style={{ fontSize: 11 }}
+                          >
+                            {deletingId === t.id ? '…' : 'Confirm'}
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setConfirmDeleteId(null)}
+                            style={{ fontSize: 11 }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      : <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setConfirmDeleteId(t.id)}
+                          style={{ fontSize: 11, color: 'var(--err)', padding: '2px 6px' }}
+                        >
+                          🗑
+                        </button>
+                  )}
                 </div>
               );
             })}
