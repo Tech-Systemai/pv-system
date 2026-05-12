@@ -21,6 +21,7 @@ const TICKET_ICON: Record<string, string> = {
   ticket_new:      '🎫',
   ticket_reply:    '💬',
   ticket_resolved: '✅',
+  task_assigned:   '☑',
 };
 
 export default function NotificationBell({ userId, userRole }: { userId: string; userRole: string }) {
@@ -188,7 +189,9 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
   const count = allNotifs.length;
 
   const navigate = (n: any) => {
-    if (n._kind === 'ticket') {
+    if (n.type === 'task_assigned') {
+      router.push(`/dashboard/${userRole}/tasks`);
+    } else if (n._kind === 'ticket') {
       router.push(`/dashboard/${userRole}/tickets`);
     } else if (n._kind === 'inbox') {
       router.push(`/dashboard/${userRole}/inbox`);

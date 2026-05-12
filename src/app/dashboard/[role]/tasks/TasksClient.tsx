@@ -51,12 +51,13 @@ export default function TasksClient({
     const fd = new FormData(e.currentTarget);
     const assignedTo = fd.get('assigned_to') as string;
     const newTask = {
-      title: fd.get('title') as string,
+      title:       fd.get('title') as string,
+      description: (fd.get('description') as string) || null,
       assigned_to: assignedTo,
       assigned_by: currentUserId,
-      due_date: fd.get('due_date') as string,
-      priority: fd.get('priority') as string,
-      completed: false,
+      due_date:    fd.get('due_date') as string,
+      priority:    fd.get('priority') as string,
+      completed:   false,
     };
     const { data } = await dbOp('tasks', 'insert', newTask);
     if (data?.[0]) {
@@ -179,6 +180,9 @@ export default function TasksClient({
                   {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, textDecoration: t.completed ? 'line-through' : 'none', color: t.completed ? 'var(--ink-3)' : 'var(--ink)' }}>{t.title}</div>
+                    {t.description && (
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>
                       → {t.assigned_user?.name ?? '—'} · By {t.by_user?.name ?? '—'}
                       {t.due_date && (
@@ -239,6 +243,7 @@ export default function TasksClient({
                 </select>
               </div>
               <div className="pv-fld"><label>Task title</label><input type="text" name="title" required placeholder="e.g. Follow up with client X" /></div>
+              <div className="pv-fld"><label>Description <span style={{ fontWeight: 400, color: 'var(--ink-4)' }}>(optional)</span></label><textarea name="description" rows={3} placeholder="Additional details or instructions…" /></div>
               <div className="pv-fld"><label>Due Date</label><input type="date" name="due_date" required /></div>
               <div className="pv-fld">
                 <label>Priority</label>
