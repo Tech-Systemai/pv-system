@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/client';
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [tab, setTab] = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [msg, setMsg] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
@@ -52,9 +52,24 @@ export default function LoginPage() {
     setLoading(false);
   };
 
-  const switchTab = (next: 'login' | 'register') => {
+  const switchTab = (next: 'login' | 'register' | 'forgot') => {
     setTab(next);
     setMsg(null);
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMsg(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://portal.pioneersveneers.com/reset-password',
+    });
+    if (error) {
+      setMsg({ text: error.message, type: 'error' });
+    } else {
+      setMsg({ text: 'Check your email — a reset link has been sent.', type: 'success' });
+    }
+    setLoading(false);
   };
 
   return (
@@ -110,35 +125,39 @@ export default function LoginPage() {
 
         <div className="pv-login-form-wrap">
           <div className="pv-login-eyebrow">
-            {tab === 'login' ? 'Welcome back' : 'Request access'}
+            {tab === 'login' ? 'Welcome back' : tab === 'register' ? 'Request access' : 'Password reset'}
           </div>
           <div className="pv-login-form-head">
             <h2>
-              {tab === 'login' ? 'Sign in to your portal' : 'Create your account'}
+              {tab === 'login' ? 'Sign in to your portal' : tab === 'register' ? 'Create your account' : 'Forgot your password?'}
             </h2>
             <p>
               {tab === 'login'
                 ? 'Continue where you left off — your shift, queues, and approvals are waiting.'
-                : 'Submit your details for owner approval. Most are reviewed within a business day.'}
+                : tab === 'register'
+                ? 'Submit your details for owner approval. Most are reviewed within a business day.'
+                : 'Enter your work email and we will send you a reset link.'}
             </p>
           </div>
 
-          <div className="pv-login-mode-toggle">
-            <button
-              type="button"
-              className={tab === 'login' ? 'active' : ''}
-              onClick={() => switchTab('login')}
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              className={tab === 'register' ? 'active' : ''}
-              onClick={() => switchTab('register')}
-            >
-              Request access
-            </button>
-          </div>
+          {tab !== 'forgot' && (
+            <div className="pv-login-mode-toggle">
+              <button
+                type="button"
+                className={tab === 'login' ? 'active' : ''}
+                onClick={() => switchTab('login')}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                className={tab === 'register' ? 'active' : ''}
+                onClick={() => switchTab('register')}
+              >
+                Request access
+              </button>
+            </div>
+          )}
 
           {msg && (
             <div className={msg.type === 'error' ? 'pv-login-error' : 'pv-login-success'}>
@@ -146,49 +165,75 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleAuth}>
-            <div className="pv-fld">
-              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Work email</span>
-              </label>
-              <input
-                type="email"
-                placeholder="you@pioneersveneers.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
-            </div>
-            <div className="pv-fld">
-              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Password</span>
-                {tab === 'login' && (
-                  <a style={{ color: 'var(--accent-ink)', fontSize: '11.5px', fontWeight: 500 }} href="#">Forgot?</a>
+          {tab === 'forgot' && (
+            <form onSubmit={handleForgot}>
+              <div className="pv-fld">
+                <label>Work email</label>
+                <input
+                  type="email"
+                  placeholder="you@pioneersveneers.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                  autoComplete="email"
+                />
+              </div>
+              <button type="submit" className="pv-login-btn" disabled={loading}>
+                {loading ? (
+                  <><span className="spin" style={{ width: 12, height: 12, marginRight: 4 }} /> Sending…</>
+                ) : 'Send reset link →'}
+              </button>
+            </form>
+          )}
+
+          {tab !== 'forgot' && (
+            <form onSubmit={handleAuth}>
+              <div className="pv-fld">
+                <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Work email</span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="you@pioneersveneers.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <div className="pv-fld">
+                <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Password</span>
+                  {tab === 'login' && (
+                    <a style={{ color: 'var(--accent-ink)', fontSize: '11.5px', fontWeight: 500, cursor: 'pointer' }} onClick={() => switchTab('forgot')}>Forgot?</a>
+                  )}
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                />
+              </div>
+              <button type="submit" className="pv-login-btn" disabled={loading}>
+                {loading ? (
+                  <><span className="spin" style={{ width: 12, height: 12, marginRight: 4 }} /> Authenticating…</>
+                ) : tab === 'login' ? (
+                  'Sign in to portal →'
+                ) : (
+                  'Submit request'
                 )}
-              </label>
-              <input
-                type="password"
-                placeholder="••••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-              />
-            </div>
-            <button type="submit" className="pv-login-btn" disabled={loading}>
-              {loading ? (
-                <><span className="spin" style={{ width: 12, height: 12, marginRight: 4 }} /> Authenticating…</>
-              ) : tab === 'login' ? (
-                'Sign in to portal →'
-              ) : (
-                'Submit request'
-              )}
-            </button>
-          </form>
+              </button>
+            </form>
+          )}
 
           <div className="pv-login-footer">
-            {tab === 'login' ? (
+            {tab === 'forgot' ? (
+              <><a role="button" onClick={() => switchTab('login')}>← Back to sign in</a></>
+            ) : tab === 'login' ? (
               <>Need an account?{' '}
                 <a role="button" onClick={() => switchTab('register')}>Request access</a>
               </>
