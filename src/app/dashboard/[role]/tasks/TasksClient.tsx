@@ -24,10 +24,11 @@ export default function TasksClient({
   currentUserId: string;
   userRole: string;
 }) {
-  const [tasks, setTasks] = useState(initialTasks);
-  const [filterTab, setFilterTab] = useState<FilterTab>('all');
+  const [tasks, setTasks]           = useState(initialTasks);
+  const [filterTab, setFilterTab]   = useState<FilterTab>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [viewTask, setViewTask]     = useState<any>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -35,8 +36,16 @@ export default function TasksClient({
     setDeletingId(taskId);
     await dbOp('tasks', 'delete', undefined, { id: taskId });
     setTasks(prev => prev.filter(t => t.id !== taskId));
+    if (viewTask?.id === taskId) setViewTask(null);
     setConfirmDeleteId(null);
     setDeletingId(null);
+  };
+
+  const handleToggleFromDetail = async (task: any) => {
+    const completed = !task.completed;
+    await dbOp('tasks', 'update', { completed }, { id: task.id });
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed } : t));
+    setViewTask((prev: any) => ({ ...prev, completed }));
   };
 
   const toggleTask = async (task: any) => {
@@ -153,15 +162,17 @@ export default function TasksClient({
               return (
                 <div
                   key={t.id}
+                  onClick={() => setViewTask(t)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
                     borderBottom: '1px solid var(--line-2)',
                     opacity: t.completed ? 0.55 : 1,
+                    cursor: 'pointer',
                   }}
                 >
                   {/* Checkbox */}
                   <button
-                    onClick={() => toggleTask(t)}
+                    onClick={e => { e.stopPropagation(); toggleTask(t); }}
                     style={{
                       width: 22, height: 22, borderRadius: 6, flexShrink: 0,
                       border: t.completed ? 'none' : '1.5px solid var(--line)',
@@ -201,14 +212,14 @@ export default function TasksClient({
                           <button
                             className="btn btn-err btn-sm"
                             disabled={deletingId === t.id}
-                            onClick={() => handleDeleteTask(t.id)}
+                            onClick={e => { e.stopPropagation(); handleDeleteTask(t.id); }}
                             style={{ fontSize: 11 }}
                           >
                             {deletingId === t.id ? '…' : 'Confirm'}
                           </button>
                           <button
                             className="btn btn-ghost btn-sm"
-                            onClick={() => setConfirmDeleteId(null)}
+                            onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}
                             style={{ fontSize: 11 }}
                           >
                             Cancel
@@ -216,7 +227,7 @@ export default function TasksClient({
                         </>
                       : <button
                           className="btn btn-ghost btn-sm"
-                          onClick={() => setConfirmDeleteId(t.id)}
+                          onClick={e => { e.stopPropagation(); setConfirmDeleteId(t.id); }}
                           style={{ fontSize: 11, color: 'var(--err)', padding: '2px 6px' }}
                         >
                           🗑
@@ -228,6 +239,104 @@ export default function TasksClient({
           </div>
         )}
       </div>
+
+      {/* ── Task detail modal ── */}
+      {viewTask && (() => {
+        const isOverdue = viewTask.due_date && !viewTask.completed && new Date(viewTask.due_date) < new Date();
+        const hue = ((viewTask.assigned_user?.name ?? 'U').charCodeAt(0) * 13) % 360;
+        return (
+          <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setViewTask(null); setConfirmDeleteId(null); } }}>
+            <div className="md" style={{ width: 480, maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+
+              {/* Header */}
+              <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.4, flex: 1, textDecoration: viewTask.completed ? 'line-through' : 'none' }}>
+                    {viewTask.title}
+                  </div>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setViewTask(null); setConfirmDeleteId(null); }} style={{ flexShrink: 0 }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span className={PRIORITY_BADGE[viewTask.priority] ?? 'bdg bdg-gy'}>{viewTask.priority ?? 'Normal'}</span>
+                  {viewTask.completed
+                    ? <span className="bdg bdg-ok">✓ Completed</span>
+                    : <span className="bdg bdg-acc">Open</span>}
+                  {isOverdue && <span className="bdg bdg-err">Overdue</span>}
+                </div>
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                {/* Description */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Description</div>
+                  <div style={{ fontSize: 13, color: viewTask.description ? 'var(--ink)' : 'var(--ink-4)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {viewTask.description || 'No description provided.'}
+                  </div>
+                </div>
+
+                {/* Meta grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Assigned to</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="av-circle" style={{ width: 24, height: 24, fontSize: 9, flexShrink: 0, background: `linear-gradient(135deg, oklch(0.55 0.13 ${hue}), oklch(0.42 0.16 ${hue + 20}))` }}>
+                        {(viewTask.assigned_user?.name ?? 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 500 }}>{viewTask.assigned_user?.name ?? '—'}</span>
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Assigned by</div>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{viewTask.by_user?.name ?? '—'}</span>
+                  </div>
+                  {viewTask.due_date && (
+                    <div style={{ background: isOverdue ? 'var(--err-soft)' : 'var(--surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                      <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Due date</div>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: isOverdue ? 'var(--err)' : 'var(--ink)' }}>
+                        {new Date(viewTask.due_date).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                        {isOverdue && ' (overdue)'}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Created</div>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>
+                      {new Date(viewTask.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer actions */}
+              <div style={{ borderTop: '1px solid var(--line)', padding: '12px 20px', flexShrink: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  className={viewTask.completed ? 'btn btn-sec btn-sm' : 'btn btn-acc btn-sm'}
+                  onClick={() => handleToggleFromDetail(viewTask)}
+                >
+                  {viewTask.completed ? '↩ Reopen' : '✓ Mark Complete'}
+                </button>
+
+                {userRole === 'owner' && (
+                  confirmDeleteId === viewTask.id
+                    ? <>
+                        <button className="btn btn-err btn-sm" disabled={deletingId === viewTask.id} onClick={() => handleDeleteTask(viewTask.id)}>
+                          {deletingId === viewTask.id ? 'Deleting…' : 'Confirm Delete'}
+                        </button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                      </>
+                    : <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDeleteId(viewTask.id)} style={{ color: 'var(--err)' }}>
+                        🗑 Delete
+                      </button>
+                )}
+
+                <button className="btn btn-ghost btn-sm" onClick={() => { setViewTask(null); setConfirmDeleteId(null); }} style={{ marginLeft: 'auto' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Assign Task modal */}
       {isModalOpen && (
