@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-type ApprovalSection = 'timeoff' | 'schedules' | 'payroll' | 'documents' | 'access';
+type ApprovalSection = 'timeoff' | 'schedules' | 'payroll' | 'documents' | 'access' | 'signup';
 
 const mono = { fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' } as const;
 const approveStyle = { background: 'oklch(0.96 0.05 145)', color: 'var(--ok)', border: '1px solid oklch(0.88 0.07 145)' } as const;
@@ -56,6 +56,7 @@ export default function ApprovalsClient({
   initialDocs,
   initialAccessRequests = [],
   initialMatrix = {},
+  initialSignups = [],
   isOwner = false,
 }: {
   initialTimeoff: any[];
@@ -64,6 +65,7 @@ export default function ApprovalsClient({
   initialDocs: any[];
   initialAccessRequests?: any[];
   initialMatrix?: Record<string, any>;
+  initialSignups?: any[];
   isOwner?: boolean;
 }) {
   const [timeoff,        setTimeoff]        = useState(initialTimeoff);
@@ -71,10 +73,13 @@ export default function ApprovalsClient({
   const [payrolls,       setPayrolls]       = useState(initialPayrolls);
   const [docs,           setDocs]           = useState(initialDocs);
   const [accessReqs,     setAccessReqs]     = useState(initialAccessRequests);
+  const [signups,        setSignups]        = useState(initialSignups);
   const [matrix,         setMatrix]         = useState<Record<string, any>>(initialMatrix);
   const [busy,           setBusy]           = useState<string | null>(null);
   const [activeSection,  setActiveSection]  = useState<ApprovalSection>('timeoff');
   const [expandedDoc,    setExpandedDoc]    = useState<string | null>(null);
+  const [approvingSignup, setApprovingSignup] = useState<any>(null);
+  const [signupForm, setSignupForm] = useState({ name: '', role: 'sales', department: '', salary: '2500' });
   const [log, setLog] = useState<{ id: string; name: string; action: string; time: string }[]>([]);
 
   const addLog = (name: string, action: string) =>
@@ -115,6 +120,35 @@ export default function ApprovalsClient({
     setBusy(null);
   };
 
+  const openSignupApproval = (s: any) => {
+    setSignupForm({ name: s.name ?? s.username?.split('@')[0] ?? '', role: 'sales', department: 'Sales', salary: '2500' });
+    setApprovingSignup(s);
+  };
+
+  const handleSignupApprove = async () => {
+    if (!approvingSignup) return;
+    setBusy(approvingSignup.id);
+    await dbOp('profiles', 'update', {
+      name: signupForm.name,
+      role: signupForm.role,
+      department: signupForm.department,
+      salary: Number(signupForm.salary),
+      status: 'Active',
+    }, { id: approvingSignup.id });
+    setSignups(prev => prev.filter((s: any) => s.id !== approvingSignup.id));
+    addLog(signupForm.name || approvingSignup.username, 'Approved');
+    setApprovingSignup(null);
+    setBusy(null);
+  };
+
+  const handleSignupDeny = async (s: any) => {
+    setBusy(s.id);
+    await dbOp('profiles', 'update', { status: 'Inactive' }, { id: s.id });
+    setSignups(prev => prev.filter((p: any) => p.id !== s.id));
+    addLog(s.name || s.username, 'Denied');
+    setBusy(null);
+  };
+
   const handleAccessAction = async (req: any, action: 'approved' | 'denied') => {
     setBusy(req.id);
     await dbOp('access_requests', 'update', { status: action }, { id: req.id });
@@ -140,10 +174,11 @@ export default function ApprovalsClient({
   }, {});
 
   const weekCount = Object.keys(scheduleWeeks).length;
-  const totalPending = timeoff.length + weekCount + payrolls.length + docs.length + accessReqs.length;
+  const totalPending = timeoff.length + weekCount + payrolls.length + docs.length + accessReqs.length + signups.length;
 
   const SECTIONS: { id: ApprovalSection; label: string; count: number; hue: number }[] = [
-    { id: 'timeoff',   label: 'Time-Off',        count: timeoff.length,    hue: 75  },
+    { id: 'signup',    label: 'New Members',      count: signups.length,    hue: 35  },
+    { id: 'timeoff',   label: 'Time-Off',         count: timeoff.length,    hue: 75  },
     { id: 'schedules', label: 'Schedules',        count: weekCount,         hue: 268 },
     { id: 'payroll',   label: 'Payroll',          count: payrolls.length,   hue: 145 },
     { id: 'documents', label: 'Documents',        count: docs.length,       hue: 220 },
@@ -151,6 +186,7 @@ export default function ApprovalsClient({
   ];
 
   return (
+    <>
     <div className="page-fade">
       {/* Stat cards */}
       <div className="stat-grid" style={{ marginBottom: 20 }}>
@@ -185,6 +221,38 @@ export default function ApprovalsClient({
                 ))}
               </div>
             </div>
+
+            {/* ─── New Members (signup requests) ───────────────────────────────── */}
+            {activeSection === 'signup' && (
+              signups.length === 0
+                ? <EmptyState label="No pending sign-up requests" />
+                : (
+                  <div style={{ padding: '0 18px 18px' }}>
+                    {signups.map((s: any) => {
+                      const email = s.username ?? '—';
+                      return (
+                        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 14, marginBottom: 10, border: '1px solid var(--line)', borderRadius: 10 }}>
+                          <div style={{ width: 38, height: 38, borderRadius: 9, background: 'oklch(0.94 0.05 35)', color: 'oklch(0.40 0.14 35)', display: 'grid', placeItems: 'center', fontSize: 18, flexShrink: 0 }}>👤</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{email}</div>
+                            <div style={{ fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginTop: 2 }}>
+                              Requested {new Date(s.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button className="btn btn-sm" style={approveStyle} disabled={busy === s.id} onClick={() => openSignupApproval(s)}>
+                              ✓ Approve &amp; Assign
+                            </button>
+                            <button className="btn btn-sm" style={rejectStyle} disabled={busy === s.id} onClick={() => handleSignupDeny(s)}>
+                              {busy === s.id ? '…' : '✕ Deny'}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+            )}
 
             {/* ─── Time-Off ────────────────────────────────────────────────────── */}
             {activeSection === 'timeoff' && (
@@ -536,5 +604,46 @@ export default function ApprovalsClient({
         </div>
       </div>
     </div>
+
+      {/* ─── Signup approval modal ───────────────────────────────────────────── */}
+      {approvingSignup && (
+        <div className="mb">
+          <div className="md" style={{ width: 420 }}>
+            <div className="md-t">Approve — {approvingSignup.username}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 16 }}>
+              Assign this person a role and department before granting access.
+            </div>
+            <div className="pv-fld">
+              <label>Display Name</label>
+              <input type="text" value={signupForm.name} onChange={e => setSignupForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" />
+            </div>
+            <div className="pv-fld">
+              <label>Role</label>
+              <select value={signupForm.role} onChange={e => setSignupForm(f => ({ ...f, role: e.target.value }))}>
+                <option value="sales">Sales</option>
+                <option value="cx">CX</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="admin">Admin</option>
+                <option value="accountant">Accountant</option>
+              </select>
+            </div>
+            <div className="pv-fld">
+              <label>Department</label>
+              <input type="text" value={signupForm.department} onChange={e => setSignupForm(f => ({ ...f, department: e.target.value }))} placeholder="e.g. Sales Team A" />
+            </div>
+            <div className="pv-fld">
+              <label>Base Salary ($)</label>
+              <input type="number" value={signupForm.salary} onChange={e => setSignupForm(f => ({ ...f, salary: e.target.value }))} min={0} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-acc" disabled={busy === approvingSignup.id || !signupForm.name || !signupForm.department} onClick={handleSignupApprove}>
+                {busy === approvingSignup.id ? 'Approving…' : '✓ Approve & Grant Access'}
+              </button>
+              <button className="btn btn-sec" onClick={() => setApprovingSignup(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

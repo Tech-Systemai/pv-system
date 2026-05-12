@@ -22,11 +22,13 @@ export default async function ApprovalsPage() {
     { data: schedules },
     { data: payrolls },
     { data: docs },
+    { data: pendingSignups },
   ] = await Promise.all([
     admin.from('time_off_requests').select('*, profiles!time_off_requests_user_id_fkey(name)').eq('status', 'Pending'),
     admin.from('schedules').select('*, profiles!schedules_user_id_fkey(name, role)').eq('status', 'Pending'),
     admin.from('payrolls').select('*, profiles!payrolls_user_id_fkey(name)').eq('status', 'Pending'),
     admin.from('inbox_documents').select('*, profiles!inbox_documents_user_id_fkey(name)').eq('approval_status', 'pending').order('created_at', { ascending: false }),
+    admin.from('profiles').select('id, username, name, role, department, created_at').eq('status', 'Pending').order('created_at', { ascending: false }),
   ]);
 
   let accessRequests: any[] = [];
@@ -48,6 +50,7 @@ export default async function ApprovalsPage() {
       initialDocs={docs || []}
       initialAccessRequests={accessRequests}
       initialMatrix={matrix}
+      initialSignups={pendingSignups || []}
       isOwner={isOwner}
     />
   );

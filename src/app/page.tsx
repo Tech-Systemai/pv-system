@@ -43,10 +43,18 @@ export default function LoginPage() {
       } else if (data.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, status')
           .eq('id', data.user.id)
           .single();
-        router.push(`/dashboard/${profile?.role ?? 'sales'}`);
+        if (profile?.status === 'Pending') {
+          await supabase.auth.signOut();
+          setMsg({ text: 'Your access request is pending approval. You will be notified once reviewed.', type: 'error' });
+        } else if (profile?.status === 'Inactive' || profile?.status === 'Suspended') {
+          await supabase.auth.signOut();
+          setMsg({ text: 'Your account has been deactivated. Contact an administrator.', type: 'error' });
+        } else {
+          router.push(`/dashboard/${profile?.role ?? 'sales'}`);
+        }
       }
     }
     setLoading(false);
