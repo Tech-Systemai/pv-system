@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
+import { createClient } from '@/utils/supabase/client';
 
 type FilterTab = 'all' | 'open' | 'high' | 'done';
 
@@ -31,6 +32,10 @@ export default function TasksClient({
   const [viewTask, setViewTask]     = useState<any>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [completingTask,       setCompletingTask]       = useState<any>(null);
+  const [completionNote,       setCompletionNote]       = useState('');
+  const [completionFile,       setCompletionFile]       = useState<File | null>(null);
+  const [completionUploading,  setCompletionUploading]  = useState(false);
 
   const handleDeleteTask = async (taskId: string) => {
     setDeletingId(taskId);
@@ -41,17 +46,53 @@ export default function TasksClient({
     setDeletingId(null);
   };
 
-  const handleToggleFromDetail = async (task: any) => {
-    const completed = !task.completed;
-    await dbOp('tasks', 'update', { completed }, { id: task.id });
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed } : t));
-    setViewTask((prev: any) => ({ ...prev, completed }));
+  const openCompletionModal = (task: any) => {
+    setCompletingTask(task);
+    setCompletionNote('');
+    setCompletionFile(null);
   };
 
-  const toggleTask = async (task: any) => {
-    const completed = !task.completed;
-    await dbOp('tasks', 'update', { completed }, { id: task.id });
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed } : t));
+  const submitCompletion = async (note: string | null, file: File | null) => {
+    if (!completingTask) return;
+    setCompletionUploading(true);
+    let fileUrl: string | null = null;
+    let fileName: string | null = null;
+    if (file) {
+      const supabase = createClient();
+      const ext = file.name.split('.').pop() || 'bin';
+      const path = `tasks/${completingTask.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('employee-docs').upload(path, file, { upsert: true });
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage.from('employee-docs').getPublicUrl(path);
+        fileUrl = publicUrl;
+        fileName = file.name;
+      }
+    }
+    const patch: any = { completed: true, completion_note: note || null, completion_file_url: fileUrl, completion_file_name: fileName };
+    await dbOp('tasks', 'update', patch, { id: completingTask.id });
+    setTasks(prev => prev.map(t => t.id === completingTask.id ? { ...t, ...patch } : t));
+    if (viewTask?.id === completingTask.id) setViewTask((prev: any) => ({ ...prev, ...patch }));
+    setCompletingTask(null);
+    setCompletionNote('');
+    setCompletionFile(null);
+    setCompletionUploading(false);
+  };
+
+  const handleReopen = async (task: any) => {
+    const patch = { completed: false, completion_note: null, completion_file_url: null, completion_file_name: null };
+    await dbOp('tasks', 'update', patch, { id: task.id });
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...patch } : t));
+    if (viewTask?.id === task.id) setViewTask((prev: any) => ({ ...prev, ...patch }));
+  };
+
+  const handleToggleFromDetail = (task: any) => {
+    if (task.completed) handleReopen(task);
+    else openCompletionModal(task);
+  };
+
+  const toggleTask = (task: any) => {
+    if (task.completed) handleReopen(task);
+    else openCompletionModal(task);
   };
 
   const handleAssign = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -276,6 +317,28 @@ export default function TasksClient({
                   </div>
                 </div>
 
+                {/* Completion note / attachment */}
+                {viewTask.completed && (viewTask.completion_note || viewTask.completion_file_url) && (
+                  <div style={{ background: 'oklch(0.96 0.04 145)', border: '1px solid oklch(0.88 0.07 145)', borderRadius: 8, padding: '12px 14px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'oklch(0.42 0.12 155)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Completion note</div>
+                    {viewTask.completion_note && (
+                      <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: viewTask.completion_file_url ? 8 : 0 }}>
+                        {viewTask.completion_note}
+                      </div>
+                    )}
+                    {viewTask.completion_file_url && (
+                      <a
+                        href={viewTask.completion_file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'oklch(0.42 0.14 268)', fontWeight: 500, textDecoration: 'none' }}
+                      >
+                        📎 {viewTask.completion_file_name ?? 'Attachment'}
+                      </a>
+                    )}
+                  </div>
+                )}
+
                 {/* Meta grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px' }}>
@@ -337,6 +400,64 @@ export default function TasksClient({
           </div>
         );
       })()}
+
+      {/* ── Completion modal ── */}
+      {completingTask && (
+        <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setCompletingTask(null); setCompletionFile(null); setCompletionNote(''); } }}>
+          <div className="md" style={{ width: 460 }}>
+            <div className="md-t">Complete Task</div>
+            <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, fontWeight: 600 }}>
+              {completingTask.title}
+            </div>
+
+            <div className="pv-fld">
+              <label>Note <span style={{ fontWeight: 400, color: 'var(--ink-4)' }}>(optional)</span></label>
+              <textarea
+                rows={3}
+                placeholder="Describe what was done, any outcomes or observations…"
+                value={completionNote}
+                onChange={e => setCompletionNote(e.target.value)}
+              />
+            </div>
+
+            <div className="pv-fld">
+              <label>Attachment <span style={{ fontWeight: 400, color: 'var(--ink-4)' }}>(optional — PDF, Word, image…)</span></label>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                onChange={e => setCompletionFile(e.target.files?.[0] ?? null)}
+              />
+              {completionFile && (
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 5 }}>📎 {completionFile.name}</div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-acc"
+                disabled={completionUploading}
+                onClick={() => submitCompletion(completionNote, completionFile)}
+              >
+                {completionUploading ? 'Uploading…' : '✓ Mark Complete'}
+              </button>
+              <button
+                className="btn btn-sec"
+                disabled={completionUploading}
+                onClick={() => submitCompletion(null, null)}
+              >
+                Skip &amp; Complete
+              </button>
+              <button
+                className="btn btn-ghost"
+                disabled={completionUploading}
+                onClick={() => { setCompletingTask(null); setCompletionFile(null); setCompletionNote(''); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Assign Task modal */}
       {isModalOpen && (
