@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
+const COLLECTION_TYPES = ['CRM Website', 'Partial Collection'] as const;
+const LOCATIONS = ['Main Office', 'North Branch', 'South Branch'] as const;
+
 export default function CollectionsClient({
   initialCollections,
   currentUserId,
@@ -14,17 +17,26 @@ export default function CollectionsClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const todayISO = new Date().toISOString().slice(0, 10);
+
   const handleLog = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
     const fd = new FormData(e.currentTarget);
     const newColl = {
-      user_id: currentUserId,
-      customer_id: fd.get('customer_id') as string,
-      amount: parseFloat(fd.get('amount') as string),
-      type: 'Collection',
-      status: 'Pending',
+      user_id:         currentUserId,
+      type:            'Collection',
+      status:          'Pending',
+      customer_name:   fd.get('customer_name') as string,
+      customer_phone:  fd.get('customer_phone') as string,
+      customer_email:  fd.get('customer_email') as string,
+      amount:          parseFloat(fd.get('amount') as string),
+      collection_type: fd.get('collection_type') as string,
+      location:        fd.get('location') as string,
+      collection_date: fd.get('collection_date') as string,
+      // keep customer_id populated for backward-compat with existing queries
+      customer_id:     fd.get('customer_name') as string,
     };
     const { data, error: err } = await dbOp('sales_logs', 'insert', newColl);
     if (err) {
@@ -85,18 +97,59 @@ export default function CollectionsClient({
               {error}
             </div>
           )}
-          <form onSubmit={handleLog} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-            <div className="pv-fld" style={{ margin: 0 }}>
-              <label>Customer ID / Name</label>
-              <input type="text" name="customer_id" required placeholder="e.g. CUST-1042" />
+          <form onSubmit={handleLog}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {/* Row 1: Customer name + phone */}
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Customer Name</label>
+                <input type="text" name="customer_name" required placeholder="Full name" />
+              </div>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Phone Number</label>
+                <input type="tel" name="customer_phone" placeholder="+1 (555) 000-0000" />
+              </div>
+
+              {/* Row 2: Email + Amount */}
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Email Address</label>
+                <input type="email" name="customer_email" placeholder="customer@email.com" />
+              </div>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Amount ($)</label>
+                <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" />
+              </div>
+
+              {/* Row 3: Collection type + Location */}
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Collection Type</label>
+                <select name="collection_type" required>
+                  <option value="">Select type…</option>
+                  {COLLECTION_TYPES.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Location</label>
+                <select name="location" required>
+                  <option value="">Select location…</option>
+                  {LOCATIONS.map(l => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 4: Date + submit */}
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Collection Date</label>
+                <input type="date" name="collection_date" required defaultValue={todayISO} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button type="submit" className="btn btn-acc" disabled={isSubmitting} style={{ height: 36, width: '100%' }}>
+                  {isSubmitting ? 'Logging…' : '+ Log Collection'}
+                </button>
+              </div>
             </div>
-            <div className="pv-fld" style={{ margin: 0 }}>
-              <label>Amount ($)</label>
-              <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" />
-            </div>
-            <button type="submit" className="btn btn-acc" disabled={isSubmitting} style={{ height: 36, alignSelf: 'end' }}>
-              {isSubmitting ? 'Logging…' : '+ Log Collection'}
-            </button>
           </form>
         </div>
       </div>
@@ -119,7 +172,10 @@ export default function CollectionsClient({
               <thead>
                 <tr>
                   <th>Customer</th>
-                  <th>Date / Time</th>
+                  <th>Contact</th>
+                  <th>Type</th>
+                  <th>Location</th>
+                  <th>Date</th>
                   <th>Amount</th>
                   <th>Status</th>
                 </tr>
@@ -128,13 +184,22 @@ export default function CollectionsClient({
                 {collections.map(c => (
                   <tr key={c.id}>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'oklch(0.96 0.05 145)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ok)', fontWeight: 700, fontSize: 14 }}>$</div>
-                        <div style={{ fontWeight: 600 }}>{c.customer_id}</div>
-                      </div>
+                      <div style={{ fontWeight: 600 }}>{c.customer_name || c.customer_id || '—'}</div>
                     </td>
+                    <td>
+                      <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.customer_phone || '—'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{c.customer_email || ''}</div>
+                    </td>
+                    <td>
+                      {c.collection_type ? (
+                        <span className="bdg bdg-acc">{c.collection_type}</span>
+                      ) : '—'}
+                    </td>
+                    <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.location || '—'}</td>
                     <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>
-                      {new Date(c.created_at).toLocaleString()}
+                      {c.collection_date
+                        ? new Date(c.collection_date + 'T00:00:00').toLocaleDateString()
+                        : new Date(c.created_at).toLocaleDateString()}
                     </td>
                     <td style={{ fontWeight: 700, color: 'var(--ok)', fontSize: 14 }}>
                       ${Number(c.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
