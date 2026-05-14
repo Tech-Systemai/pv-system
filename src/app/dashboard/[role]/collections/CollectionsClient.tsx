@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-const COLLECTION_TYPES = ['CRM Website', 'Partial Collection'] as const;
-const LOCATIONS = ['Main Office', 'North Branch', 'South Branch'] as const;
+const COLLECTION_TYPES = ['CRM', 'Website', 'Partially'] as const;
 
 export default function CollectionsClient({
   initialCollections,
@@ -33,7 +32,6 @@ export default function CollectionsClient({
       customer_email:  fd.get('customer_email') as string,
       amount:          parseFloat(fd.get('amount') as string),
       collection_type: fd.get('collection_type') as string,
-      location:        fd.get('location') as string,
       collection_date: fd.get('collection_date') as string,
       // keep customer_id populated for backward-compat with existing queries
       customer_id:     fd.get('customer_name') as string,
@@ -119,7 +117,7 @@ export default function CollectionsClient({
                 <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00" />
               </div>
 
-              {/* Row 3: Collection type + Location */}
+              {/* Row 3: Collection type + Date */}
               <div className="pv-fld" style={{ margin: 0 }}>
                 <label>Collection Type</label>
                 <select name="collection_type" required>
@@ -130,22 +128,17 @@ export default function CollectionsClient({
                 </select>
               </div>
               <div className="pv-fld" style={{ margin: 0 }}>
-                <label>Location</label>
-                <select name="location" required>
-                  <option value="">Select location…</option>
-                  {LOCATIONS.map(l => (
-                    <option key={l} value={l}>{l}</option>
-                  ))}
-                </select>
+                <label>Collection Date</label>
+                <input type="date" name="collection_date" required defaultValue={todayISO} />
               </div>
 
-              {/* Row 4: Date + submit */}
+              {/* Row 4: Submit */}
               <div className="pv-fld" style={{ margin: 0 }}>
                 <label>Collection Date</label>
                 <input type="date" name="collection_date" required defaultValue={todayISO} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <button type="submit" className="btn btn-acc" disabled={isSubmitting} style={{ height: 36, width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gridColumn: '1 / -1' }}>
+                <button type="submit" className="btn btn-acc" disabled={isSubmitting} style={{ height: 36 }}>
                   {isSubmitting ? 'Logging…' : '+ Log Collection'}
                 </button>
               </div>
@@ -174,7 +167,6 @@ export default function CollectionsClient({
                   <th>Customer</th>
                   <th>Contact</th>
                   <th>Type</th>
-                  <th>Location</th>
                   <th>Date</th>
                   <th>Amount</th>
                   <th>Status</th>
@@ -195,7 +187,6 @@ export default function CollectionsClient({
                         <span className="bdg bdg-acc">{c.collection_type}</span>
                       ) : '—'}
                     </td>
-                    <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.location || '—'}</td>
                     <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>
                       {c.collection_date
                         ? new Date(c.collection_date + 'T00:00:00').toLocaleDateString()

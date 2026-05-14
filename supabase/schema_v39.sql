@@ -5,8 +5,7 @@ ALTER TABLE public.sales_logs
   ADD COLUMN IF NOT EXISTS customer_name   TEXT,
   ADD COLUMN IF NOT EXISTS customer_phone  TEXT,
   ADD COLUMN IF NOT EXISTS customer_email  TEXT,
-  ADD COLUMN IF NOT EXISTS collection_type TEXT CHECK (collection_type IN ('CRM Website', 'Partial Collection')),
-  ADD COLUMN IF NOT EXISTS location        TEXT,
+  ADD COLUMN IF NOT EXISTS collection_type TEXT CHECK (collection_type IN ('CRM', 'Website', 'Partially')),
   ADD COLUMN IF NOT EXISTS collection_date DATE DEFAULT CURRENT_DATE;
 
 -- Allow CX agents to read their own sales_logs rows (mirrors the existing sales policy)

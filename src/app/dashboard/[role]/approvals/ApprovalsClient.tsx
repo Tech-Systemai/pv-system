@@ -292,7 +292,7 @@ export default function ApprovalsClient({
                       <thead>
                         <tr>
                           <th>Agent</th><th>Customer</th><th>Contact</th>
-                          <th>Type</th><th>Location</th><th>Date</th>
+                          <th>Type</th><th>Date</th>
                           <th>Amount</th><th>Actions</th>
                         </tr>
                       </thead>
@@ -308,7 +308,6 @@ export default function ApprovalsClient({
                                 <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{c.customer_email || ''}</div>
                               </td>
                               <td>{c.collection_type ? <span className="bdg bdg-acc">{c.collection_type}</span> : '—'}</td>
-                              <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.location || '—'}</td>
                               <td style={mono}>
                                 {c.collection_date
                                   ? new Date(c.collection_date + 'T00:00:00').toLocaleDateString()
