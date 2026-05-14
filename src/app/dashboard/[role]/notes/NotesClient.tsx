@@ -32,6 +32,7 @@ export default function NotesClient({
   const [editNote,     setEditNote]     = useState<any>(null);
   const [viewShared,   setViewShared]   = useState<any>(null);
   const [saving,       setSaving]       = useState(false);
+  const [saveError,    setSaveError]    = useState('');
   const [deleting,     setDeleting]     = useState<string | null>(null);
   const [formTitle,    setFormTitle]    = useState('');
   const [formContent,  setFormContent]  = useState('');
@@ -48,6 +49,7 @@ export default function NotesClient({
     setFormType('General');
     setFormSharedWith([]);
     setUserSearch('');
+    setSaveError('');
     setIsModalOpen(true);
   };
 
@@ -58,6 +60,7 @@ export default function NotesClient({
     setFormType(note.type ?? 'General');
     setFormSharedWith(note.shared_with ?? []);
     setUserSearch('');
+    setSaveError('');
     setIsModalOpen(true);
   };
 
@@ -70,18 +73,21 @@ export default function NotesClient({
   const handleSave = async () => {
     if (!formTitle.trim()) return;
     setSaving(true);
+    setSaveError('');
     if (editNote) {
       const { error } = await dbOp('notes', 'update',
         { title: formTitle, content: formContent, type: formType, shared_with: formSharedWith, updated_at: new Date().toISOString() },
         { id: editNote.id }
       );
-      if (!error) setNotes(prev => prev.map(n =>
+      if (error) { setSaveError(error); setSaving(false); return; }
+      setNotes(prev => prev.map(n =>
         n.id === editNote.id ? { ...n, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith } : n
       ));
     } else {
-      const { data } = await dbOp('notes', 'insert',
+      const { data, error } = await dbOp('notes', 'insert',
         { user_id: currentUserId, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith }
       );
+      if (error) { setSaveError(error); setSaving(false); return; }
       if (data?.[0]) setNotes(prev => [data[0], ...prev]);
     }
     setSaving(false);
@@ -399,6 +405,11 @@ export default function NotesClient({
               </div>
             )}
 
+            {saveError && (
+              <div style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)', padding: '10px 12px', borderRadius: 8, fontSize: 12, marginBottom: 12 }}>
+                ⚠ {saveError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-acc" onClick={handleSave} disabled={saving || !formTitle.trim()}>
                 {saving ? 'Saving…' : editNote ? 'Update Note' : 'Save Note'}
