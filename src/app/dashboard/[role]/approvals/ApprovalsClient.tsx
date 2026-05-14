@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
-type ApprovalSection = 'timeoff' | 'schedules' | 'payroll' | 'documents' | 'access' | 'signup';
+type ApprovalSection = 'timeoff' | 'schedules' | 'payroll' | 'documents' | 'access' | 'signup' | 'collections';
 
 const mono = { fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' } as const;
 const approveStyle = { background: 'oklch(0.96 0.05 145)', color: 'var(--ok)', border: '1px solid oklch(0.88 0.07 145)' } as const;
@@ -57,6 +57,7 @@ export default function ApprovalsClient({
   initialAccessRequests = [],
   initialMatrix = {},
   initialSignups = [],
+  initialCollections = [],
   isOwner = false,
 }: {
   initialTimeoff: any[];
@@ -66,6 +67,7 @@ export default function ApprovalsClient({
   initialAccessRequests?: any[];
   initialMatrix?: Record<string, any>;
   initialSignups?: any[];
+  initialCollections?: any[];
   isOwner?: boolean;
 }) {
   const [timeoff,        setTimeoff]        = useState(initialTimeoff);
@@ -74,6 +76,7 @@ export default function ApprovalsClient({
   const [docs,           setDocs]           = useState(initialDocs);
   const [accessReqs,     setAccessReqs]     = useState(initialAccessRequests);
   const [signups,        setSignups]        = useState(initialSignups);
+  const [collections,    setCollections]    = useState(initialCollections);
   const [matrix,         setMatrix]         = useState<Record<string, any>>(initialMatrix);
   const [busy,           setBusy]           = useState<string | null>(null);
   const [activeSection,  setActiveSection]  = useState<ApprovalSection>('timeoff');
@@ -149,6 +152,30 @@ export default function ApprovalsClient({
     setBusy(null);
   };
 
+  const handleCollectionVerify = async (id: string, name: string) => {
+    setBusy(id);
+    await dbOp('sales_logs', 'update', { status: 'Verified' }, { id });
+    setCollections(prev => prev.filter(c => c.id !== id));
+    addLog(name, 'Verified');
+    setBusy(null);
+  };
+
+  const handleCollectionDecline = async (id: string, name: string) => {
+    setBusy(id);
+    await dbOp('sales_logs', 'update', { status: 'Declined' }, { id });
+    setCollections(prev => prev.filter(c => c.id !== id));
+    addLog(name, 'Declined');
+    setBusy(null);
+  };
+
+  const handleCollectionDelete = async (id: string, name: string) => {
+    setBusy(id);
+    await dbOp('sales_logs', 'delete', undefined, { id });
+    setCollections(prev => prev.filter(c => c.id !== id));
+    addLog(name, 'Deleted');
+    setBusy(null);
+  };
+
   const handleAccessAction = async (req: any, action: 'approved' | 'denied') => {
     setBusy(req.id);
     await dbOp('access_requests', 'update', { status: action }, { id: req.id });
@@ -174,14 +201,15 @@ export default function ApprovalsClient({
   }, {});
 
   const weekCount = Object.keys(scheduleWeeks).length;
-  const totalPending = timeoff.length + weekCount + payrolls.length + docs.length + accessReqs.length + signups.length;
+  const totalPending = timeoff.length + weekCount + payrolls.length + docs.length + accessReqs.length + signups.length + collections.length;
 
   const SECTIONS: { id: ApprovalSection; label: string; count: number; hue: number }[] = [
-    { id: 'signup',    label: 'New Members',      count: signups.length,    hue: 35  },
-    { id: 'timeoff',   label: 'Time-Off',         count: timeoff.length,    hue: 75  },
-    { id: 'schedules', label: 'Schedules',        count: weekCount,         hue: 268 },
-    { id: 'payroll',   label: 'Payroll',          count: payrolls.length,   hue: 145 },
-    { id: 'documents', label: 'Documents',        count: docs.length,       hue: 220 },
+    { id: 'signup',      label: 'New Members',      count: signups.length,     hue: 35  },
+    { id: 'collections', label: 'Collections',      count: collections.length, hue: 185 },
+    { id: 'timeoff',     label: 'Time-Off',         count: timeoff.length,     hue: 75  },
+    { id: 'schedules',   label: 'Schedules',        count: weekCount,          hue: 268 },
+    { id: 'payroll',     label: 'Payroll',          count: payrolls.length,    hue: 145 },
+    { id: 'documents',   label: 'Documents',        count: docs.length,        hue: 220 },
     ...(isOwner ? [{ id: 'access' as const, label: 'Access Requests', count: accessReqs.length, hue: 310 }] : []),
   ];
 
@@ -250,6 +278,66 @@ export default function ApprovalsClient({
                         </div>
                       );
                     })}
+                  </div>
+                )
+            )}
+
+            {/* ─── Collections ─────────────────────────────────────────────────── */}
+            {activeSection === 'collections' && (
+              collections.length === 0
+                ? <EmptyState label="No pending collections" />
+                : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Agent</th><th>Customer</th><th>Contact</th>
+                          <th>Type</th><th>Location</th><th>Date</th>
+                          <th>Amount</th><th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {collections.map(c => {
+                          const hue = ((c.profiles?.name ?? 'U').charCodeAt(0) * 13) % 360;
+                          return (
+                            <tr key={c.id}>
+                              <td><AvCell name={c.profiles?.name ?? 'Agent'} hue={hue} /></td>
+                              <td style={{ fontWeight: 600 }}>{c.customer_name || c.customer_id || '—'}</td>
+                              <td>
+                                <div style={{ fontSize: 12 }}>{c.customer_phone || '—'}</div>
+                                <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{c.customer_email || ''}</div>
+                              </td>
+                              <td>{c.collection_type ? <span className="bdg bdg-acc">{c.collection_type}</span> : '—'}</td>
+                              <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{c.location || '—'}</td>
+                              <td style={mono}>
+                                {c.collection_date
+                                  ? new Date(c.collection_date + 'T00:00:00').toLocaleDateString()
+                                  : new Date(c.created_at).toLocaleDateString()}
+                              </td>
+                              <td style={{ fontWeight: 700, color: 'var(--ok)', fontSize: 14 }}>
+                                ${Number(c.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button className="btn btn-sm" style={approveStyle} disabled={busy === c.id}
+                                    onClick={() => handleCollectionVerify(c.id, c.profiles?.name ?? 'Agent')}>
+                                    {busy === c.id ? '…' : '✓ Verify'}
+                                  </button>
+                                  <button className="btn btn-sm" style={rejectStyle} disabled={busy === c.id}
+                                    onClick={() => handleCollectionDecline(c.id, c.profiles?.name ?? 'Agent')}>
+                                    {busy === c.id ? '…' : '✕ Decline'}
+                                  </button>
+                                  <button className="btn btn-sm" style={{ background: 'var(--surface-3)', color: 'var(--ink-3)', border: '1px solid var(--line)' }} disabled={busy === c.id}
+                                    onClick={() => handleCollectionDelete(c.id, c.profiles?.name ?? 'Agent')}>
+                                    {busy === c.id ? '…' : '🗑'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )
             )}

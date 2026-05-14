@@ -205,7 +205,7 @@ export default function CollectionsClient({
                       ${Number(c.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
                     <td>
-                      <span className={c.status === 'Verified' ? 'bdg bdg-ok' : 'bdg bdg-warn'}>{c.status}</span>
+                      <span className={c.status === 'Verified' ? 'bdg bdg-ok' : c.status === 'Declined' ? 'bdg bdg-err' : 'bdg bdg-warn'}>{c.status}</span>
                     </td>
                   </tr>
                 ))}
