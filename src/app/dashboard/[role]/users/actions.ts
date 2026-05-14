@@ -55,8 +55,20 @@ export async function deleteEmployee(userId: string) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-  if (error) return { error: error.message };
+
+  // 1. Nullify task assignments (tasks.assigned_to/assigned_by have no CASCADE)
+  await supabaseAdmin.from('tasks').update({ assigned_to: null }).eq('assigned_to', userId);
+  await supabaseAdmin.from('tasks').update({ assigned_by: null }).eq('assigned_by', userId);
+
+  // 2. Delete the profile row — all other FKs pointing here have CASCADE or SET NULL
+  //    so this clears sales_logs, time_off_requests, schedules, attendance_logs, etc.
+  const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
+  if (profileError) return { error: profileError.message };
+
+  // 3. Now auth.users has no referencing profile row — safe to delete
+  const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (authError) return { error: authError.message };
+
   return { success: true };
 }
 
