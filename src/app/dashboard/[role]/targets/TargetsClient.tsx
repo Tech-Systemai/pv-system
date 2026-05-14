@@ -167,6 +167,7 @@ export default function TargetsClient({
   cxBonus: CxBonus;
 }) {
   const [targets, setTargets] = useState<Target[]>(initialTargets);
+  const [activeTab, setActiveTab] = useState<'sales' | 'cx'>('sales');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editType, setEditType] = useState<'sales' | 'cx'>('sales');
   const [editValue, setEditValue] = useState('');
@@ -211,8 +212,9 @@ export default function TargetsClient({
 
   const salesAgents = agents.filter(a => a.role === 'sales');
   const cxAgents = agents.filter(a => a.role === 'cx');
+  const isCxAgent = currentUserRole === 'cx';
 
-  // Team/personal summary numbers
+  // Summary numbers
   const teamSalesCount = salesAgents.reduce((s, a) => s + getSalesCount(a.id), 0);
   const teamSalesTarget = salesAgents.reduce((s, a) => s + (getTarget(a.id)?.sales_count_target ?? 50), 0);
   const teamSalesPct = teamSalesTarget > 0 ? Math.min(Math.round((teamSalesCount / teamSalesTarget) * 100), 100) : 0;
@@ -220,191 +222,243 @@ export default function TargetsClient({
   const teamCollections = cxAgents.reduce((s, a) => s + getCollected(a.id), 0);
   const teamCxBonus = cxAgents.reduce((s, a) => s + Math.floor(getCollected(a.id) / cxBonus.threshold) * cxBonus.amount, 0);
 
-  // Personal agent numbers (non-mgmt)
-  const myAgent = agents.find(a => a.id === currentUserId);
-  const isCxAgent = currentUserRole === 'cx';
+  if (isMgmt) {
+    return (
+      <div className="page-fade">
+        {/* Tab selector */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {(['sales', 'cx'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => { setActiveTab(tab); setEditingId(null); }}
+              className={activeTab === tab ? 'btn btn-acc' : 'btn btn-sec'}
+              style={{ fontWeight: 600, fontSize: 13 }}
+            >
+              {tab === 'sales' ? 'Sales Targets' : 'Customer Service Targets'}
+            </button>
+          ))}
+        </div>
 
-  return (
-    <div className="page-fade">
-      {/* Summary stat cards */}
-      {isMgmt ? (
+        {/* ── SALES TAB ── */}
+        {activeTab === 'sales' && (
+          <>
+            <div className="stat-grid" style={{ marginBottom: 20 }}>
+              <div className="stat-card" style={{ cursor: 'default' }}>
+                <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
+                <div className="stat-l">TEAM COMPLETION</div>
+                <div className="stat-v" style={{ color: barColor(teamSalesPct) }}>{teamSalesPct}%</div>
+                <div className="stat-foot">{teamSalesCount} / {teamSalesTarget} sales</div>
+              </div>
+              <div className="stat-card" style={{ cursor: 'default' }}>
+                <div className="stat-h"><div className="stat-ico ok">$</div></div>
+                <div className="stat-l">SALES REVENUE</div>
+                <div className="stat-v">${teamRevenue.toLocaleString()}</div>
+                <div className="stat-foot">{period}</div>
+              </div>
+              <div className="stat-card" style={{ cursor: 'default' }}>
+                <div className="stat-h"><div className="stat-ico acc">👥</div></div>
+                <div className="stat-l">ACTIVE AGENTS</div>
+                <div className="stat-v">{salesAgents.length}</div>
+                <div className="stat-foot">Sales team</div>
+              </div>
+            </div>
+
+            {salesAgents.length > 0 && (
+              <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
+                <div className="card-hdr">
+                  <div>
+                    <div className="card-title">Sales Agent Progress</div>
+                    <div className="card-sub">Click a target number to edit it</div>
+                  </div>
+                </div>
+                <div style={{ padding: '0 18px 18px' }}>
+                  {salesAgents.map(agent => {
+                    const count = getSalesCount(agent.id);
+                    const revenue = getSalesRevenue(agent.id);
+                    const targetCount = getTarget(agent.id)?.sales_count_target ?? 50;
+                    const pct = Math.min(Math.round((count / targetCount) * 100), 100);
+                    return (
+                      <AgentRow
+                        key={agent.id}
+                        agent={agent} count={count} revenue={revenue} targetCount={targetCount} pct={pct}
+                        isMgmt={true} editingId={editingId} editValue={editValue} saving={saving}
+                        setEditValue={setEditValue}
+                        onStartEdit={() => startSalesEdit(agent)}
+                        onSave={() => saveTarget(agent)}
+                        onCancel={() => setEditingId(null)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Commission Ladder — sales tab only */}
+            <div className="card">
+              <div className="card-hdr">
+                <div className="card-title">Commission Ladder</div>
+                <div className="card-sub">Per-sale rate based on monthly volume</div>
+              </div>
+              <div style={{ padding: '0 18px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+                {COMMISSION_TIERS.map(tier => (
+                  <div key={tier.range} style={{
+                    padding: '14px 16px', borderRadius: 10,
+                    background: 'var(--surface-2)',
+                    border: '1.5px solid var(--line)',
+                  }}>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 6 }}>{tier.range}</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-2)' }}>{tier.rate}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── CX TAB ── */}
+        {activeTab === 'cx' && (
+          <>
+            <div className="stat-grid" style={{ marginBottom: 20 }}>
+              <div className="stat-card" style={{ cursor: 'default' }}>
+                <div className="stat-h"><div className="stat-ico acc">💰</div></div>
+                <div className="stat-l">TOTAL COLLECTIONS</div>
+                <div className="stat-v">${teamCollections.toLocaleString()}</div>
+                <div className="stat-foot">{period}</div>
+              </div>
+              <div className="stat-card" style={{ cursor: 'default' }}>
+                <div className="stat-h"><div className="stat-ico ok">🎁</div></div>
+                <div className="stat-l">CX BONUSES EARNED</div>
+                <div className="stat-v" style={{ color: 'var(--ok)' }}>${teamCxBonus}</div>
+                <div className="stat-foot">Team total</div>
+              </div>
+              <div className="stat-card" style={{ cursor: 'default' }}>
+                <div className="stat-h"><div className="stat-ico ind">👥</div></div>
+                <div className="stat-l">CX AGENTS</div>
+                <div className="stat-v">{cxAgents.length}</div>
+                <div className="stat-foot">Customer service team</div>
+              </div>
+            </div>
+
+            {cxAgents.length > 0 && (
+              <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
+                <div className="card-hdr">
+                  <div>
+                    <div className="card-title">CX Collection Progress</div>
+                    <div className="card-sub">${cxBonus.amount} bonus per ${cxBonus.threshold.toLocaleString()} collected · Click target to edit</div>
+                  </div>
+                </div>
+                <div style={{ padding: '0 18px 18px' }}>
+                  {cxAgents.map(agent => {
+                    const collected = getCollected(agent.id);
+                    const targetAmt = getTarget(agent.id)?.collection_amount_target ?? 0;
+                    return (
+                      <CxRow
+                        key={agent.id}
+                        agent={agent} collected={collected} targetAmt={targetAmt} cxBonus={cxBonus}
+                        isMgmt={true} editingId={editingId} editValue={editValue} saving={saving}
+                        setEditValue={setEditValue}
+                        onStartEdit={() => startCxEdit(agent)}
+                        onSave={() => saveTarget(agent)}
+                        onCancel={() => setEditingId(null)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* CX Bonus Structure reference */}
+            <div className="card">
+              <div className="card-hdr">
+                <div className="card-title">CX Bonus Structure</div>
+                <div className="card-sub">Commission is calculated per collection milestone</div>
+              </div>
+              <div style={{ padding: '0 18px 18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ padding: '14px 20px', borderRadius: 10, background: 'oklch(0.96 0.04 145)', border: '1px solid oklch(0.88 0.07 145)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--ok)', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>Bonus per milestone</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ok)' }}>${cxBonus.amount}</div>
+                  </div>
+                  <div style={{ color: 'var(--ink-4)', fontSize: 16, fontWeight: 500 }}>for every</div>
+                  <div style={{ padding: '14px 20px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--ink-3)', fontWeight: 700, marginBottom: 4, textTransform: 'uppercase' }}>Collection milestone</div>
+                    <div style={{ fontSize: 22, fontWeight: 800 }}>${cxBonus.threshold.toLocaleString()}</div>
+                  </div>
+                  <div style={{ color: 'var(--ink-4)', fontSize: 13, maxWidth: 260 }}>
+                    collected. Bonuses stack — collecting ${(cxBonus.threshold * 3).toLocaleString()} earns ${cxBonus.amount * 3} in bonuses.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ── AGENT VIEW (non-mgmt) ──
+  if (isCxAgent) {
+    const collected = getCollected(currentUserId);
+    const targetAmt = getTarget(currentUserId)?.collection_amount_target ?? 0;
+    const pct = targetAmt > 0 ? Math.min(Math.round((collected / targetAmt) * 100), 100) : 0;
+    const bonus = Math.floor(collected / cxBonus.threshold) * cxBonus.amount;
+
+    return (
+      <div className="page-fade">
         <div className="stat-grid" style={{ marginBottom: 20 }}>
           <div className="stat-card" style={{ cursor: 'default' }}>
-            <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
-            <div className="stat-l">SALES COMPLETION</div>
-            <div className="stat-v" style={{ color: barColor(teamSalesPct) }}>{teamSalesPct}%</div>
-            <div className="stat-foot">{teamSalesCount} / {teamSalesTarget} sales</div>
-          </div>
-          <div className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className="stat-ico ok">$</div></div>
-            <div className="stat-l">SALES REVENUE</div>
-            <div className="stat-v">${teamRevenue.toLocaleString()}</div>
+            <div className="stat-l">COLLECTED</div>
+            <div className="stat-v" style={{ color: 'var(--ok)' }}>${collected.toLocaleString()}</div>
             <div className="stat-foot">{period}</div>
           </div>
           <div className="stat-card" style={{ cursor: 'default' }}>
-            <div className="stat-h"><div className="stat-ico acc">💰</div></div>
-            <div className="stat-l">CX COLLECTIONS</div>
-            <div className="stat-v">${teamCollections.toLocaleString()}</div>
-            <div className="stat-foot">{period}</div>
+            <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
+            <div className="stat-l">TARGET</div>
+            <div className="stat-v">{targetAmt > 0 ? `$${targetAmt.toLocaleString()}` : 'Not set'}</div>
+            <div className="stat-foot">{targetAmt > 0 ? `${pct}% complete` : 'Ask your manager'}</div>
           </div>
           <div className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className="stat-ico ok">🎁</div></div>
-            <div className="stat-l">CX BONUSES</div>
-            <div className="stat-v" style={{ color: 'var(--ok)' }}>${teamCxBonus}</div>
-            <div className="stat-foot">Total earned</div>
+            <div className="stat-l">BONUS EARNED</div>
+            <div className="stat-v" style={{ color: 'var(--ok)' }}>${bonus}</div>
+            <div className="stat-foot">{Math.floor(collected / cxBonus.threshold)} × ${cxBonus.amount}</div>
+          </div>
+          <div className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className="stat-ico acc">➡</div></div>
+            <div className="stat-l">NEXT BONUS IN</div>
+            <div className="stat-v">${(cxBonus.threshold - (collected % cxBonus.threshold)).toLocaleString()}</div>
+            <div className="stat-foot">More to collect</div>
           </div>
         </div>
-      ) : (
-        <div className="stat-grid" style={{ marginBottom: 20 }}>
-          {isCxAgent ? (() => {
-            const collected = getCollected(currentUserId);
-            const targetAmt = getTarget(currentUserId)?.collection_amount_target ?? 0;
-            const pct = targetAmt > 0 ? Math.min(Math.round((collected / targetAmt) * 100), 100) : 0;
-            const bonus = Math.floor(collected / cxBonus.threshold) * cxBonus.amount;
-            return (
-              <>
-                <div className="stat-card" style={{ cursor: 'default' }}>
-                  <div className="stat-h"><div className="stat-ico ok">$</div></div>
-                  <div className="stat-l">COLLECTED</div>
-                  <div className="stat-v" style={{ color: 'var(--ok)' }}>${collected.toLocaleString()}</div>
-                  <div className="stat-foot">{period}</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'default' }}>
-                  <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
-                  <div className="stat-l">TARGET</div>
-                  <div className="stat-v">{targetAmt > 0 ? `$${targetAmt.toLocaleString()}` : 'Not set'}</div>
-                  <div className="stat-foot">{targetAmt > 0 ? `${pct}% complete` : 'Ask your manager'}</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'default' }}>
-                  <div className="stat-h"><div className="stat-ico ok">🎁</div></div>
-                  <div className="stat-l">BONUS EARNED</div>
-                  <div className="stat-v" style={{ color: 'var(--ok)' }}>${bonus}</div>
-                  <div className="stat-foot">{Math.floor(collected / cxBonus.threshold)} × ${cxBonus.amount}</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'default' }}>
-                  <div className="stat-h"><div className="stat-ico acc">➡</div></div>
-                  <div className="stat-l">NEXT BONUS</div>
-                  <div className="stat-v">${cxBonus.threshold - (collected % cxBonus.threshold) < cxBonus.threshold ? (cxBonus.threshold - Math.floor(collected % cxBonus.threshold)).toLocaleString() : '0'}</div>
-                  <div className="stat-foot">More to collect</div>
-                </div>
-              </>
-            );
-          })() : (() => {
-            const count = getSalesCount(currentUserId);
-            const targetCount = getTarget(currentUserId)?.sales_count_target ?? 50;
-            const pct = Math.min(Math.round((count / targetCount) * 100), 100);
-            return (
-              <>
-                <div className="stat-card" style={{ cursor: 'default' }}>
-                  <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
-                  <div className="stat-l">MY COMPLETION</div>
-                  <div className="stat-v" style={{ color: barColor(pct) }}>{pct}%</div>
-                  <div className="stat-foot">{count} / {targetCount} sales</div>
-                </div>
-                <div className="stat-card" style={{ cursor: 'default' }}>
-                  <div className="stat-h"><div className="stat-ico ok">$</div></div>
-                  <div className="stat-l">MY REVENUE</div>
-                  <div className="stat-v">${getSalesRevenue(currentUserId).toLocaleString()}</div>
-                  <div className="stat-foot">{period}</div>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      )}
 
-      {/* Sales agent section */}
-      {(isMgmt || !isCxAgent) && salesAgents.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
-          <div className="card-hdr">
-            <div>
-              <div className="card-title">{isMgmt ? 'Sales Agent Progress' : 'My Progress'}</div>
-              <div className="card-sub">{isMgmt ? 'Click target to edit' : `Your sales this month · ${period}`}</div>
-            </div>
-          </div>
-          <div style={{ padding: '0 18px 18px' }}>
-            {salesAgents.map(agent => {
-              const count = getSalesCount(agent.id);
-              const revenue = getSalesRevenue(agent.id);
-              const targetCount = getTarget(agent.id)?.sales_count_target ?? 50;
-              const pct = Math.min(Math.round((count / targetCount) * 100), 100);
-              return (
-                <AgentRow
-                  key={agent.id}
-                  agent={agent} count={count} revenue={revenue} targetCount={targetCount} pct={pct}
-                  isMgmt={isMgmt} editingId={editingId} editValue={editValue} saving={saving}
-                  setEditValue={setEditValue}
-                  onStartEdit={() => startSalesEdit(agent)}
-                  onSave={() => saveTarget(agent)}
-                  onCancel={() => setEditingId(null)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* CX agent section */}
-      {(isMgmt || isCxAgent) && cxAgents.length > 0 && (
-        <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
-          <div className="card-hdr">
-            <div>
-              <div className="card-title">{isMgmt ? 'CX Collection Progress' : 'My Collection Progress'}</div>
-              <div className="card-sub">
-                ${cxBonus.amount} bonus per ${cxBonus.threshold.toLocaleString()} collected
-                {isMgmt && ' · Click target to edit'}
+        {cxAgents.length > 0 && (
+          <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
+            <div className="card-hdr">
+              <div>
+                <div className="card-title">My Collection Progress</div>
+                <div className="card-sub">{period}</div>
               </div>
             </div>
+            <div style={{ padding: '0 18px 18px' }}>
+              {cxAgents.filter(a => a.id === currentUserId).map(agent => {
+                const agentCollected = getCollected(agent.id);
+                const agentTarget = getTarget(agent.id)?.collection_amount_target ?? 0;
+                return (
+                  <CxRow
+                    key={agent.id}
+                    agent={agent} collected={agentCollected} targetAmt={agentTarget} cxBonus={cxBonus}
+                    isMgmt={false} editingId={null} editValue="" saving={false}
+                    setEditValue={() => {}}
+                    onStartEdit={() => {}} onSave={() => {}} onCancel={() => {}}
+                  />
+                );
+              })}
+            </div>
           </div>
-          <div style={{ padding: '0 18px 18px' }}>
-            {cxAgents.map(agent => {
-              const collected = getCollected(agent.id);
-              const targetAmt = getTarget(agent.id)?.collection_amount_target ?? 0;
-              return (
-                <CxRow
-                  key={agent.id}
-                  agent={agent} collected={collected} targetAmt={targetAmt} cxBonus={cxBonus}
-                  isMgmt={isMgmt} editingId={editingId} editValue={editValue} saving={saving}
-                  setEditValue={setEditValue}
-                  onStartEdit={() => startCxEdit(agent)}
-                  onSave={() => saveTarget(agent)}
-                  onCancel={() => setEditingId(null)}
-                />
-              );
-            })}
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Commission ladder — only for sales agents */}
-      {(!isCxAgent) && (
-        <div className="card">
-          <div className="card-hdr">
-            <div className="card-title">Commission Ladder</div>
-          </div>
-          <div style={{ padding: '0 18px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-            {COMMISSION_TIERS.map(tier => {
-              const myCount = getSalesCount(currentUserId);
-              const active = myCount >= tier.min;
-              const current = myCount >= tier.min && (tier.max === Infinity || myCount <= tier.max);
-              return (
-                <div key={tier.range} style={{
-                  padding: '14px 16px', borderRadius: 10,
-                  background: current ? 'oklch(0.96 0.05 145)' : active ? 'oklch(0.97 0.02 145)' : 'var(--surface-2)',
-                  border: `1.5px solid ${current ? 'oklch(0.85 0.08 145)' : active ? 'oklch(0.90 0.04 145)' : 'var(--line)'}`,
-                }}>
-                  <div style={{ fontSize: 11, color: current ? 'var(--ok)' : 'var(--ink-3)', fontWeight: 700, marginBottom: 6 }}>{tier.range}</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: current ? 'var(--ok)' : active ? 'oklch(0.48 0.10 145)' : 'var(--ink-3)' }}>{tier.rate}</div>
-                  {current && <div style={{ fontSize: 10, color: 'var(--ok)', marginTop: 6, fontWeight: 600 }}>● Current tier</div>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* CX bonus reference — only for CX agents viewing their own page */}
-      {isCxAgent && !isMgmt && (
+        {/* CX bonus reference — no commission ladder */}
         <div className="card">
           <div className="card-hdr">
             <div className="card-title">Your Bonus Structure</div>
@@ -421,7 +475,83 @@ export default function TargetsClient({
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ── SALES AGENT VIEW ──
+  const count = getSalesCount(currentUserId);
+  const targetCount = getTarget(currentUserId)?.sales_count_target ?? 50;
+  const pct = Math.min(Math.round((count / targetCount) * 100), 100);
+
+  return (
+    <div className="page-fade">
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ind">🎯</div></div>
+          <div className="stat-l">MY COMPLETION</div>
+          <div className="stat-v" style={{ color: barColor(pct) }}>{pct}%</div>
+          <div className="stat-foot">{count} / {targetCount} sales</div>
+        </div>
+        <div className="stat-card" style={{ cursor: 'default' }}>
+          <div className="stat-h"><div className="stat-ico ok">$</div></div>
+          <div className="stat-l">MY REVENUE</div>
+          <div className="stat-v">${getSalesRevenue(currentUserId).toLocaleString()}</div>
+          <div className="stat-foot">{period}</div>
+        </div>
+      </div>
+
+      {salesAgents.length > 0 && (
+        <div className="card" style={{ overflow: 'hidden', marginBottom: 20 }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">My Progress</div>
+              <div className="card-sub">Your sales this month · {period}</div>
+            </div>
+          </div>
+          <div style={{ padding: '0 18px 18px' }}>
+            {salesAgents.filter(a => a.id === currentUserId).map(agent => {
+              const c = getSalesCount(agent.id);
+              const r = getSalesRevenue(agent.id);
+              const tc = getTarget(agent.id)?.sales_count_target ?? 50;
+              const p = Math.min(Math.round((c / tc) * 100), 100);
+              return (
+                <AgentRow
+                  key={agent.id}
+                  agent={agent} count={c} revenue={r} targetCount={tc} pct={p}
+                  isMgmt={false} editingId={null} editValue="" saving={false}
+                  setEditValue={() => {}}
+                  onStartEdit={() => {}} onSave={() => {}} onCancel={() => {}}
+                />
+              );
+            })}
+          </div>
+        </div>
       )}
+
+      {/* Commission Ladder — sales agents only */}
+      <div className="card">
+        <div className="card-hdr">
+          <div className="card-title">Commission Ladder</div>
+        </div>
+        <div style={{ padding: '0 18px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+          {COMMISSION_TIERS.map(tier => {
+            const active = count >= tier.min;
+            const current = count >= tier.min && (tier.max === Infinity || count <= tier.max);
+            return (
+              <div key={tier.range} style={{
+                padding: '14px 16px', borderRadius: 10,
+                background: current ? 'oklch(0.96 0.05 145)' : active ? 'oklch(0.97 0.02 145)' : 'var(--surface-2)',
+                border: `1.5px solid ${current ? 'oklch(0.85 0.08 145)' : active ? 'oklch(0.90 0.04 145)' : 'var(--line)'}`,
+              }}>
+                <div style={{ fontSize: 11, color: current ? 'var(--ok)' : 'var(--ink-3)', fontWeight: 700, marginBottom: 6 }}>{tier.range}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: current ? 'var(--ok)' : active ? 'oklch(0.48 0.10 145)' : 'var(--ink-3)' }}>{tier.rate}</div>
+                {current && <div style={{ fontSize: 10, color: 'var(--ok)', marginTop: 6, fontWeight: 600 }}>● Current tier</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
