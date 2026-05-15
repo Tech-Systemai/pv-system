@@ -252,9 +252,11 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
 export default function Sidebar({
   role,
   allowedModules,
+  userName,
 }: {
   role: string;
   allowedModules?: Record<string, string>; // ViewType per module for this role
+  userName?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -454,8 +456,9 @@ export default function Sidebar({
     return vt === 'agent' ? item.agentLabel : item.label;
   };
 
-  const nameInitial = profile?.name
-    ? profile.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toLowerCase()
+  const displayName = profile?.name || userName || '';
+  const nameInitial = displayName
+    ? displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toLowerCase()
     : 'u';
 
   const p = FULL_PORTALS[role] || FULL_PORTALS.sales;
@@ -523,7 +526,7 @@ export default function Sidebar({
           <div className="sb-av">{nameInitial}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="sb-un" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {profile?.name ? profile.name.split(' ')[0].toLowerCase() : '…'}
+              {displayName ? displayName.split(' ')[0].toLowerCase() : '…'}
             </div>
             <div className="sb-ur">{profile?.role || role}</div>
           </div>

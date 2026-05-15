@@ -83,7 +83,7 @@ export default async function DashboardLayout({
     <div className="pv">
       <DailyUpdatePrompt userId={user.id} />
       <div className="pv-grid">
-        <Sidebar role={urlRole} allowedModules={allowedModules} />
+        <Sidebar role={urlRole} allowedModules={allowedModules} userName={profile?.name ?? ''} />
 
         <main className="main">
           <header className="tb">

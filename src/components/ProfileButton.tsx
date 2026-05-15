@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
 
 const BUCKET = 'employee-docs';
@@ -60,6 +61,7 @@ export default function ProfileButton({
   };
 }) {
   const supabase = createClient();
+  const [mounted, setMounted]   = useState(false);
   const [open, setOpen]         = useState(false);
   const [tab, setTab]           = useState<Tab>('overview');
   const [profile, setProfile]   = useState(initialProfile);
@@ -68,6 +70,8 @@ export default function ProfileButton({
   const [paystubs,  setPaystubs]  = useState<any[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const idRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -126,9 +130,9 @@ export default function ProfileButton({
         {initials}
       </button>
 
-      {open && (
+      {open && mounted && createPortal(
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(15,23,42,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
         >
           <div style={{ background: '#fff', borderRadius: 16, width: 540, maxWidth: '100%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
@@ -292,7 +296,8 @@ export default function ProfileButton({
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
