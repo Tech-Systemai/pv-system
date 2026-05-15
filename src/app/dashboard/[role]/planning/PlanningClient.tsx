@@ -1,684 +1,731 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
-/* ─── Data ─────────────────────────────────────────────────── */
-
-const PLAN_AREAS = [
-  {
-    id: 'marketing', label: 'Marketing', hue: 268, glyph: '📣',
-    objective: 'Drive brand awareness and lead generation across all channels.',
-    kpis: [{ label: 'Leads / mo', value: '340', target: '500', pct: 68 }, { label: 'CAC', value: '$42', target: '$35', pct: 55 }, { label: 'Campaign ROI', value: '2.8×', target: '4×', pct: 70 }],
-    owner: 'Sara M.', contributors: ['James K.', 'Lin W.'],
-    nudges: ['Revisit content calendar for Q3 gaps.', 'A/B test subject lines on next campaign.'],
-    spark: [30, 45, 40, 60, 55, 80, 78, 90],
-  },
-  {
-    id: 'business', label: 'Business Dev', hue: 25, glyph: '🤝',
-    objective: 'Expand partnerships and close enterprise pipeline.',
-    kpis: [{ label: 'Pipeline', value: '$1.2M', target: '$2M', pct: 60 }, { label: 'Partnerships', value: '4', target: '8', pct: 50 }, { label: 'Meetings / wk', value: '6', target: '10', pct: 60 }],
-    owner: 'Omar T.', contributors: ['Priya S.'],
-    nudges: ['Follow up with Acme Corp proposal.', 'Schedule Q3 partner summit.'],
-    spark: [20, 30, 35, 40, 50, 45, 60, 65],
-  },
-  {
-    id: 'financial', label: 'Financial', hue: 145, glyph: '📊',
-    objective: 'Maintain healthy margins and forecast accuracy within 5%.',
-    kpis: [{ label: 'Gross Margin', value: '58%', target: '65%', pct: 89 }, { label: 'Burn Rate', value: '$80k', target: '$70k', pct: 55 }, { label: 'Forecast Δ', value: '6%', target: '<5%', pct: 40 }],
-    owner: 'Dana L.', contributors: ['Omar T.', 'Sara M.'],
-    nudges: ['Tighten opex forecast model.', 'Reconcile Q2 vendor invoices.'],
-    spark: [50, 52, 55, 53, 60, 62, 58, 64],
-  },
-  {
-    id: 'website', label: 'Website', hue: 200, glyph: '🌐',
-    objective: 'Improve conversion rate and reduce time-to-value for visitors.',
-    kpis: [{ label: 'Conv. Rate', value: '2.1%', target: '3.5%', pct: 60 }, { label: 'Bounce Rate', value: '54%', target: '40%', pct: 43 }, { label: 'Page Speed', value: '72', target: '90', pct: 80 }],
-    owner: 'Lin W.', contributors: ['James K.'],
-    nudges: ['Compress hero images for mobile.', 'Add social proof section above fold.'],
-    spark: [60, 62, 58, 65, 70, 68, 74, 80],
-  },
-  {
-    id: 'cx', label: 'CX', hue: 75, glyph: '⭐',
-    objective: 'Achieve NPS ≥ 50 and < 2% churn by end of quarter.',
-    kpis: [{ label: 'NPS', value: '43', target: '50', pct: 86 }, { label: 'Churn', value: '2.4%', target: '<2%', pct: 50 }, { label: 'CSAT', value: '4.2', target: '4.7', pct: 89 }],
-    owner: 'Priya S.', contributors: ['Dana L.'],
-    nudges: ['Launch post-onboarding survey.', 'Reduce ticket first-response to < 2 hrs.'],
-    spark: [40, 45, 50, 48, 55, 58, 62, 70],
-  },
-  {
-    id: 'sales', label: 'Sales', hue: 155, glyph: '💰',
-    objective: 'Hit $500k MRR with < 45-day average deal cycle.',
-    kpis: [{ label: 'MRR', value: '$380k', target: '$500k', pct: 76 }, { label: 'Deal Cycle', value: '52d', target: '45d', pct: 60 }, { label: 'Win Rate', value: '28%', target: '35%', pct: 80 }],
-    owner: 'James K.', contributors: ['Omar T.', 'Lin W.'],
-    nudges: ['Implement deal-stage SLAs in CRM.', 'Reinstate Friday pipeline review call.'],
-    spark: [55, 60, 65, 62, 70, 75, 78, 85],
-  },
-];
-
-type WidgetType = 'goal' | 'sticky' | 'checklist' | 'file' | 'text';
-type Tool = 'pointer' | 'sticky' | 'pen' | 'goal' | 'checklist' | 'text';
-type ViewMode = 'board' | 'outline' | 'timeline';
-
+/* ── Types ─────────────────────────────────────────────────── */
+type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
 interface CheckItem { text: string; done: boolean }
-interface Widget {
-  id: string; type: WidgetType;
-  x: number; y: number; w: number; h: number;
-  text?: string; color?: string;
-  items?: CheckItem[];
-  label?: string; progress?: number;
-  areaId: string;
+interface PlanCard {
+  id: string; title: string; description: string;
+  priority: Priority; dueDate: string; tags: string[];
+  checklist: CheckItem[]; assignee: string;
 }
-interface Stroke { points: [number, number][]; color: string; width: number }
-
-function makeSeedWidgets(areaId: string, hue: number): Widget[] {
-  return [
-    { id: `${areaId}-g1`, type: 'goal', x: 40, y: 40, w: 200, h: 90, label: 'Q3 Objective', progress: 62, areaId },
-    { id: `${areaId}-s1`, type: 'sticky', x: 280, y: 40, w: 160, h: 120, text: 'Review KPIs weekly with team', color: `oklch(0.96 0.04 ${hue})`, areaId },
-    { id: `${areaId}-c1`, type: 'checklist', x: 40, y: 170, w: 200, h: 140, items: [{ text: 'Define OKRs', done: true }, { text: 'Assign owners', done: true }, { text: 'Set milestones', done: false }, { text: 'Schedule reviews', done: false }], areaId },
-    { id: `${areaId}-t1`, type: 'text', x: 280, y: 200, w: 220, h: 80, text: 'Key insight: focus on top 20% of activities that drive 80% of outcomes.', areaId },
-  ];
+interface PlanColumn { id: string; title: string; color: string; cards: PlanCard[] }
+interface PlanBoard {
+  id: string; title: string; description: string;
+  areaId: string; shared: boolean; createdAt: string;
+  columns: PlanColumn[];
 }
 
-const SEED_BOARDS: Record<string, { widgets: Widget[]; strokes: Stroke[] }> = {};
-for (const a of PLAN_AREAS) {
-  SEED_BOARDS[a.id] = { widgets: makeSeedWidgets(a.id, a.hue), strokes: [] };
-}
-
-const TOOLS: { id: Tool; icon: string; label: string }[] = [
-  { id: 'pointer', icon: '↖', label: 'Select' },
-  { id: 'sticky', icon: '📝', label: 'Sticky' },
-  { id: 'pen', icon: '✏', label: 'Pen' },
-  { id: 'goal', icon: '🎯', label: 'Goal' },
-  { id: 'checklist', icon: '☑', label: 'Checklist' },
-  { id: 'text', icon: 'T', label: 'Text' },
+/* ── Constants ─────────────────────────────────────────────── */
+const AREAS = [
+  { id: 'marketing',  label: 'Marketing',    hue: 268, glyph: '📣' },
+  { id: 'business',   label: 'Business Dev', hue: 25,  glyph: '🤝' },
+  { id: 'financial',  label: 'Financial',    hue: 145, glyph: '📊' },
+  { id: 'website',    label: 'Website',      hue: 200, glyph: '🌐' },
+  { id: 'cx',         label: 'CX',           hue: 75,  glyph: '⭐' },
+  { id: 'sales',      label: 'Sales',        hue: 155, glyph: '💰' },
+  { id: 'operations', label: 'Operations',   hue: 220, glyph: '⚙️' },
+  { id: 'hr',         label: 'HR',           hue: 340, glyph: '👥' },
 ];
 
-/* ─── Helpers ───────────────────────────────────────────────── */
+const PRIORITY_CFG: Record<Priority, { label: string; badgeCls: string }> = {
+  none:   { label: '—',      badgeCls: 'bdg-gy' },
+  low:    { label: 'Low',    badgeCls: 'bdg-ok' },
+  medium: { label: 'Medium', badgeCls: 'bdg-warn' },
+  high:   { label: 'High',   badgeCls: 'bdg-err' },
+  urgent: { label: 'Urgent', badgeCls: 'bdg-acc' },
+};
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
+const DEFAULT_COLS = [
+  { title: 'To Do',       color: '220' },
+  { title: 'In Progress', color: '268' },
+  { title: 'Review',      color: '75' },
+  { title: 'Done',        color: '155' },
+];
+
+/* ── Helpers ───────────────────────────────────────────────── */
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+function makeBoard(title: string, areaId: string, description = ''): PlanBoard {
+  return {
+    id: uid(), title, description, areaId, shared: false,
+    createdAt: new Date().toISOString(),
+    columns: DEFAULT_COLS.map(c => ({ id: uid(), title: c.title, color: c.color, cards: [] })),
+  };
 }
 
-function Sparkline({ values, hue }: { values: number[]; hue: number }) {
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const range = max - min || 1;
-  const w = 56; const h = 22;
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - ((v - min) / range) * (h - 4) - 2;
-    return `${x},${y}`;
-  }).join(' ');
-  return (
-    <svg width={w} height={h} style={{ display: 'block' }}>
-      <polyline points={pts} fill="none" stroke={`oklch(0.60 0.14 ${hue})`} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function fmtDate(d: string) {
+  if (!d) return '';
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function KpiBar({ label, value, target, pct, hue }: { label: string; value: string; target: string; pct: number; hue: number }) {
-  const color = pct >= 80 ? 'var(--ok)' : pct >= 55 ? 'var(--warn)' : 'var(--err)';
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-        <span style={{ color: 'var(--ink-3)', fontWeight: 600 }}>{label}</span>
-        <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{value} <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>/ {target}</span></span>
-      </div>
-      <div style={{ height: 4, borderRadius: 2, background: 'var(--line)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: color, transition: 'width 0.4s' }} />
-      </div>
-    </div>
-  );
+function isOverdue(d: string) {
+  return !!d && new Date(d + 'T23:59:59') < new Date();
 }
 
-/* ─── Widget renderer ───────────────────────────────────────── */
+/* ── Seed data ─────────────────────────────────────────────── */
+const SEED: PlanBoard[] = [
+  {
+    id: 'b-1', title: 'Q3 Marketing Plan', description: 'Campaigns, content, and growth initiatives for Q3.',
+    areaId: 'marketing', shared: true, createdAt: new Date().toISOString(),
+    columns: [
+      { id: 'c-1', title: 'To Do', color: '220', cards: [
+        { id: 'k-1', title: 'Launch email re-engagement campaign', description: 'Send targeted flow to leads inactive 60+ days.', priority: 'high', dueDate: '2025-07-15', tags: ['Email'], checklist: [{ text: 'Write copy', done: true }, { text: 'Design template', done: false }, { text: 'Set up automation', done: false }], assignee: 'Sara M.' },
+        { id: 'k-2', title: 'Blog post: Industry trends report', description: '', priority: 'medium', dueDate: '', tags: ['Content'], checklist: [], assignee: 'Lin W.' },
+        { id: 'k-3', title: 'Set up retargeting audiences', description: '', priority: 'low', dueDate: '', tags: ['Ads'], checklist: [], assignee: '' },
+      ]},
+      { id: 'c-2', title: 'In Progress', color: '268', cards: [
+        { id: 'k-4', title: 'A/B test paid ad creatives', description: 'Testing two creative variants across Facebook & Google.', priority: 'high', dueDate: '2025-07-10', tags: ['Ads'], checklist: [{ text: 'Create variant A', done: true }, { text: 'Create variant B', done: true }, { text: 'Launch campaigns', done: false }, { text: 'Monitor daily spend', done: false }], assignee: 'James K.' },
+      ]},
+      { id: 'c-3', title: 'Review', color: '75', cards: [
+        { id: 'k-5', title: 'Brand guidelines refresh', description: '', priority: 'low', dueDate: '', tags: ['Brand'], checklist: [], assignee: 'Sara M.' },
+      ]},
+      { id: 'c-4', title: 'Done', color: '155', cards: [
+        { id: 'k-6', title: 'Q2 campaign performance report', description: '', priority: 'none', dueDate: '', tags: ['Report'], checklist: [], assignee: 'Sara M.' },
+      ]},
+    ],
+  },
+  {
+    id: 'b-2', title: 'Sales Pipeline Q3', description: 'Track deals, outreach, and pipeline initiatives.',
+    areaId: 'sales', shared: false, createdAt: new Date().toISOString(),
+    columns: [
+      { id: 'c-5', title: 'To Do', color: '220', cards: [
+        { id: 'k-7', title: 'Prospect 20 new enterprise accounts', description: '', priority: 'urgent', dueDate: '2025-07-08', tags: [], checklist: [], assignee: 'James K.' },
+        { id: 'k-8', title: 'Update CRM deal stages', description: '', priority: 'medium', dueDate: '', tags: [], checklist: [], assignee: '' },
+      ]},
+      { id: 'c-6', title: 'In Progress', color: '268', cards: [
+        { id: 'k-9', title: 'Proposal: Acme Corp', description: 'Custom enterprise package for 200-seat deployment.', priority: 'high', dueDate: '2025-07-12', tags: ['Enterprise'], checklist: [{ text: 'Discovery call', done: true }, { text: 'Draft proposal', done: false }, { text: 'Internal review', done: false }, { text: 'Send to client', done: false }], assignee: 'Omar T.' },
+      ]},
+      { id: 'c-7', title: 'Review', color: '75', cards: [] },
+      { id: 'c-8', title: 'Done', color: '155', cards: [] },
+    ],
+  },
+];
 
-function WidgetCard({
-  widget, selected, onSelect, onMove, hue,
-  onUpdate,
-}: {
-  widget: Widget; selected: boolean; hue: number;
-  onSelect: (id: string) => void;
-  onMove: (id: string, dx: number, dy: number) => void;
-  onUpdate: (id: string, patch: Partial<Widget>) => void;
-}) {
-  const dragRef = useRef<{ sx: number; sy: number; wx: number; wy: number } | null>(null);
-
-  const onMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
-    e.stopPropagation();
-    onSelect(widget.id);
-    dragRef.current = { sx: e.clientX, sy: e.clientY, wx: widget.x, wy: widget.y };
-    const onMove_ = (me: MouseEvent) => {
-      if (!dragRef.current) return;
-      onMove(widget.id, me.clientX - dragRef.current.sx, me.clientY - dragRef.current.sy);
-    };
-    const onUp = () => { dragRef.current = null; window.removeEventListener('mousemove', onMove_); window.removeEventListener('mouseup', onUp); };
-    window.addEventListener('mousemove', onMove_);
-    window.addEventListener('mouseup', onUp);
-  };
-
-  const base: React.CSSProperties = {
-    position: 'absolute', left: widget.x, top: widget.y, width: widget.w, minHeight: widget.h,
-    borderRadius: 10, cursor: 'grab', userSelect: 'none',
-    boxShadow: selected ? `0 0 0 2px oklch(0.56 0.16 ${hue}), var(--sh-2)` : 'var(--sh-1)',
-    transition: 'box-shadow 0.15s',
-  };
-
-  if (widget.type === 'sticky') {
-    return (
-      <div onMouseDown={onMouseDown} style={{ ...base, background: widget.color ?? `oklch(0.96 0.04 ${hue})`, padding: 12 }}>
-        <div data-no-drag style={{ fontSize: 12, color: 'var(--ink)', lineHeight: 1.55, minHeight: 40 }}
-          contentEditable suppressContentEditableWarning
-          onBlur={e => onUpdate(widget.id, { text: e.currentTarget.textContent ?? '' })}>
-          {widget.text}
-        </div>
-      </div>
-    );
-  }
-
-  if (widget.type === 'goal') {
-    const pct = widget.progress ?? 0;
-    const color = pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn)' : 'var(--err)';
-    return (
-      <div onMouseDown={onMouseDown} style={{ ...base, background: 'white', border: `1.5px solid oklch(0.88 0.06 ${hue})`, padding: 14 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: `oklch(0.55 0.12 ${hue})`, marginBottom: 6 }}>🎯 Goal</div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 10 }}>{widget.label}</div>
-        <div style={{ height: 6, borderRadius: 3, background: 'var(--line)', overflow: 'hidden', marginBottom: 6 }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.4s' }} />
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{pct}% complete</div>
-      </div>
-    );
-  }
-
-  if (widget.type === 'checklist') {
-    const items = widget.items ?? [];
-    const done = items.filter(i => i.done).length;
-    return (
-      <div onMouseDown={onMouseDown} style={{ ...base, background: 'white', border: '1.5px solid var(--line)', padding: 14 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-3)', marginBottom: 8 }}>
-          ☑ Checklist <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>({done}/{items.length})</span>
-        </div>
-        <div data-no-drag style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {items.map((item, i) => (
-            <label key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', cursor: 'pointer', fontSize: 12 }}>
-              <input type="checkbox" checked={item.done} onChange={() => {
-                const next = items.map((it, j) => j === i ? { ...it, done: !it.done } : it);
-                onUpdate(widget.id, { items: next });
-              }} style={{ marginTop: 1, flexShrink: 0 }} />
-              <span style={{ color: item.done ? 'var(--ink-4)' : 'var(--ink)', textDecoration: item.done ? 'line-through' : 'none', lineHeight: 1.4 }}>{item.text}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (widget.type === 'text') {
-    return (
-      <div onMouseDown={onMouseDown} style={{ ...base, background: 'transparent', padding: 8 }}>
-        <div data-no-drag style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.65, minHeight: 30 }}
-          contentEditable suppressContentEditableWarning
-          onBlur={e => onUpdate(widget.id, { text: e.currentTarget.textContent ?? '' })}>
-          {widget.text}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+/* ── Card Detail Modal ─────────────────────────────────────── */
+interface CardModalProps {
+  card: PlanCard; col: PlanColumn; board: PlanBoard;
+  onClose: () => void;
+  onUpdate: (bid: string, cid: string, kid: string, p: Partial<PlanCard>) => void;
+  onMove: (bid: string, from: string, to: string, kid: string) => void;
+  onDelete: (bid: string, cid: string, kid: string) => void;
 }
 
-/* ─── Canvas ────────────────────────────────────────────────── */
+function CardModal({ card, col, board, onClose, onUpdate, onMove, onDelete }: CardModalProps) {
+  const [draft, setDraft] = useState(card);
+  const [newItem, setNewItem] = useState('');
+  const [newTag, setNewTag] = useState('');
 
-function Canvas({
-  widgets, strokes, selectedId, tool, hue,
-  onSelect, onMoveWidget, onUpdateWidget,
-  onAddWidget, onAddStroke,
-}: {
-  widgets: Widget[]; strokes: Stroke[]; selectedId: string | null;
-  tool: Tool; hue: number;
-  onSelect: (id: string | null) => void;
-  onMoveWidget: (id: string, dx: number, dy: number) => void;
-  onUpdateWidget: (id: string, patch: Partial<Widget>) => void;
-  onAddWidget: (w: Widget) => void;
-  onAddStroke: (s: Stroke) => void;
-}) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const penRef = useRef<[number, number][]>([]);
-  const [drawing, setDrawing] = useState(false);
-  const [livePoints, setLivePoints] = useState<[number, number][]>([]);
-
-  const getPos = (e: React.MouseEvent): [number, number] => {
-    const rect = svgRef.current!.getBoundingClientRect();
-    return [e.clientX - rect.left, e.clientY - rect.top];
+  const save = (patch: Partial<PlanCard>) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    onUpdate(board.id, col.id, card.id, patch);
   };
 
-  const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    if (tool === 'pointer') { onSelect(null); return; }
-    if (tool === 'pen') {
-      const pt = getPos(e);
-      penRef.current = [pt];
-      setLivePoints([pt]);
-      setDrawing(true);
-      return;
-    }
-    const [x, y] = getPos(e);
-    const typeMap: Record<string, WidgetType> = { sticky: 'sticky', goal: 'goal', checklist: 'checklist', text: 'text' };
-    const type = typeMap[tool];
-    if (!type) return;
-    const id = uid();
-    const base = { id, x, y, w: 180, h: 110, areaId: '' };
-    if (type === 'sticky') onAddWidget({ ...base, type, text: 'New note…', color: `oklch(0.96 0.04 ${hue})` });
-    else if (type === 'goal') onAddWidget({ ...base, type, label: 'New Goal', progress: 0 });
-    else if (type === 'checklist') onAddWidget({ ...base, type, items: [{ text: 'Task 1', done: false }] });
-    else if (type === 'text') onAddWidget({ ...base, type, text: 'Add text…' });
-  };
+  const area = AREAS.find(a => a.id === board.areaId) ?? AREAS[0];
+  const done = draft.checklist.filter(i => i.done).length;
+  const total = draft.checklist.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!drawing) return;
-    const pt = getPos(e);
-    penRef.current = [...penRef.current, pt];
-    setLivePoints([...penRef.current]);
-  };
-
-  const handleMouseUp = () => {
-    if (drawing && penRef.current.length > 1) {
-      onAddStroke({ points: penRef.current, color: `oklch(0.40 0.14 ${hue})`, width: 2 });
-    }
-    setDrawing(false);
-    penRef.current = [];
-    setLivePoints([]);
-  };
-
-  const toPath = (pts: [number, number][]) => pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]},${p[1]}`).join(' ');
-
-  const widgetOrigins = useRef<Record<string, { x: number; y: number }>>({});
-  useEffect(() => {
-    const map: Record<string, { x: number; y: number }> = {};
-    for (const w of widgets) map[w.id] = { x: w.x, y: w.y };
-    widgetOrigins.current = map;
-  }, []);
-
-  const handleMoveWidget = useCallback((id: string, dx: number, dy: number) => {
-    const origin = widgetOrigins.current[id];
-    if (!origin) return;
-    onMoveWidget(id, origin.x + dx, origin.y + dy);
-  }, [onMoveWidget]);
-
-  const handleSelectWidget = useCallback((id: string) => {
-    widgetOrigins.current[id] = { x: widgets.find(w => w.id === id)?.x ?? 0, y: widgets.find(w => w.id === id)?.y ?? 0 };
-    onSelect(id);
-  }, [widgets, onSelect]);
-
-  return (
+  return createPortal(
     <div
-      style={{ position: 'relative', width: '100%', minHeight: 560, overflow: 'hidden', borderRadius: 10, background: 'var(--surface-2)', backgroundImage: 'radial-gradient(circle, var(--line) 1px, transparent 1px)', backgroundSize: '28px 28px' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <svg
-        ref={svgRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 1, cursor: tool === 'pen' ? 'crosshair' : 'default', pointerEvents: tool === 'pen' ? 'all' : 'none' }}
-        onMouseDown={tool === 'pen' ? handleCanvasMouseDown : undefined}
-        onMouseMove={tool === 'pen' ? handleMouseMove : undefined}
-        onMouseUp={tool === 'pen' ? handleMouseUp : undefined}
-        onMouseLeave={handleMouseUp}
-      >
-        {strokes.map((s, i) => (
-          <path key={i} d={toPath(s.points)} fill="none" stroke={s.color} strokeWidth={s.width} strokeLinecap="round" strokeLinejoin="round" />
-        ))}
-        {drawing && livePoints.length > 1 && (
-          <path d={toPath(livePoints)} fill="none" stroke={`oklch(0.40 0.14 ${hue})`} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-        )}
-      </svg>
+      <div style={{ background: 'white', borderRadius: 16, width: 580, maxWidth: '100%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
 
-      <div
-        style={{ position: 'absolute', inset: 0, zIndex: 2, cursor: tool !== 'pen' ? (tool === 'pointer' ? 'default' : 'crosshair') : 'none' }}
-        onMouseDown={tool !== 'pen' ? handleCanvasMouseDown : undefined}
-      >
-        {widgets.map(w => (
-          <WidgetCard
-            key={w.id} widget={w} hue={hue}
-            selected={selectedId === w.id}
-            onSelect={handleSelectWidget}
-            onMove={handleMoveWidget}
-            onUpdate={onUpdateWidget}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Outline view ──────────────────────────────────────────── */
-
-function OutlineView({ widgets, hue }: { widgets: Widget[]; hue: number }) {
-  const groups: Record<WidgetType, Widget[]> = { goal: [], sticky: [], checklist: [], file: [], text: [] };
-  for (const w of widgets) groups[w.type].push(w);
-  const order: WidgetType[] = ['goal', 'checklist', 'sticky', 'text', 'file'];
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {order.filter(t => groups[t].length > 0).map(type => (
-        <div key={type}>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-4)', marginBottom: 8 }}>
-            {type === 'goal' ? '🎯 Goals' : type === 'checklist' ? '☑ Checklists' : type === 'sticky' ? '📝 Stickies' : type === 'text' ? 'T Text Notes' : '📁 Files'}
+        {/* Header */}
+        <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: `oklch(0.55 0.12 ${area.hue})`, background: `oklch(0.94 0.04 ${area.hue})`, padding: '3px 10px', borderRadius: 20 }}>
+              {area.glyph} {area.label}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>in</span>
+            <select
+              value={col.id}
+              onChange={e => { onMove(board.id, col.id, e.target.value, card.id); onClose(); }}
+              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, border: '1px solid var(--line)', background: 'var(--surface-2)', color: 'var(--ink)', cursor: 'pointer', outline: 'none' }}
+            >
+              {board.columns.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+            <select
+              value={draft.priority}
+              onChange={e => save({ priority: e.target.value as Priority })}
+              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 20, border: '1px solid var(--line)', background: 'var(--surface-2)', color: 'var(--ink)', cursor: 'pointer', outline: 'none', marginLeft: 'auto' }}
+            >
+              {(Object.keys(PRIORITY_CFG) as Priority[]).map(p => (
+                <option key={p} value={p}>{p === 'none' ? 'No priority' : PRIORITY_CFG[p].label}</option>
+              ))}
+            </select>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {groups[type].map(w => (
-              <div key={w.id} style={{ padding: '10px 14px', background: 'white', borderRadius: 8, border: '1px solid var(--line)', fontSize: 13 }}>
-                {type === 'goal' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{w.label}</div>
-                      <div style={{ height: 4, borderRadius: 2, background: 'var(--line)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${w.progress ?? 0}%`, background: 'var(--ok)', borderRadius: 2 }} />
-                      </div>
-                    </div>
-                    <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{w.progress ?? 0}%</span>
-                  </div>
-                )}
-                {type === 'checklist' && (
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 12, color: 'var(--ink-3)' }}>
-                      {(w.items ?? []).filter(i => i.done).length}/{(w.items ?? []).length} done
-                    </div>
-                    {(w.items ?? []).map((it, i) => (
-                      <div key={i} style={{ fontSize: 12, color: it.done ? 'var(--ink-4)' : 'var(--ink)', textDecoration: it.done ? 'line-through' : 'none', marginBottom: 3 }}>
-                        {it.done ? '✓' : '○'} {it.text}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {(type === 'sticky' || type === 'text') && (
-                  <div style={{ color: 'var(--ink-2)', lineHeight: 1.5 }}>{w.text}</div>
-                )}
-              </div>
+          <textarea
+            value={draft.title}
+            onChange={e => setDraft(d => ({ ...d, title: e.target.value }))}
+            onBlur={() => save({ title: draft.title })}
+            rows={draft.title.length > 60 ? 2 : 1}
+            style={{ width: '100%', fontSize: 19, fontWeight: 700, border: 'none', outline: 'none', background: 'transparent', color: 'var(--ink)', padding: 0, resize: 'none', lineHeight: 1.3 }}
+          />
+
+          {/* Tabs */}
+          <div style={{ borderBottom: '1px solid var(--line)', marginTop: 12, display: 'flex', gap: 0 }}>
+            {['Details', 'Checklist', 'Tags'].map((t, i) => (
+              <span key={t} style={{ display: 'none' }} />
             ))}
           </div>
         </div>
-      ))}
-      {widgets.length === 0 && (
-        <div style={{ textAlign: 'center', color: 'var(--ink-4)', padding: '40px 20px', fontSize: 13 }}>
-          No items yet. Switch to Board view and add widgets.
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+          {/* Meta grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Assignee</div>
+              <input
+                value={draft.assignee}
+                onChange={e => setDraft(d => ({ ...d, assignee: e.target.value }))}
+                onBlur={() => save({ assignee: draft.assignee })}
+                placeholder="Assign to…"
+                style={{ width: '100%', fontSize: 13, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink)', outline: 'none' }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Due Date</div>
+              <input
+                type="date" value={draft.dueDate}
+                onChange={e => save({ dueDate: e.target.value })}
+                style={{ width: '100%', fontSize: 13, padding: '8px 11px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink)', outline: 'none' }}
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Description</div>
+            <textarea
+              rows={3} value={draft.description}
+              onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
+              onBlur={() => save({ description: draft.description })}
+              placeholder="Add notes, context, or links…"
+              style={{ width: '100%', fontSize: 13, padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink)', outline: 'none', resize: 'vertical', lineHeight: 1.6 }}
+            />
+          </div>
+
+          {/* Checklist */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: total > 0 ? 8 : 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                Checklist {total > 0 && <span style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({done}/{total})</span>}
+              </div>
+              {total > 0 && <span style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>{pct}%</span>}
+            </div>
+            {total > 0 && (
+              <div style={{ height: 4, borderRadius: 2, background: 'var(--line)', marginBottom: 10, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: 'var(--ok)', borderRadius: 2, transition: 'width 0.3s' }} />
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
+              {draft.checklist.map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 10px', borderRadius: 7, background: 'var(--surface-2)', border: '1px solid var(--line-2)' }}>
+                  <input type="checkbox" checked={item.done}
+                    onChange={() => save({ checklist: draft.checklist.map((it, j) => j === i ? { ...it, done: !it.done } : it) })}
+                    style={{ flexShrink: 0, accentColor: 'var(--accent)' }} />
+                  <span style={{ flex: 1, fontSize: 13, color: item.done ? 'var(--ink-4)' : 'var(--ink)', textDecoration: item.done ? 'line-through' : 'none' }}>{item.text}</span>
+                  <button onClick={() => save({ checklist: draft.checklist.filter((_, j) => j !== i) })}
+                    style={{ background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px' }}>×</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={newItem} onChange={e => setNewItem(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && newItem.trim()) { save({ checklist: [...draft.checklist, { text: newItem.trim(), done: false }] }); setNewItem(''); } }}
+                placeholder="Add item… press Enter"
+                style={{ flex: 1, fontSize: 13, padding: '7px 11px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink)', outline: 'none' }}
+              />
+              <button onClick={() => { if (newItem.trim()) { save({ checklist: [...draft.checklist, { text: newItem.trim(), done: false }] }); setNewItem(''); } }}
+                className="btn btn-sec btn-sm">Add</button>
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Tags</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+              {draft.tags.map(tag => (
+                <span key={tag} className="bdg bdg-acc" style={{ cursor: 'pointer', fontSize: 10 }}
+                  onClick={() => save({ tags: draft.tags.filter(t => t !== tag) })}>
+                  {tag} ×
+                </span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={newTag} onChange={e => setNewTag(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && newTag.trim() && !draft.tags.includes(newTag.trim())) { save({ tags: [...draft.tags, newTag.trim()] }); setNewTag(''); } }}
+                placeholder="Add tag… press Enter"
+                style={{ flex: 1, fontSize: 13, padding: '7px 11px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--ink)', outline: 'none' }}
+              />
+              <button onClick={() => { if (newTag.trim() && !draft.tags.includes(newTag.trim())) { save({ tags: [...draft.tags, newTag.trim()] }); setNewTag(''); } }}
+                className="btn btn-sec btn-sm">Add</button>
+            </div>
+          </div>
         </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button onClick={() => { onDelete(board.id, col.id, card.id); onClose(); }}
+            className="btn btn-sm" style={{ background: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)', border: '1px solid oklch(0.85 0.10 25)' }}>
+            🗑 Delete
+          </button>
+          <button onClick={onClose} className="btn btn-sec btn-sm">Close</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* ── Kanban view ───────────────────────────────────────────── */
+interface KanbanProps {
+  board: PlanBoard; onBack: () => void;
+  onUpdateCard: (bid: string, cid: string, kid: string, p: Partial<PlanCard>) => void;
+  onMoveCard: (bid: string, from: string, to: string, kid: string) => void;
+  onDeleteCard: (bid: string, cid: string, kid: string) => void;
+  onAddCard: (bid: string, cid: string, title: string) => void;
+  onAddColumn: (bid: string, title: string) => void;
+  onUpdateBoard: (bid: string, p: Partial<PlanBoard>) => void;
+}
+
+function KanbanView({ board, onBack, onUpdateCard, onMoveCard, onDeleteCard, onAddCard, onAddColumn, onUpdateBoard }: KanbanProps) {
+  const area = AREAS.find(a => a.id === board.areaId) ?? AREAS[0];
+  const [selected, setSelected] = useState<{ card: PlanCard; col: PlanColumn } | null>(null);
+  const [draftColId, setDraftColId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [addingCol, setAddingCol] = useState(false);
+  const [newColTitle, setNewColTitle] = useState('');
+
+  const totalCards = board.columns.reduce((s, c) => s + c.cards.length, 0);
+  const doneCards = board.columns.filter(c => c.title === 'Done')[0]?.cards.length ?? 0;
+
+  const submitCard = (cid: string) => {
+    if (draftTitle.trim()) onAddCard(board.id, cid, draftTitle.trim());
+    setDraftColId(null); setDraftTitle('');
+  };
+
+  return (
+    <div className="page-fade" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Board header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
+        <button onClick={onBack} className="btn btn-sm btn-sec">← Boards</button>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: `oklch(0.92 0.06 ${area.hue})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17 }}>
+          {area.glyph}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>{board.title}</div>
+          {board.description && <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>{board.description}</div>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+          {totalCards > 0 && (
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+              {doneCards}/{totalCards} done
+            </span>
+          )}
+          <button
+            className={`bdg ${board.shared ? 'bdg-ok' : 'bdg-gy'}`}
+            style={{ cursor: 'pointer', border: 'none', fontSize: 11 }}
+            onClick={() => onUpdateBoard(board.id, { shared: !board.shared })}
+          >
+            {board.shared ? '🔗 Shared' : '🔒 Private'}
+          </button>
+          <span className="bdg bdg-acc" style={{ fontSize: 11 }}>{area.label}</span>
+        </div>
+      </div>
+
+      {/* Columns */}
+      <div style={{ flex: 1, overflowX: 'auto', display: 'flex', gap: 14, alignItems: 'flex-start', paddingBottom: 16 }}>
+        {board.columns.map(col => (
+          <div key={col.id} style={{ width: 272, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Column header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '9px 13px',
+              borderRadius: 10, background: `oklch(0.95 0.03 ${col.color})`,
+              border: `1.5px solid oklch(0.88 0.06 ${col.color})`,
+            }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: `oklch(0.62 0.12 ${col.color})`, flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: `oklch(0.35 0.12 ${col.color})` }}>{col.title}</span>
+              <span style={{ fontSize: 11, color: `oklch(0.52 0.09 ${col.color})`, fontWeight: 600 }}>{col.cards.length}</span>
+            </div>
+
+            {/* Cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minHeight: 4 }}>
+              {col.cards.map(card => {
+                const overdue = isOverdue(card.dueDate);
+                const chkDone = card.checklist.filter(i => i.done).length;
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => setSelected({ card, col })}
+                    className="r-cd"
+                    style={{ display: 'flex', flexDirection: 'column', gap: 0, alignItems: 'stretch', padding: '12px 14px', cursor: 'pointer', borderRadius: 10 }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 7, lineHeight: 1.35 }}>{card.title}</div>
+                    {(card.priority !== 'none' || card.tags.length > 0) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
+                        {card.priority !== 'none' && (
+                          <span className={`bdg ${PRIORITY_CFG[card.priority].badgeCls}`} style={{ fontSize: 9.5 }}>{PRIORITY_CFG[card.priority].label}</span>
+                        )}
+                        {card.tags.map(t => <span key={t} className="bdg bdg-acc" style={{ fontSize: 9.5 }}>{t}</span>)}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      {card.checklist.length > 0 && (
+                        <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                          ☑ {chkDone}/{card.checklist.length}
+                        </span>
+                      )}
+                      {card.dueDate && (
+                        <span style={{ fontSize: 11, color: overdue ? 'var(--err)' : 'var(--ink-4)', fontWeight: overdue ? 600 : 400 }}>
+                          {overdue ? '⚠ ' : '📅 '}{fmtDate(card.dueDate)}
+                        </span>
+                      )}
+                      {card.assignee && (
+                        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-3)', fontWeight: 500 }}>
+                          {card.assignee.split(' ')[0]}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add card input */}
+            {draftColId === col.id ? (
+              <div style={{ background: 'white', border: '1.5px solid var(--accent-line)', borderRadius: 10, padding: '10px 12px', boxShadow: 'var(--sh-1)' }}>
+                <textarea
+                  autoFocus rows={2} value={draftTitle}
+                  onChange={e => setDraftTitle(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitCard(col.id); } if (e.key === 'Escape') { setDraftColId(null); setDraftTitle(''); } }}
+                  placeholder="Card title… Enter to save, Esc to cancel"
+                  style={{ width: '100%', fontSize: 13, border: 'none', outline: 'none', resize: 'none', color: 'var(--ink)', background: 'transparent', marginBottom: 8, lineHeight: 1.4 }}
+                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => submitCard(col.id)} className="btn btn-sm btn-acc">Add card</button>
+                  <button onClick={() => { setDraftColId(null); setDraftTitle(''); }} className="btn btn-sm btn-sec">✕</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setDraftColId(col.id); setDraftTitle(''); }}
+                style={{ background: 'none', border: '1.5px dashed var(--line)', borderRadius: 9, padding: '8px 12px', fontSize: 12, color: 'var(--ink-4)', cursor: 'pointer', transition: 'all 0.12s', textAlign: 'left', width: '100%' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.color = 'var(--accent-ink)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--ink-4)'; }}
+              >
+                + Add card
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* Add column */}
+        <div style={{ width: 220, flexShrink: 0 }}>
+          {addingCol ? (
+            <div style={{ background: 'white', border: '1.5px solid var(--accent-line)', borderRadius: 10, padding: '12px' }}>
+              <input
+                autoFocus value={newColTitle} onChange={e => setNewColTitle(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && newColTitle.trim()) { onAddColumn(board.id, newColTitle.trim()); setNewColTitle(''); setAddingCol(false); } if (e.key === 'Escape') setAddingCol(false); }}
+                placeholder="Column name…"
+                style={{ width: '100%', fontSize: 13, padding: '7px 10px', border: '1px solid var(--line)', borderRadius: 7, outline: 'none', marginBottom: 8 }}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { if (newColTitle.trim()) { onAddColumn(board.id, newColTitle.trim()); setNewColTitle(''); setAddingCol(false); } }} className="btn btn-sm btn-acc">Add</button>
+                <button onClick={() => setAddingCol(false)} className="btn btn-sm btn-sec">✕</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAddingCol(true)}
+              style={{ background: 'none', border: '1.5px dashed var(--line)', borderRadius: 9, padding: '10px 14px', fontSize: 12, color: 'var(--ink-4)', cursor: 'pointer', transition: 'all 0.12s', width: '100%' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-line)'; e.currentTarget.style.color = 'var(--accent-ink)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.color = 'var(--ink-4)'; }}
+            >
+              + Add column
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Card modal */}
+      {selected && (
+        <CardModal
+          card={selected.card} col={selected.col} board={board}
+          onClose={() => setSelected(null)}
+          onUpdate={(bid, cid, kid, patch) => {
+            onUpdateCard(bid, cid, kid, patch);
+            setSelected(s => s ? { ...s, card: { ...s.card, ...patch } } : null);
+          }}
+          onMove={(bid, from, to, kid) => { onMoveCard(bid, from, to, kid); setSelected(null); }}
+          onDelete={(bid, cid, kid) => { onDeleteCard(bid, cid, kid); setSelected(null); }}
+        />
       )}
     </div>
   );
 }
 
-/* ─── Timeline view ─────────────────────────────────────────── */
-
-function TimelineView({ areas, boards }: { areas: typeof PLAN_AREAS; boards: typeof SEED_BOARDS }) {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const now = new Date();
-  const currentMonth = now.getMonth();
-
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
-        <thead>
-          <tr>
-            <th style={{ width: 130, padding: '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--line)' }}>Area</th>
-            {months.map((m, i) => (
-              <th key={m} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 10, fontWeight: 600, color: i === currentMonth ? 'var(--accent-ink)' : 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--line)', background: i === currentMonth ? 'var(--accent-soft)' : 'transparent' }}>
-                {m}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {areas.map((area, ai) => {
-            const widgets = boards[area.id]?.widgets ?? [];
-            const goals = widgets.filter(w => w.type === 'goal');
-            const barStart = (ai * 2) % 8;
-            const barLen = 3 + (ai % 3);
-            return (
-              <tr key={area.id} style={{ borderBottom: '1px solid var(--line-2)' }}>
-                <td style={{ padding: '12px', verticalAlign: 'middle' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14 }}>{area.glyph}</span>
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>{area.label}</div>
-                      <div style={{ fontSize: 10, color: 'var(--ink-4)' }}>{goals.length} goal{goals.length !== 1 ? 's' : ''}</div>
-                    </div>
-                  </div>
-                </td>
-                {months.map((_, mi) => {
-                  const inBar = mi >= barStart && mi < barStart + barLen;
-                  const isStart = mi === barStart;
-                  const isEnd = mi === barStart + barLen - 1;
-                  return (
-                    <td key={mi} style={{ padding: '8px 4px', background: mi === currentMonth ? 'var(--accent-soft)' : 'transparent' }}>
-                      {inBar && (
-                        <div style={{
-                          height: 20, background: `oklch(0.78 0.10 ${area.hue})`,
-                          borderRadius: isStart && isEnd ? 4 : isStart ? '4px 0 0 4px' : isEnd ? '0 4px 4px 0' : 0,
-                          margin: '0 2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          {isStart && <span style={{ fontSize: 9, fontWeight: 700, color: `oklch(0.30 0.12 ${area.hue})`, paddingLeft: 4, whiteSpace: 'nowrap', overflow: 'hidden' }}>{area.label}</span>}
-                        </div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/* ─── Main component ────────────────────────────────────────── */
-
+/* ── Main component ────────────────────────────────────────── */
 export default function PlanningClient() {
-  const [activeAreaId, setActiveAreaId] = useState(PLAN_AREAS[0].id);
-  const [view, setView] = useState<ViewMode>('board');
-  const [tool, setTool] = useState<Tool>('pointer');
-  const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
-  const [boards, setBoards] = useState(SEED_BOARDS);
+  const [boards, setBoards] = useState<PlanBoard[]>(SEED);
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
+  const [areaFilter, setAreaFilter] = useState('all');
+  const [showNew, setShowNew] = useState(false);
+  const [form, setForm] = useState({ title: '', areaId: 'marketing', description: '' });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  const area = PLAN_AREAS.find(a => a.id === activeAreaId)!;
-  const board = boards[activeAreaId] ?? { widgets: [], strokes: [] };
+  const activeBoard = boards.find(b => b.id === activeBoardId) ?? null;
 
-  const handleMoveWidget = useCallback((id: string, x: number, y: number) => {
-    setBoards(prev => ({
-      ...prev,
-      [activeAreaId]: {
-        ...prev[activeAreaId],
-        widgets: prev[activeAreaId].widgets.map(w => w.id === id ? { ...w, x, y } : w),
-      },
-    }));
-  }, [activeAreaId]);
+  /* mutations */
+  const mutBoard = (id: string, fn: (b: PlanBoard) => PlanBoard) =>
+    setBoards(prev => prev.map(b => b.id === id ? fn(b) : b));
 
-  const handleUpdateWidget = useCallback((id: string, patch: Partial<Widget>) => {
-    setBoards(prev => ({
-      ...prev,
-      [activeAreaId]: {
-        ...prev[activeAreaId],
-        widgets: prev[activeAreaId].widgets.map(w => w.id === id ? { ...w, ...patch } : w),
-      },
-    }));
-  }, [activeAreaId]);
+  const updateBoard = (id: string, patch: Partial<PlanBoard>) => mutBoard(id, b => ({ ...b, ...patch }));
 
-  const handleAddWidget = useCallback((w: Widget) => {
-    setBoards(prev => ({
-      ...prev,
-      [activeAreaId]: { ...prev[activeAreaId], widgets: [...prev[activeAreaId].widgets, { ...w, areaId: activeAreaId }] },
-    }));
-    setTool('pointer');
-  }, [activeAreaId]);
-
-  const handleAddStroke = useCallback((s: Stroke) => {
-    setBoards(prev => ({
-      ...prev,
-      [activeAreaId]: { ...prev[activeAreaId], strokes: [...prev[activeAreaId].strokes, s] },
-    }));
-  }, [activeAreaId]);
-
-  const handleDeleteSelected = () => {
-    if (!selectedWidgetId) return;
-    setBoards(prev => ({
-      ...prev,
-      [activeAreaId]: { ...prev[activeAreaId], widgets: prev[activeAreaId].widgets.filter(w => w.id !== selectedWidgetId) },
-    }));
-    setSelectedWidgetId(null);
+  const addBoard = () => {
+    if (!form.title.trim()) return;
+    const b = makeBoard(form.title.trim(), form.areaId, form.description);
+    setBoards(prev => [b, ...prev]);
+    setActiveBoardId(b.id);
+    setShowNew(false);
+    setForm({ title: '', areaId: 'marketing', description: '' });
   };
 
-  return (
-    <div className="page-fade" style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%' }}>
+  const deleteBoard = (id: string) => {
+    if (!confirm('Delete this board and all its cards?')) return;
+    setBoards(prev => prev.filter(b => b.id !== id));
+    if (activeBoardId === id) setActiveBoardId(null);
+  };
 
-      {/* ── Briefing bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 0', marginBottom: 14, borderBottom: '1px solid var(--line)', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
-          {PLAN_AREAS.map(a => (
-            <button
-              key={a.id}
-              onClick={() => { setActiveAreaId(a.id); setSelectedWidgetId(null); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 9, fontSize: 12, fontWeight: activeAreaId === a.id ? 700 : 500,
-                background: activeAreaId === a.id ? `oklch(0.94 0.05 ${a.hue})` : 'white',
-                border: `1.5px solid ${activeAreaId === a.id ? `oklch(0.82 0.10 ${a.hue})` : 'var(--line)'}`,
-                color: activeAreaId === a.id ? `oklch(0.35 0.14 ${a.hue})` : 'var(--ink-2)',
-                boxShadow: activeAreaId === a.id ? 'var(--sh-1)' : 'none',
-                transition: 'all 0.13s',
-                cursor: 'pointer',
-              }}
-            >
-              <span>{a.glyph}</span>
-              <span>{a.label}</span>
-              <Sparkline values={a.spark} hue={a.hue} />
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-          {(['board', 'outline', 'timeline'] as ViewMode[]).map(v => (
-            <button key={v} onClick={() => setView(v)}
-              className={view === v ? 'btn btn-sm btn-acc' : 'btn btn-sm btn-sec'}
-              style={{ textTransform: 'capitalize' }}>
-              {v === 'board' ? '⊞ Board' : v === 'outline' ? '≡ Outline' : '⊟ Timeline'}
-            </button>
-          ))}
-        </div>
+  const addCard = (bid: string, cid: string, title: string) =>
+    mutBoard(bid, b => ({ ...b, columns: b.columns.map(c => c.id !== cid ? c : { ...c, cards: [...c.cards, { id: uid(), title, description: '', priority: 'none', dueDate: '', tags: [], checklist: [], assignee: '' }] }) }));
+
+  const updateCard = (bid: string, cid: string, kid: string, patch: Partial<PlanCard>) =>
+    mutBoard(bid, b => ({ ...b, columns: b.columns.map(c => c.id !== cid ? c : { ...c, cards: c.cards.map(k => k.id !== kid ? k : { ...k, ...patch }) }) }));
+
+  const moveCard = (bid: string, from: string, to: string, kid: string) =>
+    mutBoard(bid, b => {
+      const card = b.columns.find(c => c.id === from)?.cards.find(k => k.id === kid);
+      if (!card) return b;
+      return { ...b, columns: b.columns.map(c => c.id === from ? { ...c, cards: c.cards.filter(k => k.id !== kid) } : c.id === to ? { ...c, cards: [...c.cards, card] } : c) };
+    });
+
+  const deleteCard = (bid: string, cid: string, kid: string) =>
+    mutBoard(bid, b => ({ ...b, columns: b.columns.map(c => c.id !== cid ? c : { ...c, cards: c.cards.filter(k => k.id !== kid) }) }));
+
+  const addColumn = (bid: string, title: string) => {
+    const hues = ['220', '268', '75', '155', '25', '200', '340'];
+    mutBoard(bid, b => ({ ...b, columns: [...b.columns, { id: uid(), title, color: hues[b.columns.length % hues.length], cards: [] }] }));
+  };
+
+  /* stats */
+  const totalCards = boards.reduce((s, b) => s + b.columns.reduce((ss, c) => ss + c.cards.length, 0), 0);
+  const sharedCount = boards.filter(b => b.shared).length;
+  const overdueCount = boards.reduce((s, b) => s + b.columns.reduce((ss, c) => ss + c.cards.filter(k => isOverdue(k.dueDate)).length, 0), 0);
+  const inProgCount = boards.reduce((s, b) => s + (b.columns.find(c => c.title === 'In Progress')?.cards.length ?? 0), 0);
+
+  /* active board view */
+  if (activeBoard) {
+    return (
+      <KanbanView
+        board={activeBoard} onBack={() => setActiveBoardId(null)}
+        onUpdateCard={updateCard} onMoveCard={moveCard}
+        onDeleteCard={deleteCard} onAddCard={addCard}
+        onAddColumn={addColumn} onUpdateBoard={updateBoard}
+      />
+    );
+  }
+
+  /* ── Boards overview ── */
+  const usedAreaIds = [...new Set(boards.map(b => b.areaId))];
+  const filtered = areaFilter === 'all' ? boards : boards.filter(b => b.areaId === areaFilter);
+
+  return (
+    <div className="page-fade">
+
+      {/* Stat cards */}
+      <div className="stat-grid" style={{ marginBottom: 20 }}>
+        {[
+          { label: 'Total Boards', value: boards.length, foot: 'Planning workspaces', ico: 'ind', glyph: '◈' },
+          { label: 'Total Cards', value: totalCards, foot: 'Across all boards', ico: 'ind', glyph: '☑' },
+          { label: 'In Progress', value: inProgCount, foot: 'Active work items', ico: 'ok', glyph: '→' },
+          { label: 'Overdue', value: overdueCount, foot: 'Past due date', ico: overdueCount > 0 ? 'er' : 'ind', glyph: '⚠' },
+        ].map(s => (
+          <div key={s.label} className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h">
+              <div className={`stat-ico ${s.ico}`}>{s.glyph}</div>
+            </div>
+            <div className="stat-l">{s.label}</div>
+            <div className="stat-v" style={s.label === 'Overdue' && overdueCount > 0 ? { color: 'var(--err)' } : {}}>{s.value}</div>
+            <div className="stat-foot">{s.foot}</div>
+          </div>
+        ))}
       </div>
 
-      {/* ── Main content ── */}
-      <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
-
-        {/* Left: workspace */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-          {/* Toolbar (board only) */}
-          {view === 'board' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {TOOLS.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setTool(t.id)}
-                  title={t.label}
-                  style={{
-                    width: 34, height: 34, borderRadius: 8, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: tool === t.id ? `oklch(0.94 0.05 ${area.hue})` : 'white',
-                    border: `1.5px solid ${tool === t.id ? `oklch(0.82 0.10 ${area.hue})` : 'var(--line)'}`,
-                    color: tool === t.id ? `oklch(0.35 0.14 ${area.hue})` : 'var(--ink-3)',
-                    cursor: 'pointer',
-                    transition: 'all 0.12s',
-                  }}>
-                  {t.icon}
-                </button>
-              ))}
-              {selectedWidgetId && (
-                <button onClick={handleDeleteSelected}
-                  className="btn btn-sm"
-                  style={{ marginLeft: 8, background: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)', border: '1px solid oklch(0.85 0.10 25)' }}>
-                  🗑 Delete
-                </button>
-              )}
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
-                {board.widgets.length} widget{board.widgets.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
-
-          {/* View */}
-          <div className="card" style={{ flex: 1, overflow: view === 'board' ? 'hidden' : 'auto', padding: view === 'board' ? 0 : 18 }}>
-            {view === 'board' && (
-              <Canvas
-                widgets={board.widgets} strokes={board.strokes}
-                selectedId={selectedWidgetId} tool={tool} hue={area.hue}
-                onSelect={setSelectedWidgetId}
-                onMoveWidget={handleMoveWidget}
-                onUpdateWidget={handleUpdateWidget}
-                onAddWidget={handleAddWidget}
-                onAddStroke={handleAddStroke}
-              />
-            )}
-            {view === 'outline' && <OutlineView widgets={board.widgets} hue={area.hue} />}
-            {view === 'timeline' && <TimelineView areas={PLAN_AREAS} boards={boards} />}
-          </div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div className="tabs" style={{ flex: 1, flexWrap: 'wrap' }}>
+          <button className={`tab${areaFilter === 'all' ? ' active' : ''}`} onClick={() => setAreaFilter('all')}>
+            All <span style={{ fontSize: 10, opacity: 0.6 }}>({boards.length})</span>
+          </button>
+          {AREAS.filter(a => usedAreaIds.includes(a.id)).map(a => {
+            const count = boards.filter(b => b.areaId === a.id).length;
+            return (
+              <button key={a.id} className={`tab${areaFilter === a.id ? ' active' : ''}`} onClick={() => setAreaFilter(a.id)}>
+                {a.glyph} {a.label} <span style={{ fontSize: 10, opacity: 0.6 }}>({count})</span>
+              </button>
+            );
+          })}
         </div>
+        <button className="btn btn-acc" onClick={() => setShowNew(true)}>+ New Board</button>
+      </div>
 
-        {/* Right rail */}
-        <div style={{ width: 256, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Board grid */}
+      {filtered.length === 0 ? (
+        <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+          <div style={{ fontWeight: 600, marginBottom: 6, color: 'var(--ink-2)' }}>No boards yet</div>
+          <div style={{ marginBottom: 20, color: 'var(--ink-4)' }}>Create your first planning board to get started.</div>
+          <button className="btn btn-acc" onClick={() => setShowNew(true)}>+ New Board</button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
+          {filtered.map(board => {
+            const area = AREAS.find(a => a.id === board.areaId) ?? AREAS[0];
+            const total = board.columns.reduce((s, c) => s + c.cards.length, 0);
+            const done = board.columns.find(c => c.title === 'Done')?.cards.length ?? 0;
+            const inProg = board.columns.find(c => c.title === 'In Progress')?.cards.length ?? 0;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const overdue = board.columns.reduce((s, c) => s + c.cards.filter(k => isOverdue(k.dueDate)).length, 0);
+            return (
+              <div
+                key={board.id}
+                onClick={() => setActiveBoardId(board.id)}
+                style={{ background: 'white', border: '1.5px solid var(--line)', borderRadius: 14, padding: '18px', cursor: 'pointer', transition: 'all 0.15s', boxShadow: 'var(--sh-1)', position: 'relative', overflow: 'hidden' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--sh-2)'; e.currentTarget.style.borderColor = `oklch(0.84 0.08 ${area.hue})`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = 'var(--sh-1)'; e.currentTarget.style.borderColor = 'var(--line)'; }}
+              >
+                {/* Accent top strip */}
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `oklch(0.65 0.12 ${area.hue})`, borderRadius: '14px 14px 0 0' }} />
 
-          {/* Plan brief */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 20 }}>{area.glyph}</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{area.label}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>Owner: {area.owner}</div>
+                {/* Delete */}
+                <button
+                  onClick={e => { e.stopPropagation(); deleteBoard(board.id); }}
+                  style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '2px 5px', opacity: 0.5 }}
+                >×</button>
+
+                {/* Top row */}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12, marginTop: 6 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: `oklch(0.93 0.05 ${area.hue})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>
+                    {area.glyph}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.008em', paddingRight: 20, lineHeight: 1.25 }}>{board.title}</div>
+                    <div style={{ fontSize: 11, color: `oklch(0.55 0.10 ${area.hue})`, marginTop: 2, fontWeight: 500 }}>{area.label}</div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {board.description && (
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {board.description}
+                  </div>
+                )}
+
+                {/* Column pills */}
+                <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+                  {board.columns.map(c => (
+                    <span key={c.id} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: `oklch(0.95 0.03 ${c.color})`, color: `oklch(0.42 0.10 ${c.color})` }}>
+                      {c.title} {c.cards.length > 0 && <span style={{ opacity: 0.7 }}>({c.cards.length})</span>}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Progress bar */}
+                {total > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--ink-4)', marginBottom: 4 }}>
+                      <span>{done}/{total} done</span><span>{pct}%</span>
+                    </div>
+                    <div style={{ height: 4, borderRadius: 2, background: 'var(--line)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: `oklch(0.60 0.11 ${area.hue})`, borderRadius: 2, transition: 'width 0.3s' }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Footer badges */}
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {board.shared && <span className="bdg bdg-ok" style={{ fontSize: 10 }}>🔗 Shared</span>}
+                  {inProg > 0 && <span className="bdg bdg-warn" style={{ fontSize: 10 }}>{inProg} in progress</span>}
+                  {overdue > 0 && <span className="bdg bdg-err" style={{ fontSize: 10 }}>⚠ {overdue} overdue</span>}
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-5)' }}>
+                    {board.columns.length} cols
+                  </span>
+                </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* New board modal */}
+      {showNew && mounted && createPortal(
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowNew(false); }}
+        >
+          <div style={{ background: 'white', borderRadius: 16, width: 480, maxWidth: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: '28px' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', marginBottom: 4, letterSpacing: '-0.01em' }}>Create New Board</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-4)', marginBottom: 22 }}>Boards keep your plans organised by area.</div>
+
+            <div className="pv-fld">
+              <label>Board title</label>
+              <input
+                autoFocus value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') addBoard(); }}
+                placeholder="e.g. Q3 Marketing Plan"
+              />
             </div>
-            <p style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6, margin: 0 }}>{area.objective}</p>
-            {area.contributors.length > 0 && (
-              <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {area.contributors.map(c => (
-                  <span key={c} className="bdg bdg-gy" style={{ fontSize: 10 }}>{c}</span>
+            <div className="pv-fld">
+              <label>Area</label>
+              <select value={form.areaId} onChange={e => setForm(f => ({ ...f, areaId: e.target.value }))}>
+                {AREAS.map(a => <option key={a.id} value={a.id}>{a.glyph} {a.label}</option>)}
+              </select>
+            </div>
+            <div className="pv-fld">
+              <label>Description <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(optional)</span></label>
+              <textarea rows={2} value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="What is this board for?"
+              />
+            </div>
+
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', marginBottom: 22 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Starts with 4 default columns</div>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {DEFAULT_COLS.map(c => (
+                  <span key={c.title} style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: `oklch(0.94 0.04 ${c.color})`, color: `oklch(0.38 0.11 ${c.color})` }}>{c.title}</span>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* KPIs */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-4)', marginBottom: 12 }}>KPIs</div>
-            {area.kpis.map(k => (
-              <KpiBar key={k.label} {...k} hue={area.hue} />
-            ))}
-          </div>
-
-          {/* WISE nudges */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-4)', marginBottom: 10 }}>💡 WISE Nudges</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {area.nudges.map((n, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>→</span>
-                  <span style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>{n}</span>
-                </div>
-              ))}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={addBoard} className="btn btn-acc" disabled={!form.title.trim()}>Create Board</button>
+              <button onClick={() => { setShowNew(false); setForm({ title: '', areaId: 'marketing', description: '' }); }} className="btn btn-sec">Cancel</button>
             </div>
           </div>
-
-          {/* Board summary */}
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-4)', marginBottom: 10 }}>Board</div>
-            {(['goal', 'checklist', 'sticky', 'text'] as WidgetType[]).map(type => {
-              const count = board.widgets.filter(w => w.type === type).length;
-              const label = type === 'goal' ? 'Goals' : type === 'checklist' ? 'Checklists' : type === 'sticky' ? 'Stickies' : 'Notes';
-              const icon = type === 'goal' ? '🎯' : type === 'checklist' ? '☑' : type === 'sticky' ? '📝' : 'T';
-              return (
-                <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, fontSize: 12 }}>
-                  <span style={{ color: 'var(--ink-3)' }}>{icon} {label}</span>
-                  <span style={{ fontWeight: 700, color: count > 0 ? 'var(--ink)' : 'var(--ink-5)' }}>{count}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
