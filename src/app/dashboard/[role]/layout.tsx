@@ -8,6 +8,7 @@ import ProfileButton from '@/components/ProfileButton';
 import TopBarTitle from '@/components/TopBarTitle';
 import TopBarClock from '@/components/TopBarClock';
 import { getPermMatrix, resolveViewType, PERM_DEFAULTS } from '@/utils/getPermissions';
+import DailyUpdatePrompt from '@/components/DailyUpdatePrompt';
 
 export default async function DashboardLayout({
   children,
@@ -80,6 +81,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="pv">
+      <DailyUpdatePrompt userId={user.id} />
       <div className="pv-grid">
         <Sidebar role={urlRole} allowedModules={allowedModules} />
 

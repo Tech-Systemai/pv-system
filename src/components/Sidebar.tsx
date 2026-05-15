@@ -67,7 +67,7 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
     { head: 'System', items: [
       { id: 'permissions', label: 'Permissions',         icon: '🔐' },
       { id: 'policy',      label: 'Policy Engine',       icon: '⚙',  module: 'policy' },
-      { id: 'audit',       label: 'Audit Log',           icon: '📜' },
+      { id: 'audit',       label: 'Daily Updates',        icon: '📋' },
       { id: 'design',      label: 'PDF Templates',       icon: '🎨' },
     ]},
   ]},
@@ -90,6 +90,7 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'coaching',   label: 'Coaching + QA',         icon: '🎯', module: 'coaching' },
       { id: 'notes',      label: 'Notes',                 icon: '📝' },
       { id: 'wise',       label: 'WISE',                  icon: '💡', module: 'wise' },
+      { id: 'audit',      label: 'Daily Updates',         icon: '📋' },
     ]},
     { head: 'People', items: [
       { id: 'users',      label: 'Employees',             icon: '👥' },
