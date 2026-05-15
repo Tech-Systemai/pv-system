@@ -140,6 +140,7 @@ export default function ContractsClient({
 
   // Send to inbox
   const [isSending, setIsSending] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
   const [toast, setToast]         = useState<{ msg: string; ok: boolean } | null>(null);
 
   const showToast = (msg: string, ok = true) => {
@@ -243,6 +244,15 @@ export default function ContractsClient({
     showToast(role === 'employer' ? 'Employer signature saved' : 'Employee signature saved');
   };
 
+  const handlePushToProfile = async () => {
+    if (!viewingContract?.id) return;
+    setIsPushing(true);
+    const { error } = await dbOp('profiles', 'update', { contract_url: `contract:${viewingContract.id}` }, { id: viewingContract.user_id });
+    if (error) showToast(`Push failed: ${error}`, false);
+    else showToast(`Contract pushed to ${viewingContract.profiles?.name ?? 'employee'}'s profile ✓`);
+    setIsPushing(false);
+  };
+
   const handleSendToInbox = async () => {
     if (!viewingContract) return;
     setIsSending(true);
@@ -297,6 +307,11 @@ export default function ContractsClient({
             {isMgmt && (
               <button className="btn btn-acc" onClick={handleSendToInbox} disabled={isSending}>
                 {isSending ? 'Sending…' : '📨 Send to Inbox'}
+              </button>
+            )}
+            {isMgmt && viewingContract.status === 'Signed' && (
+              <button className="btn btn-acc" onClick={handlePushToProfile} disabled={isPushing} style={{ background: 'oklch(0.52 0.18 145)', borderColor: 'oklch(0.52 0.18 145)' }}>
+                {isPushing ? 'Pushing…' : '⬆ Push to Profile'}
               </button>
             )}
             <button className="btn btn-sec" onClick={() => window.print()}>🖨 Print / PDF</button>

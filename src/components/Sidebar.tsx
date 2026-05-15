@@ -521,23 +521,27 @@ export default function Sidebar({
       <div className="sb-u">
         <div className="sb-user-row">
           <div className="sb-av">{nameInitial}</div>
-          <div style={{ flex: 1 }}>
-            <div className="sb-un">{profile?.name?.toLowerCase() || 'user'}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sb-un" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {profile?.name ? profile.name.split(' ')[0].toLowerCase() : '…'}
+            </div>
             <div className="sb-ur">{profile?.role || role}</div>
           </div>
           <div className="sb-out" onClick={handleSignOut} title="Sign out">⏻</div>
         </div>
-        <div>
-          <div className="sb-portal-label">Switch Portal View</div>
-          <select className="sb-portal-select" onChange={handlePortalSwitch} value={role}>
-            <option value="owner">Owner View</option>
-            <option value="admin">Admin View</option>
-            <option value="supervisor">Supervisor View</option>
-            <option value="accountant">Accountant View</option>
-            <option value="sales">Sales View</option>
-            <option value="cx">CX View</option>
-          </select>
-        </div>
+        {role === 'owner' && (
+          <div>
+            <div className="sb-portal-label">Switch Portal View</div>
+            <select className="sb-portal-select" onChange={handlePortalSwitch} value={role}>
+              <option value="owner">Owner View</option>
+              <option value="admin">Admin View</option>
+              <option value="supervisor">Supervisor View</option>
+              <option value="accountant">Accountant View</option>
+              <option value="sales">Sales View</option>
+              <option value="cx">CX View</option>
+            </select>
+          </div>
+        )}
       </div>
     </aside>
     </>
