@@ -20,7 +20,7 @@ export default async function PoliciesPage() {
   const isMgmt = isAdminView(viewType);
 
   const { data: policies } = await admin
-    .from('policies')
+    .from('company_policies')
     .select('*')
     .order('created_at', { ascending: false });
 

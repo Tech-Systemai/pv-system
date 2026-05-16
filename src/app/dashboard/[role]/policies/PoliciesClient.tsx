@@ -294,7 +294,7 @@ export default function PoliciesClient({
 
     let saved: Policy | null = null;
     if (editing?.id) {
-      const { data, error } = await dbOp('policies', 'update', payload, { id: editing.id }, '*');
+      const { data, error } = await dbOp('company_policies','update', payload, { id: editing.id }, '*');
       if (error || !data?.[0]) {
         setSaveError(error ?? 'Save failed — check that the DB migration has been run.');
         setIsSaving(false); return;
@@ -302,7 +302,7 @@ export default function PoliciesClient({
       saved = data[0];
       setPolicies(prev => prev.map(p => p.id === editing.id ? saved! : p));
     } else {
-      const { data, error } = await dbOp('policies', 'insert', payload, undefined, '*');
+      const { data, error } = await dbOp('company_policies','insert', payload, undefined, '*');
       if (error || !data?.[0]) {
         setSaveError(error ?? 'Could not create policy — please run schema_v44.sql in Supabase first.');
         setIsSaving(false); return;
@@ -329,7 +329,7 @@ export default function PoliciesClient({
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this policy? This cannot be undone.')) return;
-    const { error } = await dbOp('policies', 'delete', {}, { id });
+    const { error } = await dbOp('company_policies','delete', {}, { id });
     if (error) { showToast(`Delete failed: ${error}`, false); return; }
     setPolicies(prev => prev.filter(p => p.id !== id));
     showToast('Policy deleted');

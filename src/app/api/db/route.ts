@@ -6,7 +6,7 @@ const ALLOWED_TABLES = [
   'tickets', 'time_off_requests', 'tasks', 'coaching_sessions',
   'knowledge_base', 'messages', 'inbox_documents', 'schedules',
   'contracts', 'payrolls', 'sales_logs', 'attendance_logs',
-  'profiles', 'hr_applicants', 'policies', 'audit_logs',
+  'profiles', 'hr_applicants', 'policies', 'company_policies', 'audit_logs',
   'brand_settings', 'targets', 'finance_entries', 'permissions', 'planning_documents', 'notes', 'channel_memberships', 'channels', 'violations', 'access_requests', 'reports', 'inbox_folders', 'ticket_replies', 'notifications', 'global_settings', 'daily_updates',
 ];
 
