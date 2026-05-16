@@ -17,6 +17,7 @@ export const PERM_DEFAULTS: PermMatrix = {
   targets:    { owner: 'both', admin: 'both',  supervisor: 'both',  accountant: 'none',  sales: 'agent', cx: 'agent' },
   coaching:   { owner: 'both', admin: 'admin', supervisor: 'admin', accountant: 'none',  sales: 'none',  cx: 'none'  },
   planning:   { owner: 'both', admin: 'admin', supervisor: 'none',  accountant: 'none',  sales: 'none',  cx: 'none'  },
+  policies:   { owner: 'both', admin: 'admin', supervisor: 'none',  accountant: 'none',  sales: 'none',  cx: 'none'  },
   kb:         { owner: 'both', admin: 'both',  supervisor: 'both',  accountant: 'both',  sales: 'agent', cx: 'agent' },
   chat:       { owner: 'both', admin: 'both',  supervisor: 'both',  accountant: 'both',  sales: 'agent', cx: 'agent' },
   payroll:    { owner: 'both', admin: 'admin', supervisor: 'none',  accountant: 'admin', sales: 'none',  cx: 'none'  },
