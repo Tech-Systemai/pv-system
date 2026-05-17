@@ -645,6 +645,40 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
 
   useEffect(() => { setMounted(true); }, []);
 
+  /* One-time migration: import boards that were saved in localStorage before DB persistence */
+  useEffect(() => {
+    if (initialBoards.length > 0) return; // DB already has boards, nothing to migrate
+    try {
+      const raw = localStorage.getItem('pv-planning-v3');
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Board[];
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+      // Insert each board into the DB
+      Promise.all(parsed.map(b =>
+        dbOp('planning_documents', 'insert', {
+          id: b.id,
+          title: b.title,
+          board_desc: b.desc || '',
+          area_id: b.areaId,
+          shared: b.shared,
+          start_date: b.startDate ?? null,
+          due_date: b.dueDate ?? null,
+          content: {
+            widgets: b.widgets.map((w): Widget =>
+              w.type === 'file' && w.dataUrl && w.dataUrl.length > 200_000 ? { ...w, dataUrl: undefined } : w
+            ),
+            strokes: b.strokes,
+          },
+          created_by: currentUserId,
+        })
+      )).then(() => {
+        setBoards(parsed);
+        localStorage.removeItem('pv-planning-v3');
+      });
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* Debounced auto-save of the active board's content every 3s while editing */
   useEffect(() => {
     if (!activeBoardId) return;
