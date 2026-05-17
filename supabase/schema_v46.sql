@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS public.planning_documents (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title       TEXT NOT NULL,
-  desc        TEXT NOT NULL DEFAULT '',
+  "desc"      TEXT NOT NULL DEFAULT '',
   area_id     TEXT NOT NULL DEFAULT 'marketing',
   shared      BOOLEAN NOT NULL DEFAULT false,
   start_date  DATE,
