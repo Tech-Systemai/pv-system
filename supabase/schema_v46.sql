@@ -31,3 +31,6 @@ CREATE POLICY "pd_update" ON public.planning_documents
 
 CREATE POLICY "pd_delete" ON public.planning_documents
   FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Force PostgREST to reload its schema cache so the new table is immediately usable
+NOTIFY pgrst, 'reload schema';
