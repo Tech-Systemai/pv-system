@@ -645,37 +645,81 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
 
   useEffect(() => { setMounted(true); }, []);
 
-  /* One-time migration: import boards that were saved in localStorage before DB persistence */
+  /* One-time seed: if DB and localStorage are both empty, insert the default starter boards */
   useEffect(() => {
-    if (initialBoards.length > 0) return; // DB already has boards, nothing to migrate
+    if (initialBoards.length > 0) return;
+
+    // Try localStorage migration first
     try {
       const raw = localStorage.getItem('pv-planning-v3');
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Board[];
-      if (!Array.isArray(parsed) || parsed.length === 0) return;
-      // Insert each board into the DB
-      Promise.all(parsed.map(b =>
-        dbOp('planning_documents', 'insert', {
-          id: b.id,
-          title: b.title,
-          board_desc: b.desc || '',
-          area_id: b.areaId,
-          shared: b.shared,
-          start_date: b.startDate ?? null,
-          due_date: b.dueDate ?? null,
-          content: {
-            widgets: b.widgets.map((w): Widget =>
-              w.type === 'file' && w.dataUrl && w.dataUrl.length > 200_000 ? { ...w, dataUrl: undefined } : w
-            ),
-            strokes: b.strokes,
-          },
-          created_by: currentUserId,
-        })
-      )).then(() => {
-        setBoards(parsed);
-        localStorage.removeItem('pv-planning-v3');
-      });
+      if (raw) {
+        const parsed = JSON.parse(raw) as Board[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          Promise.all(parsed.map(b =>
+            dbOp('planning_documents', 'insert', {
+              id: b.id, title: b.title, board_desc: b.desc || '',
+              area_id: b.areaId, shared: b.shared,
+              start_date: b.startDate ?? null, due_date: b.dueDate ?? null,
+              content: {
+                widgets: b.widgets.map((w): Widget =>
+                  w.type === 'file' && w.dataUrl && w.dataUrl.length > 200_000 ? { ...w, dataUrl: undefined } : w
+                ),
+                strokes: b.strokes,
+              },
+              created_by: currentUserId,
+            })
+          )).then(() => { setBoards(parsed); localStorage.removeItem('pv-planning-v3'); });
+          return;
+        }
+      }
     } catch { /* ignore */ }
+
+    // Nothing in localStorage either — seed with the default starter boards
+    const starters: Board[] = [
+      {
+        id: uid(), title: 'Q3 Marketing Plan', desc: 'Campaigns, content, and growth for Q3',
+        areaId: 'marketing', shared: true, created: new Date().toISOString(),
+        startDate: '2026-07-01', dueDate: '2026-09-30', strokes: [],
+        widgets: [
+          { id: uid(), type: 'sticky',    x: 60,  y: 60,  w: 180, h: 180, text: '🚀 Launch email campaign\nTarget dormant leads 60+ days', bg: '#fef08a' },
+          { id: uid(), type: 'sticky',    x: 260, y: 60,  w: 180, h: 180, text: '📊 A/B test ad creatives\nFB + Google, 2 variants', bg: '#bfdbfe' },
+          { id: uid(), type: 'goal',      x: 460, y: 60,  w: 220, h: 160, title: 'Q3 Revenue Goal', description: 'Reach $500k in pipeline value by end of Q3.', targetDate: '2026-09-30' },
+          { id: uid(), type: 'checklist', x: 460, y: 250, w: 210, h: 220, title: 'Launch Checklist', items: [
+            { text: 'Write email copy', done: true },
+            { text: 'Design ad creatives', done: true },
+            { text: 'Set up automations', done: false },
+            { text: 'Launch paid campaigns', done: false },
+            { text: 'Monitor day-1 metrics', done: false },
+          ]},
+        ],
+      },
+      {
+        id: uid(), title: 'Sales Pipeline Q3', desc: 'Deals, outreach, and targets',
+        areaId: 'sales', shared: false, created: new Date().toISOString(),
+        startDate: '2026-07-01', dueDate: '2026-09-30', strokes: [],
+        widgets: [
+          { id: uid(), type: 'sticky',    x: 60,  y: 60,  w: 180, h: 180, text: '🤝 Acme Corp proposal\nDeadline: July 12', bg: '#fed7aa' },
+          { id: uid(), type: 'sticky',    x: 260, y: 60,  w: 180, h: 180, text: '📞 20 new prospects\nThis week — URGENT', bg: '#fecdd3' },
+          { id: uid(), type: 'goal',      x: 460, y: 60,  w: 220, h: 160, title: 'Close 4 Enterprise Deals', description: 'Land 4 enterprise contracts with ACV > $50k each before end of Q3.', targetDate: '2026-09-30' },
+          { id: uid(), type: 'checklist', x: 460, y: 250, w: 210, h: 240, title: 'Acme Corp Deal', items: [
+            { text: 'Discovery call done', done: true },
+            { text: 'Proposal sent',       done: true },
+            { text: 'Technical review',    done: false },
+            { text: 'Pricing negotiation', done: false },
+            { text: 'Contract signed',     done: false },
+          ]},
+        ],
+      },
+    ];
+    Promise.all(starters.map(b =>
+      dbOp('planning_documents', 'insert', {
+        id: b.id, title: b.title, board_desc: b.desc,
+        area_id: b.areaId, shared: b.shared,
+        start_date: b.startDate ?? null, due_date: b.dueDate ?? null,
+        content: { widgets: b.widgets, strokes: [] },
+        created_by: currentUserId,
+      })
+    )).then(() => setBoards(starters));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
