@@ -740,11 +740,17 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
     setActive(null);
   };
 
-  const addBoard = async () => {
+  const addBoard = () => {
     if (!form.title.trim()) return;
     setCreateError('');
     const b = makeBoard(form.title.trim(), form.areaId, form.desc, form.startDate, form.dueDate);
-    const { error } = await dbOp('planning_documents', 'insert', {
+    // Add to UI immediately (optimistic)
+    setBoards(prev => [b, ...prev]);
+    setActive(b.id);
+    setShowNew(false);
+    setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
+    // Save to DB in background
+    dbOp('planning_documents', 'insert', {
       id: b.id,
       title: b.title,
       board_desc: b.desc,
@@ -754,16 +760,9 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
       due_date: b.dueDate ?? null,
       content: { widgets: [], strokes: [] },
       created_by: currentUserId,
+    }).then(({ error }) => {
+      if (error) setCreateError(`Board created locally but DB save failed: ${error}`);
     });
-    if (error) {
-      setCreateError(error);
-      return;
-    }
-    setBoards(prev => [b, ...prev]);
-    setActive(b.id);
-    setShowNew(false);
-    setCreateError('');
-    setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
   };
 
   const saveEditBoard = async () => {
