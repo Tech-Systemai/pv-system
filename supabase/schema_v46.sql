@@ -41,7 +41,7 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='planning_documents' AND policyname='Authenticated users can delete planning_documents') THEN
     CREATE POLICY "Authenticated users can delete planning_documents"
       ON public.planning_documents FOR DELETE USING (
-        auth.uid() = created_by
+        auth.uid() = planning_documents.created_by
         OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('owner','admin'))
       );
   END IF;
