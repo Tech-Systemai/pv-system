@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { dbOp } from '@/utils/db';
 
 /* ── Types ─────────────────────────────────────────────────────── */
 type ToolId   = 'select' | 'pan' | 'sticky' | 'note' | 'text' | 'pen' | 'file' | 'goal' | 'checklist';
@@ -26,8 +27,6 @@ interface Board  {
 interface XF { x: number; y: number; s: number; }
 
 /* ── Constants ──────────────────────────────────────────────────── */
-const STORAGE_KEY = 'pv-planning-v3';
-
 const AREAS = [
   { id: 'marketing',  label: 'Marketing',    hue: 268, g: '📣' },
   { id: 'business',   label: 'Business Dev', hue: 25,  g: '🤝' },
@@ -82,48 +81,6 @@ function makePath(pts: [number, number][]): string {
 function makeBoard(title: string, areaId: string, desc = '', startDate = '', dueDate = ''): Board {
   return { id: uid(), title, desc, areaId, shared: false, created: new Date().toISOString(), startDate: startDate || undefined, dueDate: dueDate || undefined, widgets: [], strokes: [] };
 }
-
-/* ── Seed ───────────────────────────────────────────────────────── */
-const SEED: Board[] = [
-  {
-    id: 'b1', title: 'Q3 Marketing Plan', desc: 'Campaigns, content, and growth for Q3',
-    areaId: 'marketing', shared: true, created: new Date().toISOString(),
-    startDate: '2026-05-01', dueDate: '2026-08-31', strokes: [],
-    widgets: [
-      { id: 'w1', type: 'sticky',    x: 60,  y: 60,  w: 180, h: 180, text: '🚀 Launch email campaign\nTarget dormant leads 60+ days', bg: '#fef08a' },
-      { id: 'w2', type: 'sticky',    x: 270, y: 60,  w: 180, h: 180, text: '📊 A/B test ad creatives\nFB + Google, 2 variants', bg: '#bfdbfe' },
-      { id: 'w3', type: 'sticky',    x: 480, y: 60,  w: 180, h: 180, text: '✍️ Blog: Industry trends\n1500 words, SEO', bg: '#bbf7d0' },
-      { id: 'w4', type: 'note',      x: 60,  y: 280, w: 240, h: 170, title: 'Q3 Goals', body: '• Pipeline to $500k\n• CAC below $40\n• 3 new partnerships\n• 12 content pieces' },
-      { id: 'w5', type: 'text',      x: 340, y: 290, w: 300, h: 55,  content: '🎯 Top 20% of channels drive 80% of leads', size: 'md' },
-      { id: 'w6', type: 'goal',      x: 680, y: 60,  w: 220, h: 160, title: 'Q3 Revenue Goal', description: 'Reach $500k in pipeline value by end of Q3 through disciplined outbound and content marketing.', targetDate: '2026-09-30' },
-      { id: 'w7', type: 'checklist', x: 680, y: 250, w: 210, h: 220, title: 'Launch Checklist', items: [
-        { text: 'Write email copy', done: true },
-        { text: 'Design ad creatives', done: true },
-        { text: 'Set up automations', done: false },
-        { text: 'Launch paid campaigns', done: false },
-        { text: 'Monitor day-1 metrics', done: false },
-      ]},
-    ],
-  },
-  {
-    id: 'b2', title: 'Sales Pipeline Q3', desc: 'Deals, outreach, and targets',
-    areaId: 'sales', shared: false, created: new Date().toISOString(),
-    startDate: '2026-04-15', dueDate: '2026-09-30', strokes: [],
-    widgets: [
-      { id: 'w8',  type: 'sticky',    x: 60,  y: 60,  w: 180, h: 180, text: '🤝 Acme Corp proposal\nDeadline: July 12', bg: '#fed7aa' },
-      { id: 'w9',  type: 'sticky',    x: 270, y: 60,  w: 180, h: 180, text: '📞 20 new prospects\nThis week — URGENT', bg: '#fecdd3' },
-      { id: 'w10', type: 'note',      x: 60,  y: 280, w: 240, h: 160, title: 'Targets', body: '• MRR: $500k by EOQ\n• Deal cycle: ≤ 45 days\n• Win rate: 35%' },
-      { id: 'w11', type: 'goal',      x: 340, y: 60,  w: 220, h: 160, title: 'Close 4 Enterprise Deals', description: 'Land 4 enterprise contracts with ACV > $50k each before end of Q3.', targetDate: '2026-09-30' },
-      { id: 'w12', type: 'checklist', x: 340, y: 260, w: 210, h: 240, title: 'Acme Corp Deal', items: [
-        { text: 'Discovery call done', done: true },
-        { text: 'Proposal sent',       done: true },
-        { text: 'Technical review',    done: false },
-        { text: 'Pricing negotiation', done: false },
-        { text: 'Contract signed',     done: false },
-      ]},
-    ],
-  },
-];
 
 /* ── Shared delete button ───────────────────────────────────────── */
 function DelBtn({ onDelete }: { onDelete: () => void }) {
@@ -295,7 +252,6 @@ function CalendarView({ boards, onClose, onEditBoard }: {
   const datedBoards = boards.filter(b => b.startDate && b.dueDate);
   const allBoards   = boards;
 
-  // Compute date range
   const today = new Date();
   let rangeMin = new Date(today);
   let rangeMax = new Date(today);
@@ -310,10 +266,9 @@ function CalendarView({ boards, onClose, onEditBoard }: {
   rangeMin.setDate(rangeMin.getDate() - 7);
   rangeMax.setDate(rangeMax.getDate() + 14);
 
-  // Generate weeks
   const weeks: Date[] = [];
   const wCur = new Date(rangeMin);
-  wCur.setDate(wCur.getDate() - wCur.getDay() + 1); // Monday
+  wCur.setDate(wCur.getDate() - wCur.getDay() + 1);
   while (wCur <= rangeMax) {
     weeks.push(new Date(wCur));
     wCur.setDate(wCur.getDate() + 7);
@@ -350,7 +305,6 @@ function CalendarView({ boards, onClose, onEditBoard }: {
         <div style={{ overflowX: 'auto' }}>
           <div style={{ minWidth: 600, width: 240 + totalPx }}>
 
-            {/* Week header row */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}>
               <div style={{ width: 240, flexShrink: 0, padding: '9px 18px', fontSize: 10, fontWeight: 700, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.06em', borderRight: '1px solid var(--line)' }}>Board</div>
               <div style={{ position: 'relative', width: totalPx, flexShrink: 0, height: 34 }}>
@@ -361,7 +315,6 @@ function CalendarView({ boards, onClose, onEditBoard }: {
                     </span>
                   </div>
                 ))}
-                {/* Today line */}
                 {todayLeft >= 0 && todayLeft <= totalPx && (
                   <div style={{ position: 'absolute', left: todayLeft, top: 0, bottom: 0, width: 2, background: 'var(--accent)', zIndex: 2 }}>
                     <div style={{ position: 'absolute', top: 2, left: 4, fontSize: 9, color: 'var(--accent-ink)', fontWeight: 700, whiteSpace: 'nowrap' }}>Today</div>
@@ -370,13 +323,11 @@ function CalendarView({ boards, onClose, onEditBoard }: {
               </div>
             </div>
 
-            {/* Board rows */}
             {allBoards.map(board => {
               const area = AREAS.find(a => a.id === board.areaId) ?? AREAS[0];
               const bar  = getBar(board);
               return (
                 <div key={board.id} style={{ display: 'flex', borderBottom: '1px solid var(--line-2)', minHeight: 52, alignItems: 'center' }}>
-                  {/* Label */}
                   <div style={{ width: 240, flexShrink: 0, padding: '8px 18px', borderRight: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: `oklch(0.62 0.14 ${area.hue})`, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -391,13 +342,10 @@ function CalendarView({ boards, onClose, onEditBoard }: {
                     </div>
                   </div>
 
-                  {/* Gantt bar track */}
                   <div style={{ position: 'relative', width: totalPx, height: 52, flexShrink: 0 }}>
-                    {/* Week grid lines */}
                     {weeks.map((_, i) => i > 0 && (
                       <div key={i} style={{ position: 'absolute', left: i * WEEK_PX, top: 0, bottom: 0, width: 1, background: 'var(--line-2)' }} />
                     ))}
-                    {/* Today marker */}
                     {todayLeft >= 0 && todayLeft <= totalPx && (
                       <div style={{ position: 'absolute', left: todayLeft, top: 0, bottom: 0, width: 2, background: 'oklch(0.62 0.18 260)', opacity: 0.25, zIndex: 1 }} />
                     )}
@@ -418,7 +366,7 @@ function CalendarView({ boards, onClose, onEditBoard }: {
 
         {datedBoards.length === 0 && (
           <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13, borderTop: '1px solid var(--line)' }}>
-            No boards have dates set yet. Click "+ Set dates" on any board above, or add dates when creating a new board.
+            No boards have dates set yet. Click &quot;+ Set dates&quot; on any board above, or add dates when creating a new board.
           </div>
         )}
       </div>
@@ -462,7 +410,6 @@ function WhiteboardView({ board, onUpdate, onBack }: {
     });
   };
 
-  /* Keyboard shortcuts */
   useEffect(() => {
     const MAP: Record<string, ToolId> = { v: 'select', h: 'pan', s: 'sticky', n: 'note', t: 'text', g: 'goal', c: 'checklist', p: 'pen', f: 'file' };
     const handler = (e: KeyboardEvent) => {
@@ -478,14 +425,12 @@ function WhiteboardView({ board, onUpdate, onBack }: {
     return () => window.removeEventListener('keydown', handler);
   }, [selId, onUpdate]);
 
-  /* Wheel zoom */
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const rect = containerRef.current!.getBoundingClientRect();
     zoom(e.deltaY < 0 ? 1.1 : 0.9, e.clientX - rect.left, e.clientY - rect.top);
   };
 
-  /* File input handler */
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !pendingFile.current) { e.target.value = ''; return; }
@@ -510,7 +455,6 @@ function WhiteboardView({ board, onUpdate, onBack }: {
     setTool('select');
   };
 
-  /* Canvas pointer down */
   const handleCanvasPD = (e: React.PointerEvent) => {
     if (e.button !== 0 && e.button !== 1) return;
     if (e.button === 1 || tool === 'pan') {
@@ -550,7 +494,6 @@ function WhiteboardView({ board, onUpdate, onBack }: {
     setTool('select');
   };
 
-  /* Drag */
   const makeDrag = (wid: string, wx0: number, wy0: number) => (e: React.PointerEvent) => {
     if (tool !== 'select') return;
     if ((e.target as HTMLElement).closest('[data-no-drag]')) return;
@@ -572,10 +515,8 @@ function WhiteboardView({ board, onUpdate, onBack }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*,.html,.htm,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.txt,.csv,.zip" style={{ display: 'none' }} onChange={handleFileInput} />
 
-      {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '1px solid var(--line)', background: 'white', flexShrink: 0, zIndex: 10, flexWrap: 'wrap' }}>
         <button onClick={onBack} className="btn btn-sm btn-sec" style={{ flexShrink: 0 }}>← Boards</button>
         <div style={{ width: 28, height: 28, borderRadius: 7, background: `oklch(0.93 0.05 ${area.hue})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{area.g}</div>
@@ -584,7 +525,6 @@ function WhiteboardView({ board, onUpdate, onBack }: {
           {board.desc && <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{board.desc}</div>}
         </div>
 
-        {/* Zoom controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           <button className="btn btn-sm btn-sec" onClick={() => zoom(0.8)} title="Zoom out (−)" style={{ width: 28, padding: 0, textAlign: 'center', fontWeight: 700, fontSize: 16 }}>−</button>
           <span style={{ fontSize: 11, color: 'var(--ink-4)', fontVariantNumeric: 'tabular-nums', minWidth: 38, textAlign: 'center' }}>{Math.round(xf.s * 100)}%</span>
@@ -602,10 +542,8 @@ function WhiteboardView({ board, onUpdate, onBack }: {
         </button>
       </div>
 
-      {/* Toolbar + Canvas */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* Left toolbar */}
         <div style={{ width: 50, background: 'white', borderRight: '1px solid var(--line)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 0', gap: 3, flexShrink: 0, overflowY: 'auto', zIndex: 10 }}>
           {TOOLS.map((t, i) => (
             <div key={t.id}>
@@ -659,7 +597,6 @@ function WhiteboardView({ board, onUpdate, onBack }: {
           )}
         </div>
 
-        {/* Canvas */}
         <div ref={containerRef} onPointerDown={handleCanvasPD} onWheel={handleWheel}
           style={{ flex: 1, overflow: 'hidden', position: 'relative', cursor, background: 'var(--surface-2)', backgroundImage: 'radial-gradient(circle, oklch(0.84 0.01 265) 1px, transparent 1px)', backgroundSize: '28px 28px', touchAction: 'none' }}>
           <div style={{ position: 'absolute', transformOrigin: '0 0', transform: `translate(${xf.x}px,${xf.y}px) scale(${xf.s})`, width: 3600, height: 2800 }}>
@@ -695,65 +632,99 @@ function WhiteboardView({ board, onUpdate, onBack }: {
 }
 
 /* ── Boards Overview ────────────────────────────────────────────── */
-export default function PlanningClient() {
-  const [boards, setBoards]           = useState<Board[]>(SEED);
-  const [activeBoardId, setActive]    = useState<string | null>(null);
-  const [areaFilter, setAreaFilter]   = useState('all');
+export default function PlanningClient({ initialBoards, currentUserId }: { initialBoards: Board[]; currentUserId: string }) {
+  const [boards, setBoards]             = useState<Board[]>(initialBoards);
+  const [activeBoardId, setActive]      = useState<string | null>(null);
+  const [areaFilter, setAreaFilter]     = useState('all');
   const [showCalendar, setShowCalendar] = useState(false);
-  const [showNew, setShowNew]         = useState(false);
-  const [editBoard, setEditBoard]     = useState<Board | null>(null);
-  const [form, setForm]               = useState({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
-  const [mounted, setMounted]         = useState(false);
-  const [loaded, setLoaded]           = useState(false);
+  const [showNew, setShowNew]           = useState(false);
+  const [editBoard, setEditBoard]       = useState<Board | null>(null);
+  const [form, setForm]                 = useState({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
+  const [mounted, setMounted]           = useState(false);
+  const savePendingRef                  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
-  /* Load from localStorage on mount */
+  /* Debounced auto-save of the active board's content every 3s while editing */
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Board[];
-        if (Array.isArray(parsed) && parsed.length > 0) setBoards(parsed);
+    if (!activeBoardId) return;
+    if (savePendingRef.current) clearTimeout(savePendingRef.current);
+    savePendingRef.current = setTimeout(async () => {
+      const board = boards.find(b => b.id === activeBoardId);
+      if (!board) return;
+      const safeWidgets = board.widgets.map((w): Widget =>
+        w.type === 'file' && w.dataUrl && w.dataUrl.length > 200_000 ? { ...w, dataUrl: undefined } : w
+      );
+      await dbOp('planning_documents', 'update', {
+        content: { widgets: safeWidgets, strokes: board.strokes },
+        updated_at: new Date().toISOString(),
+      }, { id: board.id });
+    }, 3000);
+  }, [boards, activeBoardId]);
+
+  const activeBoard = boards.find(b => b.id === activeBoardId);
+  const updateBoard = (fn: (b: Board) => Board) => setBoards(prev => prev.map(b => b.id === activeBoardId ? fn(b) : b));
+  const updateById  = (id: string, fn: (b: Board) => Board) => setBoards(prev => prev.map(b => b.id === id ? fn(b) : b));
+
+  /* Save active board immediately then navigate back */
+  const handleBack = () => {
+    if (savePendingRef.current) clearTimeout(savePendingRef.current);
+    if (activeBoardId) {
+      const board = boards.find(b => b.id === activeBoardId);
+      if (board) {
+        const safeWidgets = board.widgets.map((w): Widget =>
+          w.type === 'file' && w.dataUrl && w.dataUrl.length > 200_000 ? { ...w, dataUrl: undefined } : w
+        );
+        dbOp('planning_documents', 'update', {
+          content: { widgets: safeWidgets, strokes: board.strokes },
+          shared: board.shared,
+          updated_at: new Date().toISOString(),
+        }, { id: board.id });
       }
-    } catch { /* ignore */ }
-    setLoaded(true);
-  }, []);
-
-  /* Save to localStorage whenever boards change */
-  useEffect(() => {
-    if (!loaded) return;
-    try {
-      // Strip large dataUrls from images before saving to avoid quota errors
-      const safe = boards.map(b => ({
-        ...b,
-        widgets: b.widgets.map(w => {
-          if (w.type === 'file' && w.dataUrl && w.dataUrl.length > 200_000) {
-            return { ...w, dataUrl: undefined };
-          }
-          return w;
-        }),
-      }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
-    } catch { /* quota exceeded — silently ignore */ }
-  }, [boards, loaded]);
-
-  const activeBoard  = boards.find(b => b.id === activeBoardId);
-  const updateBoard  = (fn: (b: Board) => Board) => setBoards(prev => prev.map(b => b.id === activeBoardId ? fn(b) : b));
-  const updateById   = (id: string, fn: (b: Board) => Board) => setBoards(prev => prev.map(b => b.id === id ? fn(b) : b));
-
-  const addBoard = () => {
-    if (!form.title.trim()) return;
-    const b = makeBoard(form.title.trim(), form.areaId, form.desc, form.startDate, form.dueDate);
-    setBoards(prev => [b, ...prev]);
-    setActive(b.id);
-    setShowNew(false);
-    setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
+    }
+    setActive(null);
   };
 
-  const saveEditBoard = () => {
+  const addBoard = async () => {
+    if (!form.title.trim()) return;
+    const b = makeBoard(form.title.trim(), form.areaId, form.desc, form.startDate, form.dueDate);
+    const { error } = await dbOp('planning_documents', 'insert', {
+      id: b.id,
+      title: b.title,
+      desc: b.desc,
+      area_id: b.areaId,
+      shared: b.shared,
+      start_date: b.startDate ?? null,
+      due_date: b.dueDate ?? null,
+      content: { widgets: [], strokes: [] },
+      created_by: currentUserId,
+    });
+    if (!error) {
+      setBoards(prev => [b, ...prev]);
+      setActive(b.id);
+      setShowNew(false);
+      setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
+    }
+  };
+
+  const saveEditBoard = async () => {
     if (!editBoard) return;
-    updateById(editBoard.id, b => ({ ...b, title: form.title || b.title, desc: form.desc, areaId: form.areaId, startDate: form.startDate || undefined, dueDate: form.dueDate || undefined }));
+    const patch = {
+      title: form.title || editBoard.title,
+      desc: form.desc,
+      area_id: form.areaId,
+      start_date: form.startDate || null,
+      due_date: form.dueDate || null,
+    };
+    await dbOp('planning_documents', 'update', patch, { id: editBoard.id });
+    updateById(editBoard.id, b => ({
+      ...b,
+      title: patch.title,
+      desc: patch.desc,
+      areaId: form.areaId,
+      startDate: form.startDate || undefined,
+      dueDate: form.dueDate || undefined,
+    }));
     setEditBoard(null);
   };
 
@@ -762,9 +733,13 @@ export default function PlanningClient() {
     setForm({ title: b.title, areaId: b.areaId, desc: b.desc, startDate: b.startDate ?? '', dueDate: b.dueDate ?? '' });
   };
 
-  const deleteBoard = (id: string) => { if (!confirm('Delete this board?')) return; setBoards(prev => prev.filter(b => b.id !== id)); };
+  const deleteBoard = async (id: string) => {
+    if (!confirm('Delete this board?')) return;
+    await dbOp('planning_documents', 'delete', {}, { id });
+    setBoards(prev => prev.filter(b => b.id !== id));
+  };
 
-  if (activeBoard) return <WhiteboardView board={activeBoard} onUpdate={updateBoard} onBack={() => setActive(null)} />;
+  if (activeBoard) return <WhiteboardView board={activeBoard} onUpdate={updateBoard} onBack={handleBack} />;
   if (showCalendar) return <CalendarView boards={boards} onClose={() => setShowCalendar(false)} onEditBoard={b => { openEditBoard(b); setShowCalendar(false); }} />;
 
   const usedAreaIds = [...new Set(boards.map(b => b.areaId))];
@@ -776,10 +751,10 @@ export default function PlanningClient() {
     <div className="page-fade">
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         {[
-          { label: 'Total Boards', value: boards.length,     foot: 'Planning spaces',    ico: 'ind', g: '◈' },
-          { label: 'Total Items',  value: totalItems,          foot: 'Widgets + drawings', ico: 'ind', g: '🖊' },
-          { label: 'Shared',       value: sharedCount,         foot: 'Visible to team',    ico: 'ok',  g: '🔗' },
-          { label: 'Areas',        value: usedAreaIds.length,  foot: 'Business areas',     ico: 'ind', g: '◉' },
+          { label: 'Total Boards', value: boards.length,    foot: 'Planning spaces',    ico: 'ind', g: '◈' },
+          { label: 'Total Items',  value: totalItems,         foot: 'Widgets + drawings', ico: 'ind', g: '🖊' },
+          { label: 'Shared',       value: sharedCount,        foot: 'Visible to team',    ico: 'ok',  g: '🔗' },
+          { label: 'Areas',        value: usedAreaIds.length, foot: 'Business areas',     ico: 'ind', g: '◉' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className={`stat-ico ${s.ico}`}>{s.g}</div></div>
