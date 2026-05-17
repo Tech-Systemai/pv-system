@@ -642,6 +642,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
   const [form, setForm]                 = useState({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
   const [mounted, setMounted]           = useState(false);
   const [createError, setCreateError]   = useState('');
+  const [dbBanner, setDbBanner]         = useState('');
   const savePendingRef                  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
@@ -761,7 +762,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
       content: { widgets: [], strokes: [] },
       created_by: currentUserId,
     }).then(({ error }) => {
-      if (error) setCreateError(`Board created locally but DB save failed: ${error}`);
+      if (error) setDbBanner(`⚠️ Board not saved to database: ${error}. Go to Supabase → Settings → API → Reload schema cache, then refresh this page.`);
     });
   };
 
@@ -807,6 +808,12 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
 
   return (
     <div className="page-fade">
+      {dbBanner && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#dc2626', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <span>{dbBanner}</span>
+          <button onClick={() => setDbBanner('')} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>×</button>
+        </div>
+      )}
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         {[
           { label: 'Total Boards', value: boards.length,    foot: 'Planning spaces',    ico: 'ind', g: '◈' },
