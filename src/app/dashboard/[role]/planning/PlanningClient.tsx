@@ -73,7 +73,13 @@ const IMAGE_EXTS = new Set(['png','jpg','jpeg','gif','webp','svg']);
 const HTML_EXTS  = new Set(['html','htm']);
 
 /* ── Helpers ────────────────────────────────────────────────────── */
-function uid() { return Math.random().toString(36).slice(2, 10); }
+function uid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
 function makePath(pts: [number, number][]): string {
   if (pts.length < 2) return '';
   return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
