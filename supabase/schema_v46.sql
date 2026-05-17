@@ -14,6 +14,16 @@ CREATE TABLE IF NOT EXISTS public.planning_documents (
   updated_at  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Ensure all columns exist in case the table was created by an earlier partial run
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS board_desc  TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS area_id     TEXT NOT NULL DEFAULT 'marketing';
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS shared      BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS start_date  DATE;
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS due_date    DATE;
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS content     JSONB NOT NULL DEFAULT '{"widgets":[],"strokes":[]}';
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS created_by  UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.planning_documents ADD COLUMN IF NOT EXISTS updated_at  TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL;
+
 ALTER TABLE public.planning_documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "pd_select" ON public.planning_documents;
@@ -31,13 +41,17 @@ CREATE POLICY "pd_update"
   ON public.planning_documents FOR UPDATE
   USING (auth.role() = 'authenticated');
 
+-- Delete: only the creator or an owner/admin can delete
 DROP POLICY IF EXISTS "pd_delete" ON public.planning_documents;
 CREATE POLICY "pd_delete"
   ON public.planning_documents FOR DELETE
   USING (
-    auth.uid() = created_by
-    OR EXISTS (
+    EXISTS (
       SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role IN ('owner', 'admin')
+      WHERE profiles.id = auth.uid()
+        AND (
+          profiles.id = planning_documents.created_by
+          OR profiles.role IN ('owner', 'admin')
+        )
     )
   );
