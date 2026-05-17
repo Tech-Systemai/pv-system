@@ -691,7 +691,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
     const { error } = await dbOp('planning_documents', 'insert', {
       id: b.id,
       title: b.title,
-      desc: b.desc,
+      board_desc: b.desc,
       area_id: b.areaId,
       shared: b.shared,
       start_date: b.startDate ?? null,
@@ -711,7 +711,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
     if (!editBoard) return;
     const patch = {
       title: form.title || editBoard.title,
-      desc: form.desc,
+      board_desc: form.desc,
       area_id: form.areaId,
       start_date: form.startDate || null,
       due_date: form.dueDate || null,
@@ -720,7 +720,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
     updateById(editBoard.id, b => ({
       ...b,
       title: patch.title,
-      desc: patch.desc,
+      desc: patch.board_desc,
       areaId: form.areaId,
       startDate: form.startDate || undefined,
       dueDate: form.dueDate || undefined,

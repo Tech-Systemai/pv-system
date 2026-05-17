@@ -16,7 +16,7 @@ export default async function PlanningPage() {
   const boards = (rows || []).map((row: any) => ({
     id: row.id,
     title: row.title,
-    desc: row.desc || '',
+    desc: row.board_desc || '',
     areaId: row.area_id,
     shared: row.shared,
     startDate: row.start_date ?? undefined,
