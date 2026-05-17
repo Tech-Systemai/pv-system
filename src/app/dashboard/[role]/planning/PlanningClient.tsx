@@ -648,6 +648,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
   const [form, setForm]                 = useState({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
   const [mounted, setMounted]           = useState(false);
   const [createError, setCreateError]   = useState('');
+  const [creating, setCreating]         = useState(false);
   const [dbBanner, setDbBanner]         = useState('');
   const savePendingRef                  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -747,17 +748,12 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
     setActive(null);
   };
 
-  const addBoard = () => {
+  const addBoard = async () => {
     if (!form.title.trim()) return;
     setCreateError('');
+    setCreating(true);
     const b = makeBoard(form.title.trim(), form.areaId, form.desc, form.startDate, form.dueDate);
-    // Add to UI immediately (optimistic)
-    setBoards(prev => [b, ...prev]);
-    setActive(b.id);
-    setShowNew(false);
-    setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
-    // Save to DB in background
-    dbOp('planning_documents', 'insert', {
+    const { error } = await dbOp('planning_documents', 'insert', {
       id: b.id,
       title: b.title,
       board_desc: b.desc,
@@ -767,9 +763,16 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
       due_date: b.dueDate ?? null,
       content: { widgets: [], strokes: [] },
       created_by: currentUserId,
-    }).then(({ error }) => {
-      if (error) setDbBanner(`⚠️ Board not saved to database: ${error}. Go to Supabase → Settings → API → Reload schema cache, then refresh this page.`);
     });
+    setCreating(false);
+    if (error) {
+      setCreateError(error);
+      return;
+    }
+    setBoards(prev => [b, ...prev]);
+    setActive(b.id);
+    setShowNew(false);
+    setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
   };
 
   const saveEditBoard = async () => {
@@ -945,8 +948,10 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={addBoard} className="btn btn-acc" disabled={!form.title.trim()}>Create Board</button>
-              <button onClick={() => { setShowNew(false); setCreateError(''); setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' }); }} className="btn btn-sec">Cancel</button>
+              <button onClick={addBoard} className="btn btn-acc" disabled={!form.title.trim() || creating}>
+                {creating ? 'Creating…' : 'Create Board'}
+              </button>
+              <button onClick={() => { setShowNew(false); setCreateError(''); setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' }); }} className="btn btn-sec" disabled={creating}>Cancel</button>
             </div>
           </div>
         </div>,
