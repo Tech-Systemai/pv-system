@@ -674,41 +674,17 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
       }
     } catch { /* ignore */ }
 
-    // Nothing in localStorage either — seed with the default starter boards
+    // Nothing in localStorage either — recreate the boards that were lost
     const starters: Board[] = [
       {
-        id: uid(), title: 'Q3 Marketing Plan', desc: 'Campaigns, content, and growth for Q3',
-        areaId: 'marketing', shared: true, created: new Date().toISOString(),
-        startDate: '2026-07-01', dueDate: '2026-09-30', strokes: [],
-        widgets: [
-          { id: uid(), type: 'sticky',    x: 60,  y: 60,  w: 180, h: 180, text: '🚀 Launch email campaign\nTarget dormant leads 60+ days', bg: '#fef08a' },
-          { id: uid(), type: 'sticky',    x: 260, y: 60,  w: 180, h: 180, text: '📊 A/B test ad creatives\nFB + Google, 2 variants', bg: '#bfdbfe' },
-          { id: uid(), type: 'goal',      x: 460, y: 60,  w: 220, h: 160, title: 'Q3 Revenue Goal', description: 'Reach $500k in pipeline value by end of Q3.', targetDate: '2026-09-30' },
-          { id: uid(), type: 'checklist', x: 460, y: 250, w: 210, h: 220, title: 'Launch Checklist', items: [
-            { text: 'Write email copy', done: true },
-            { text: 'Design ad creatives', done: true },
-            { text: 'Set up automations', done: false },
-            { text: 'Launch paid campaigns', done: false },
-            { text: 'Monitor day-1 metrics', done: false },
-          ]},
-        ],
+        id: uid(), title: 'Business Plan', desc: '',
+        areaId: 'business', shared: false, created: new Date().toISOString(),
+        widgets: [], strokes: [],
       },
       {
-        id: uid(), title: 'Sales Pipeline Q3', desc: 'Deals, outreach, and targets',
-        areaId: 'sales', shared: false, created: new Date().toISOString(),
-        startDate: '2026-07-01', dueDate: '2026-09-30', strokes: [],
-        widgets: [
-          { id: uid(), type: 'sticky',    x: 60,  y: 60,  w: 180, h: 180, text: '🤝 Acme Corp proposal\nDeadline: July 12', bg: '#fed7aa' },
-          { id: uid(), type: 'sticky',    x: 260, y: 60,  w: 180, h: 180, text: '📞 20 new prospects\nThis week — URGENT', bg: '#fecdd3' },
-          { id: uid(), type: 'goal',      x: 460, y: 60,  w: 220, h: 160, title: 'Close 4 Enterprise Deals', description: 'Land 4 enterprise contracts with ACV > $50k each before end of Q3.', targetDate: '2026-09-30' },
-          { id: uid(), type: 'checklist', x: 460, y: 250, w: 210, h: 240, title: 'Acme Corp Deal', items: [
-            { text: 'Discovery call done', done: true },
-            { text: 'Proposal sent',       done: true },
-            { text: 'Technical review',    done: false },
-            { text: 'Pricing negotiation', done: false },
-            { text: 'Contract signed',     done: false },
-          ]},
-        ],
+        id: uid(), title: 'CX Team Management', desc: '',
+        areaId: 'cx', shared: false, created: new Date().toISOString(),
+        widgets: [], strokes: [],
       },
     ];
     Promise.all(starters.map(b =>
