@@ -641,6 +641,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
   const [editBoard, setEditBoard]       = useState<Board | null>(null);
   const [form, setForm]                 = useState({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
   const [mounted, setMounted]           = useState(false);
+  const [createError, setCreateError]   = useState('');
   const savePendingRef                  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
@@ -741,6 +742,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
 
   const addBoard = async () => {
     if (!form.title.trim()) return;
+    setCreateError('');
     const b = makeBoard(form.title.trim(), form.areaId, form.desc, form.startDate, form.dueDate);
     const { error } = await dbOp('planning_documents', 'insert', {
       id: b.id,
@@ -753,12 +755,15 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
       content: { widgets: [], strokes: [] },
       created_by: currentUserId,
     });
-    if (!error) {
-      setBoards(prev => [b, ...prev]);
-      setActive(b.id);
-      setShowNew(false);
-      setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
+    if (error) {
+      setCreateError(error);
+      return;
     }
+    setBoards(prev => [b, ...prev]);
+    setActive(b.id);
+    setShowNew(false);
+    setCreateError('');
+    setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' });
   };
 
   const saveEditBoard = async () => {
@@ -922,9 +927,14 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
               <div className="pv-fld"><label>Due date <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(optional)</span></label>
                 <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} /></div>
             </div>
+            {createError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#dc2626' }}>
+                ⚠️ {createError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={addBoard} className="btn btn-acc" disabled={!form.title.trim()}>Create Board</button>
-              <button onClick={() => { setShowNew(false); setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' }); }} className="btn btn-sec">Cancel</button>
+              <button onClick={() => { setShowNew(false); setCreateError(''); setForm({ title: '', areaId: 'marketing', desc: '', startDate: '', dueDate: '' }); }} className="btn btn-sec">Cancel</button>
             </div>
           </div>
         </div>,
