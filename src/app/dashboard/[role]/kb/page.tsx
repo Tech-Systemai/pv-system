@@ -10,6 +10,7 @@ export default async function KBPage() {
   const admin = createAdminClient();
   const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
   const { data: articles } = await admin.from('knowledge_base').select('*').order('created_at', { ascending: false });
+  const { data: kbFolderRow } = await admin.from('global_settings').select('value').eq('key', 'kb_folders').single();
 
-  return <KBClient initialArticles={articles || []} userRole={profile?.role || 'sales'} currentUserId={user.id} />;
+  return <KBClient initialArticles={articles || []} userRole={profile?.role || 'sales'} currentUserId={user.id} savedCustomFolders={kbFolderRow?.value ?? []} />;
 }

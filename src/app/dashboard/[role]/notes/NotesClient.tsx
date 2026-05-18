@@ -1,7 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { dbOp } from '@/utils/db';
+
+const FILE_ICONS: Record<string, string> = {
+  pdf: '📕', doc: '📘', docx: '📘', xls: '📗', xlsx: '📗',
+  ppt: '📙', pptx: '📙', zip: '📦', txt: '📝', csv: '📊', mp4: '🎬',
+};
+function getFileIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  return FILE_ICONS[ext] ?? '📄';
+}
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function AttachmentRow({ a, onRemove }: { a: any; onRemove?: () => void }) {
+  const isImage = a.type?.startsWith('image/');
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--line)', marginBottom: 6 }}>
+      {isImage
+        ? <img src={a.dataUrl} alt={a.name} style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />
+        : <span style={{ fontSize: 20, flexShrink: 0 }}>{getFileIcon(a.name)}</span>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</div>
+        <div style={{ fontSize: 10, color: 'var(--ink-4)' }}>{formatSize(a.size)}</div>
+      </div>
+      {a.dataUrl && (
+        <a href={a.dataUrl} download={a.name} onClick={e => e.stopPropagation()}
+          style={{ fontSize: 11, color: 'var(--accent-ink)', textDecoration: 'none', padding: '3px 8px', background: 'var(--accent-soft)', borderRadius: 6, fontWeight: 600, flexShrink: 0 }}>
+          ↓
+        </a>
+      )}
+      {onRemove && (
+        <button onClick={onRemove} style={{ background: 'none', border: 'none', color: 'var(--err)', cursor: 'pointer', fontSize: 14, padding: '2px', flexShrink: 0 }}>✕</button>
+      )}
+    </div>
+  );
+}
 
 const NOTE_TYPES = ['Meeting Note', 'Vision', 'Follow-up', 'Ideas', 'Action Items', 'Policy Note', 'General'];
 
@@ -38,7 +76,27 @@ export default function NotesClient({
   const [formContent,  setFormContent]  = useState('');
   const [formType,     setFormType]     = useState('General');
   const [formSharedWith, setFormSharedWith] = useState<string[]>([]);
+  const [formAttachments, setFormAttachments] = useState<any[]>([]);
   const [userSearch,   setUserSearch]   = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
+    Array.from(e.target.files ?? []).forEach(file => {
+      if (file.size > 10 * 1024 * 1024) { alert(`"${file.name}" exceeds 10 MB limit.`); return; }
+      const reader = new FileReader();
+      reader.onload = ev => {
+        setFormAttachments(prev => [...prev, {
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          dataUrl: ev.target?.result as string,
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
 
   const filtered = filterType === 'All' ? notes : notes.filter(n => n.type === filterType);
 
@@ -48,6 +106,7 @@ export default function NotesClient({
     setFormContent('');
     setFormType('General');
     setFormSharedWith([]);
+    setFormAttachments([]);
     setUserSearch('');
     setSaveError('');
     setIsModalOpen(true);
@@ -59,6 +118,7 @@ export default function NotesClient({
     setFormContent(note.content ?? '');
     setFormType(note.type ?? 'General');
     setFormSharedWith(note.shared_with ?? []);
+    setFormAttachments(note.attachments ?? []);
     setUserSearch('');
     setSaveError('');
     setIsModalOpen(true);
@@ -76,16 +136,16 @@ export default function NotesClient({
     setSaveError('');
     if (editNote) {
       const { error } = await dbOp('notes', 'update',
-        { title: formTitle, content: formContent, type: formType, shared_with: formSharedWith, updated_at: new Date().toISOString() },
+        { title: formTitle, content: formContent, type: formType, shared_with: formSharedWith, attachments: formAttachments, updated_at: new Date().toISOString() },
         { id: editNote.id }
       );
       if (error) { setSaveError(error); setSaving(false); return; }
       setNotes(prev => prev.map(n =>
-        n.id === editNote.id ? { ...n, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith } : n
+        n.id === editNote.id ? { ...n, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith, attachments: formAttachments } : n
       ));
     } else {
       const { data, error } = await dbOp('notes', 'insert',
-        { user_id: currentUserId, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith }
+        { user_id: currentUserId, title: formTitle, content: formContent, type: formType, shared_with: formSharedWith, attachments: formAttachments }
       );
       if (error) { setSaveError(error); setSaving(false); return; }
       if (data?.[0]) setNotes(prev => [data[0], ...prev]);
@@ -215,14 +275,21 @@ export default function NotesClient({
                   <div style={{ fontSize: 10, color: `oklch(0.65 0.06 ${hue})` }}>
                     {new Date(note.updated_at ?? note.created_at).toLocaleDateString()}
                   </div>
-                  {shareCount > 0 && (
-                    <div
-                      title={sharedNames.join(', ')}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: `oklch(0.40 0.14 ${hue})`, background: `oklch(0.90 0.06 ${hue})`, padding: '2px 8px', borderRadius: 20 }}
-                    >
-                      👥 {shareCount === 1 ? sharedNames[0] : `${shareCount} people`}
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                    {(note.attachments ?? []).length > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: `oklch(0.40 0.14 ${hue})`, background: `oklch(0.90 0.06 ${hue})`, padding: '2px 8px', borderRadius: 20 }}>
+                        📎 {note.attachments.length}
+                      </span>
+                    )}
+                    {shareCount > 0 && (
+                      <div
+                        title={sharedNames.join(', ')}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color: `oklch(0.40 0.14 ${hue})`, background: `oklch(0.90 0.06 ${hue})`, padding: '2px 8px', borderRadius: 20 }}
+                      >
+                        👥 {shareCount === 1 ? sharedNames[0] : `${shareCount} people`}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -306,6 +373,14 @@ export default function NotesClient({
                 ? <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{viewShared.content}</div>
                 : <div style={{ fontSize: 13, color: 'var(--ink-4)' }}>No content.</div>
               }
+              {(viewShared.attachments ?? []).length > 0 && (
+                <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Attachments ({viewShared.attachments.length})
+                  </div>
+                  {viewShared.attachments.map((a: any) => <AttachmentRow key={a.id} a={a} />)}
+                </div>
+              )}
             </div>
             <div style={{ borderTop: '1px solid var(--line)', padding: '12px 20px', flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
@@ -322,6 +397,7 @@ export default function NotesClient({
         <div className="mb">
           <div className="md" style={{ width: 580, maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="md-t">{editNote ? 'Edit Note' : 'New Note'}</div>
+            <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }} onChange={handleFileAdd} />
             <div className="pv-fld">
               <label>Title</label>
               <input type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="Note title…" autoFocus />
@@ -335,6 +411,17 @@ export default function NotesClient({
             <div className="pv-fld">
               <label>Content</label>
               <textarea rows={8} value={formContent} onChange={e => setFormContent(e.target.value)} placeholder="Write your note here…" style={{ resize: 'vertical' }} />
+            </div>
+
+            {/* Attachments */}
+            <div className="pv-fld">
+              <label>Attachments</label>
+              <button type="button" className="btn btn-sec btn-sm" onClick={() => fileInputRef.current?.click()} style={{ marginBottom: formAttachments.length > 0 ? 10 : 0 }}>
+                📎 Attach files
+              </button>
+              {formAttachments.map(a => (
+                <AttachmentRow key={a.id} a={a} onRemove={() => setFormAttachments(prev => prev.filter(x => x.id !== a.id))} />
+              ))}
             </div>
 
             {/* Share with picker */}

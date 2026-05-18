@@ -12,9 +12,23 @@ const DEFAULT_FOLDERS = [
   { name: 'Product Documentation', access: 'Everyone', icon: '📚', hue: 155 },
 ];
 
-export default function KBClient({ initialArticles, userRole }: { initialArticles: any[], userRole: string, currentUserId?: string }) {
+function buildFolderList(savedCustomFolders: any[], articles: any[]) {
+  const all = [...DEFAULT_FOLDERS];
+  for (const cf of savedCustomFolders) {
+    if (!all.find(f => f.name === cf.name)) all.push(cf);
+  }
+  // Recover any folder referenced by articles but not yet in the list
+  for (const a of articles) {
+    if (a.folder && !all.find(f => f.name === a.folder)) {
+      all.push({ name: a.folder, access: 'Everyone', icon: '📁', hue: 200 });
+    }
+  }
+  return all;
+}
+
+export default function KBClient({ initialArticles, userRole, savedCustomFolders = [] }: { initialArticles: any[], userRole: string, currentUserId?: string, savedCustomFolders?: any[] }) {
   const [articles, setArticles] = useState(initialArticles);
-  const [folders, setFolders] = useState(DEFAULT_FOLDERS);
+  const [folders, setFolders] = useState(() => buildFolderList(savedCustomFolders, initialArticles));
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [viewArticle, setViewArticle] = useState<any>(null);
   const [newArticleModal, setNewArticleModal] = useState(false);
@@ -51,14 +65,18 @@ export default function KBClient({ initialArticles, userRole }: { initialArticle
     if (viewArticle?.id === id) setViewArticle(null);
   };
 
-  const handleCreateFolder = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateFolder = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const name = fd.get('name') as string;
     const access = fd.get('access') as string;
     const icon = fd.get('icon') as string || '📁';
     if (name && !folders.find(f => f.name === name)) {
-      setFolders(prev => [...prev, { name, access, icon, hue: Math.floor(Math.random() * 360) }]);
+      const newFolder = { name, access, icon, hue: Math.floor(Math.random() * 360) };
+      const updated = [...folders, newFolder];
+      setFolders(updated);
+      const customOnly = updated.filter(f => !DEFAULT_FOLDERS.find(df => df.name === f.name));
+      await dbOp('global_settings', 'upsert', { key: 'kb_folders', value: customOnly });
     }
     setNewFolderModal(false);
   };
