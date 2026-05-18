@@ -9,8 +9,13 @@ export default async function KBPage() {
 
   const admin = createAdminClient();
   const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
-  const { data: articles } = await admin.from('knowledge_base').select('*').order('created_at', { ascending: false });
-  const { data: kbFolderRow } = await admin.from('global_settings').select('value').eq('key', 'kb_folders').single();
+  const [{ data: articles }, { data: kbFolderRow }, { data: progress }] = await Promise.all([
+    admin.from('knowledge_base').select('*').order('order_index', { ascending: true }),
+    admin.from('global_settings').select('value').eq('key', 'kb_folders').single(),
+    admin.from('kb_progress').select('article_id').eq('user_id', user.id),
+  ]);
 
-  return <KBClient initialArticles={articles || []} userRole={profile?.role || 'sales'} currentUserId={user.id} savedCustomFolders={kbFolderRow?.value ?? []} />;
+  const progressIds = (progress ?? []).map((p: any) => p.article_id);
+
+  return <KBClient initialArticles={articles || []} userRole={profile?.role || 'sales'} currentUserId={user.id} savedCustomFolders={kbFolderRow?.value ?? []} initialProgress={progressIds} />;
 }

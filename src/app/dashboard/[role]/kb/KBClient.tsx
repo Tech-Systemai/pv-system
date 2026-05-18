@@ -1,23 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { dbOp } from '@/utils/db';
 
 const DEFAULT_FOLDERS = [
-  { name: 'Sales Playbook', access: 'Sales + Mgmt', icon: '📘', hue: 75 },
-  { name: 'CX Procedures', access: 'CX + Mgmt', icon: '📗', hue: 145 },
-  { name: 'Company Policies', access: 'Everyone', icon: '📋', hue: 268 },
-  { name: 'Onboarding', access: 'New hires', icon: '🎯', hue: 200 },
-  { name: 'Compliance & Legal', access: 'Mgmt only', icon: '⚖', hue: 25 },
-  { name: 'Product Documentation', access: 'Everyone', icon: '📚', hue: 155 },
+  { name: 'Sales Playbook',       access: 'Sales + Mgmt', icon: '📘', hue: 75  },
+  { name: 'CX Procedures',        access: 'CX + Mgmt',    icon: '📗', hue: 145 },
+  { name: 'Company Policies',     access: 'Everyone',     icon: '📋', hue: 268 },
+  { name: 'Onboarding',           access: 'New hires',    icon: '🎯', hue: 200 },
+  { name: 'Compliance & Legal',   access: 'Mgmt only',    icon: '⚖',  hue: 25  },
+  { name: 'Product Documentation',access: 'Everyone',     icon: '📚', hue: 155 },
 ];
 
-function buildFolderList(savedCustomFolders: any[], articles: any[]) {
+const TYPE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  text:  { label: 'TEXT',  bg: 'oklch(0.94 0.04 145)', color: 'oklch(0.35 0.14 145)' },
+  video: { label: 'VIDEO', bg: 'oklch(0.94 0.04 268)', color: 'oklch(0.35 0.14 268)' },
+  pdf:   { label: 'PDF',   bg: 'oklch(0.94 0.04 25)',  color: 'oklch(0.35 0.14 25)'  },
+};
+
+function buildFolderList(savedCustom: any[], articles: any[]) {
   const all = [...DEFAULT_FOLDERS];
-  for (const cf of savedCustomFolders) {
+  for (const cf of savedCustom) {
     if (!all.find(f => f.name === cf.name)) all.push(cf);
   }
-  // Recover any folder referenced by articles but not yet in the list
   for (const a of articles) {
     if (a.folder && !all.find(f => f.name === a.folder)) {
       all.push({ name: a.folder, access: 'Everyone', icon: '📁', hue: 200 });
@@ -26,68 +31,332 @@ function buildFolderList(savedCustomFolders: any[], articles: any[]) {
   return all;
 }
 
-export default function KBClient({ initialArticles, userRole, savedCustomFolders = [] }: { initialArticles: any[], userRole: string, currentUserId?: string, savedCustomFolders?: any[] }) {
-  const [articles, setArticles] = useState(initialArticles);
-  const [folders, setFolders] = useState(() => buildFolderList(savedCustomFolders, initialArticles));
-  const [activeFolder, setActiveFolder] = useState<string | null>(null);
-  const [viewArticle, setViewArticle] = useState<any>(null);
-  const [newArticleModal, setNewArticleModal] = useState(false);
-  const [newFolderModal, setNewFolderModal] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+function getYouTubeEmbed(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+  if (url.includes('youtube.com/embed/')) return url;
+  return null;
+}
 
-  const isMgmt = ['owner', 'admin', 'supervisor'].includes(userRole);
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+export default function KBClient({
+  initialArticles,
+  userRole,
+  currentUserId,
+  savedCustomFolders = [],
+  initialProgress = [],
+}: {
+  initialArticles: any[];
+  userRole: string;
+  currentUserId: string;
+  savedCustomFolders?: any[];
+  initialProgress?: number[];
+}) {
+  const [articles, setArticles]         = useState(initialArticles);
+  const [folders,  setFolders]          = useState(() => buildFolderList(savedCustomFolders, initialArticles));
+  const [completedIds, setCompletedIds] = useState<Set<number>>(() => new Set(initialProgress));
+  const [activeCourse, setActiveCourse] = useState<string | null>(null);
+  const [activeLesson, setActiveLesson] = useState<any>(null);
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [showNew,      setShowNew]      = useState(false);
+  const [showNewCourse,setShowNewCourse]= useState(false);
+  const [editArticle,  setEditArticle]  = useState<any>(null);
+  const [saving,       setSaving]       = useState(false);
+
+  const [formFolder,     setFormFolder]     = useState('');
+  const [formTitle,      setFormTitle]      = useState('');
+  const [formContent,    setFormContent]    = useState('');
+  const [formAccess,     setFormAccess]     = useState('Everyone');
+  const [formType,       setFormType]       = useState<'text'|'video'|'pdf'>('text');
+  const [formDuration,   setFormDuration]   = useState('');
+  const [formVideoUrl,   setFormVideoUrl]   = useState('');
+  const [formLessonFile, setFormLessonFile] = useState<any>(null);
+  const [formOrderIndex, setFormOrderIndex] = useState(0);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMgmt  = ['owner', 'admin', 'supervisor'].includes(userRole);
   const isOwner = userRole === 'owner';
-  const isReadOnly = ['sales', 'cx'].includes(userRole);
 
-  const handleCreateArticle = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setSaving(true);
-    const formData = new FormData(e.currentTarget);
-    const newDoc = {
-      folder: formData.get('folder') as string,
-      title: formData.get('title') as string,
-      content: formData.get('content') as string,
-      access_level: formData.get('access') as string,
-    };
-    const { data } = await dbOp('knowledge_base', 'insert', newDoc);
-    if (data?.[0]) setArticles([data[0], ...articles]);
-    setSaving(false);
-    setNewArticleModal(false);
+  /* ── Progress ───────────────────────────────────────────────── */
+  const markComplete = async (id: number) => {
+    await dbOp('kb_progress', 'insert', { user_id: currentUserId, article_id: id });
+    setCompletedIds(prev => new Set([...prev, id]));
+  };
+  const markIncomplete = async (id: number) => {
+    await dbOp('kb_progress', 'delete', undefined, { user_id: currentUserId, article_id: id });
+    setCompletedIds(prev => { const s = new Set(prev); s.delete(id); return s; });
   };
 
-  const handleDeleteArticle = async (id: string) => {
-    setDeleting(id);
+  /* ── CRUD helpers ───────────────────────────────────────────── */
+  const openCreate = (defaultFolder?: string) => {
+    const folder = defaultFolder ?? activeCourse ?? folders[0]?.name ?? '';
+    setEditArticle(null);
+    setFormFolder(folder);
+    setFormTitle(''); setFormContent(''); setFormAccess('Everyone');
+    setFormType('text'); setFormDuration(''); setFormVideoUrl('');
+    setFormLessonFile(null);
+    setFormOrderIndex(articles.filter(a => a.folder === folder).length);
+    setShowNew(true);
+  };
+
+  const openEdit = (a: any) => {
+    setEditArticle(a);
+    setFormFolder(a.folder); setFormTitle(a.title); setFormContent(a.content ?? '');
+    setFormAccess(a.access_level ?? 'Everyone'); setFormType(a.lesson_type ?? 'text');
+    setFormDuration(a.duration ?? ''); setFormVideoUrl(a.video_url ?? '');
+    setFormLessonFile(a.lesson_file ?? null); setFormOrderIndex(a.order_index ?? 0);
+    setShowNew(true);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) { alert('Max file size is 20 MB'); return; }
+    const reader = new FileReader();
+    reader.onload = ev => setFormLessonFile({ name: file.name, type: file.type, size: file.size, dataUrl: ev.target?.result as string });
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleSave = async () => {
+    if (!formTitle.trim()) return;
+    setSaving(true);
+    const payload: any = {
+      folder: formFolder, title: formTitle, content: formContent,
+      access_level: formAccess, lesson_type: formType,
+      duration: formDuration, order_index: formOrderIndex,
+      video_url: formType === 'video' ? formVideoUrl : null,
+      lesson_file: formType === 'pdf' ? formLessonFile : null,
+    };
+    if (editArticle) {
+      await dbOp('knowledge_base', 'update', payload, { id: editArticle.id });
+      setArticles(prev => prev.map(a => a.id === editArticle.id ? { ...a, ...payload } : a));
+      if (activeLesson?.id === editArticle.id) setActiveLesson((prev: any) => ({ ...prev, ...payload }));
+    } else {
+      const { data } = await dbOp('knowledge_base', 'insert', payload);
+      if (data?.[0]) setArticles(prev => [...prev, data[0]]);
+    }
+    setSaving(false);
+    setShowNew(false);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this lesson?')) return;
     await dbOp('knowledge_base', 'delete', undefined, { id });
     setArticles(prev => prev.filter(a => a.id !== id));
-    setDeleting(null);
-    if (viewArticle?.id === id) setViewArticle(null);
+    if (activeLesson?.id === id) setActiveLesson(null);
   };
 
-  const handleCreateFolder = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateCourse = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const name = fd.get('name') as string;
     const access = fd.get('access') as string;
     const icon = fd.get('icon') as string || '📁';
     if (name && !folders.find(f => f.name === name)) {
-      const newFolder = { name, access, icon, hue: Math.floor(Math.random() * 360) };
-      const updated = [...folders, newFolder];
+      const nf = { name, access, icon, hue: Math.floor(Math.random() * 360) };
+      const updated = [...folders, nf];
       setFolders(updated);
       const customOnly = updated.filter(f => !DEFAULT_FOLDERS.find(df => df.name === f.name));
       await dbOp('global_settings', 'upsert', { key: 'kb_folders', value: customOnly });
     }
-    setNewFolderModal(false);
+    setShowNewCourse(false);
   };
 
-  const folderStats = folders.map(f => {
-    const folderArticles = articles.filter(a => a.folder === f.name);
-    return { ...f, count: folderArticles.length, items: folderArticles };
-  });
+  /* ── LESSON VIEW ────────────────────────────────────────────── */
+  if (activeLesson) {
+    const done = completedIds.has(activeLesson.id);
+    const tb   = TYPE_BADGE[activeLesson.lesson_type ?? 'text'];
+    const embedUrl = activeLesson.lesson_type === 'video' ? getYouTubeEmbed(activeLesson.video_url ?? '') : null;
 
-  const selectedFolderData = activeFolder ? folderStats.find(f => f.name === activeFolder) : null;
+    return (
+      <div className="page-fade">
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          <button className="btn btn-sec btn-sm" onClick={() => setActiveLesson(null)}>← {activeCourse}</button>
+          {isMgmt && <>
+            <button className="btn btn-sec btn-sm" onClick={() => openEdit(activeLesson)}>⚙ Edit</button>
+            <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)' }} onClick={() => { handleDelete(activeLesson.id); }}>Delete</button>
+          </>}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {done ? (
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'oklch(0.45 0.15 145)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                ✓ Completed
+                <button onClick={() => markIncomplete(activeLesson.id)} style={{ fontSize: 11, background: 'none', border: 'none', color: 'var(--ink-4)', cursor: 'pointer', textDecoration: 'underline' }}>Undo</button>
+              </span>
+            ) : (
+              <button className="btn btn-acc" onClick={() => markComplete(activeLesson.id)}>✓ Mark Complete</button>
+            )}
+          </div>
+        </div>
 
+        {/* Lesson header */}
+        <div className="card" style={{ marginBottom: 20, overflow: 'hidden' }}>
+          <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: tb.bg, color: tb.color, padding: '3px 9px', borderRadius: 20 }}>{tb.label}</span>
+              {activeLesson.duration && <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{activeLesson.duration}</span>}
+              {done && <span style={{ fontSize: 10, background: 'oklch(0.93 0.05 145)', color: 'oklch(0.35 0.14 145)', padding: '3px 9px', borderRadius: 20, fontWeight: 700 }}>✓ Done</span>}
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', lineHeight: 1.3, textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'oklch(0.65 0.08 145)' }}>
+              {activeLesson.title}
+            </div>
+          </div>
+
+          <div style={{ padding: '22px 24px' }}>
+            {/* Video embed */}
+            {activeLesson.lesson_type === 'video' && (
+              embedUrl
+                ? <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 12, overflow: 'hidden', marginBottom: 16, background: '#000' }}>
+                    <iframe src={embedUrl} title={activeLesson.title} allowFullScreen
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} />
+                  </div>
+                : activeLesson.video_url
+                  ? <video controls style={{ width: '100%', borderRadius: 12, marginBottom: 16 }}>
+                      <source src={activeLesson.video_url} />
+                    </video>
+                  : <div style={{ padding: '40px 20px', background: 'var(--surface-2)', borderRadius: 12, textAlign: 'center', color: 'var(--ink-4)', fontSize: 13, marginBottom: 16 }}>No video URL provided.</div>
+            )}
+
+            {/* PDF download */}
+            {activeLesson.lesson_type === 'pdf' && activeLesson.lesson_file && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: 'oklch(0.97 0.02 25)', border: '1px solid oklch(0.90 0.06 25)', borderRadius: 12, marginBottom: 16 }}>
+                <span style={{ fontSize: 36 }}>📕</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{activeLesson.lesson_file.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{formatFileSize(activeLesson.lesson_file.size)}</div>
+                </div>
+                <a href={activeLesson.lesson_file.dataUrl} download={activeLesson.lesson_file.name}
+                  style={{ padding: '10px 20px', background: 'var(--accent)', color: 'white', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                  ↓ Download
+                </a>
+              </div>
+            )}
+
+            {/* Text content */}
+            {activeLesson.content && (
+              <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
+                {activeLesson.content}
+              </div>
+            )}
+            {!activeLesson.content && activeLesson.lesson_type === 'text' && (
+              <div style={{ color: 'var(--ink-4)', fontSize: 13 }}>No content added yet.</div>
+            )}
+          </div>
+        </div>
+
+        {!done && (
+          <div style={{ textAlign: 'center', paddingBottom: 24 }}>
+            <button className="btn btn-acc" style={{ padding: '12px 36px', fontSize: 15 }} onClick={() => markComplete(activeLesson.id)}>
+              ✓ Mark as Complete
+            </button>
+          </div>
+        )}
+
+        {/* Modals */}
+        {showNew && <LessonModal {...modalProps()} />}
+      </div>
+    );
+  }
+
+  /* ── COURSE VIEW ────────────────────────────────────────────── */
+  if (activeCourse) {
+    const folder  = folders.find(f => f.name === activeCourse);
+    const hue     = folder?.hue ?? 200;
+    const icon    = folder?.icon ?? '📁';
+    const lessons = articles
+      .filter(a => a.folder === activeCourse)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const completedCount = lessons.filter(l => completedIds.has(l.id)).length;
+    const pct = lessons.length > 0 ? Math.round((completedCount / lessons.length) * 100) : 0;
+
+    return (
+      <div className="page-fade">
+        {/* Nav */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <button className="btn btn-sec btn-sm" onClick={() => setActiveCourse(null)}>← Knowledge Base</button>
+          {isMgmt && <button className="btn btn-acc btn-sm" onClick={() => openCreate(activeCourse)}>+ Add Lesson</button>}
+        </div>
+
+        {/* Banner */}
+        <div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 20, background: `linear-gradient(135deg, oklch(0.42 0.18 ${hue}), oklch(0.28 0.20 ${hue + 30}))`, padding: '36px 32px 32px', position: 'relative', minHeight: 160 }}>
+          <div style={{ position: 'absolute', top: 20, right: 28, fontSize: 80, opacity: 0.12, userSelect: 'none', lineHeight: 1 }}>{icon}</div>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>{icon}</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: 'white', letterSpacing: '-0.02em', marginBottom: 4 }}>{activeCourse}</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 500 }}>
+            {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
+            {lessons.length > 0 && ` · ${completedCount} of ${lessons.length} complete`}
+          </div>
+        </div>
+
+        {/* Progress */}
+        {lessons.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)' }}>Your progress</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: pct === 100 ? 'oklch(0.45 0.15 145)' : 'var(--ink-3)' }}>{pct}%</span>
+            </div>
+            <div style={{ height: 8, background: 'var(--line)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'oklch(0.55 0.16 145)' : `oklch(0.52 0.18 ${hue})`, borderRadius: 4, transition: 'width 0.4s' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Lesson list */}
+        {lessons.length === 0 ? (
+          <div className="card">
+            <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+              No lessons yet.
+              {isMgmt && <button className="btn btn-acc btn-sm" onClick={() => openCreate(activeCourse)} style={{ marginLeft: 10 }}>+ Add Lesson</button>}
+            </div>
+          </div>
+        ) : (
+          <div className="card" style={{ overflow: 'hidden' }}>
+            {lessons.map((lesson, i) => {
+              const done = completedIds.has(lesson.id);
+              const tb = TYPE_BADGE[lesson.lesson_type ?? 'text'];
+              return (
+                <div key={lesson.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: i < lessons.length - 1 ? '1px solid var(--line-2)' : 'none', cursor: 'pointer', transition: 'background 0.1s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '')}
+                  onClick={() => setActiveLesson(lesson)}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', border: `2px solid ${done ? 'oklch(0.55 0.16 145)' : 'var(--line)'}`, background: done ? 'oklch(0.93 0.05 145)' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: done ? 14 : 16, color: done ? 'oklch(0.40 0.14 145)' : 'var(--ink-4)' }}>
+                    {done ? '✓' : lesson.lesson_type === 'video' ? '▶' : lesson.lesson_type === 'pdf' ? '📄' : '📝'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: done ? 'var(--ink-4)' : 'var(--ink)', textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'oklch(0.65 0.08 145)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {lesson.title}
+                    </div>
+                    {lesson.duration && <div style={{ fontSize: 11, color: 'var(--ink-5)', marginTop: 2 }}>{lesson.duration}</div>}
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: tb.bg, color: tb.color, padding: '3px 9px', borderRadius: 20, flexShrink: 0 }}>{tb.label}</span>
+                  <button onClick={e => { e.stopPropagation(); setActiveLesson(lesson); }}
+                    style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: done ? 'oklch(0.93 0.05 145)' : `oklch(0.50 0.20 ${hue})`, color: done ? 'oklch(0.35 0.14 145)' : 'white', flexShrink: 0 }}>
+                    {done ? 'Review' : 'Start →'}
+                  </button>
+                  {isMgmt && (
+                    <button onClick={e => { e.stopPropagation(); openEdit(lesson); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 13, padding: '4px 6px', opacity: 0.5, flexShrink: 0 }}>⚙</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {showNew && <LessonModal {...modalProps()} />}
+        {showNewCourse && <CourseModal onSubmit={handleCreateCourse} onClose={() => setShowNewCourse(false)} />}
+      </div>
+    );
+  }
+
+  /* ── OVERVIEW ───────────────────────────────────────────────── */
   const filteredArticles = searchQuery
     ? articles.filter(a =>
         a.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -96,248 +365,241 @@ export default function KBClient({ initialArticles, userRole, savedCustomFolders
       )
     : [];
 
+  const folderStats = folders.map(f => ({
+    ...f,
+    count:     articles.filter(a => a.folder === f.name).length,
+    completed: articles.filter(a => a.folder === f.name && completedIds.has(a.id)).length,
+  }));
+
+  /* Helper to build modal props (avoids repetition) */
+  function modalProps() {
+    return {
+      editArticle, formFolder, formTitle, formContent, formAccess,
+      formType, formDuration, formVideoUrl, formLessonFile, formOrderIndex,
+      folders, saving, fileInputRef,
+      setFormFolder, setFormTitle, setFormContent, setFormAccess,
+      setFormType, setFormDuration, setFormVideoUrl, setFormLessonFile, setFormOrderIndex,
+      handleFileSelect, handleSave,
+      onDelete: editArticle ? () => { handleDelete(editArticle.id); setShowNew(false); } : undefined,
+      onClose: () => setShowNew(false),
+      isMgmt,
+    };
+  }
+
   return (
     <div className="page-fade">
-      {/* Stat cards */}
+      {/* Stats */}
       <div className="stat-grid" style={{ marginBottom: 20 }}>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico ind">📚</div></div>
-          <div className="stat-l">TOTAL ARTICLES</div>
-          <div className="stat-v">{articles.length}</div>
-          <div className="stat-foot">Across all folders</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico acc">📁</div></div>
-          <div className="stat-l">FOLDERS</div>
-          <div className="stat-v">{folders.length}</div>
-          <div className="stat-foot">Knowledge categories</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico ok">✓</div></div>
-          <div className="stat-l">PUBLISHED</div>
-          <div className="stat-v">{articles.filter(a => a.content?.length > 0).length}</div>
-          <div className="stat-foot">With content</div>
-        </div>
-        <div className="stat-card" style={{ cursor: 'default' }}>
-          <div className="stat-h"><div className="stat-ico wn">🔒</div></div>
-          <div className="stat-l">MGMT ONLY</div>
-          <div className="stat-v">{articles.filter(a => a.access_level === 'Mgmt only').length}</div>
-          <div className="stat-foot">Restricted articles</div>
-        </div>
+        {[
+          { l: 'TOTAL LESSONS', v: articles.length,     f: 'Across all courses',  g: '📚', i: 'ind' },
+          { l: 'COURSES',       v: folders.length,      f: 'Knowledge tracks',    g: '📁', i: 'acc' },
+          { l: 'COMPLETED',     v: completedIds.size,   f: 'By you',              g: '✓',  i: 'ok'  },
+          { l: 'MGMT ONLY',     v: articles.filter(a => a.access_level === 'Mgmt only').length, f: 'Restricted', g: '🔒', i: 'wn' },
+        ].map(s => (
+          <div key={s.l} className="stat-card" style={{ cursor: 'default' }}>
+            <div className="stat-h"><div className={`stat-ico ${s.i}`}>{s.g}</div></div>
+            <div className="stat-l">{s.l}</div>
+            <div className="stat-v">{s.v}</div>
+            <div className="stat-foot">{s.f}</div>
+          </div>
+        ))}
       </div>
 
-      {isReadOnly && (
-        <div style={{ background: 'oklch(0.97 0.03 200)', border: '1px solid oklch(0.88 0.06 200)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'oklch(0.40 0.14 200)', marginBottom: 16 }}>
-          Browse and read articles. Contact your supervisor to add or edit content.
-        </div>
-      )}
-
-      {/* Search */}
+      {/* Search bar */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ padding: '14px 18px', display: 'flex', gap: 12, alignItems: 'center' }}>
           <span style={{ fontSize: 16 }}>🔍</span>
-          <input
-            type="text"
-            placeholder="Search articles by title, folder, or content…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="fld-input"
-            style={{ flex: 1, height: 38 }}
-          />
+          <input type="text" placeholder="Search lessons…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="fld-input" style={{ flex: 1, height: 38 }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            {isMgmt && <button className="btn btn-acc btn-sm" onClick={() => setNewArticleModal(true)}>+ New Article</button>}
-            {isOwner && <button className="btn btn-sec btn-sm" onClick={() => setNewFolderModal(true)}>+ New Folder</button>}
+            {isMgmt && <button className="btn btn-acc btn-sm" onClick={() => openCreate()}>+ New Lesson</button>}
+            {isOwner && <button className="btn btn-sec btn-sm" onClick={() => setShowNewCourse(true)}>+ New Course</button>}
           </div>
         </div>
         {searchQuery && filteredArticles.length > 0 && (
           <div style={{ borderTop: '1px solid var(--line)', padding: '8px 18px 14px' }}>
             <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 8 }}>{filteredArticles.length} result{filteredArticles.length !== 1 ? 's' : ''}</div>
-            {filteredArticles.map(a => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--line-2)', cursor: 'pointer' }} onClick={() => setViewArticle(a)}>
-                <span style={{ fontSize: 15 }}>📄</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{a.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{a.folder} · {a.access_level}</div>
+            {filteredArticles.map(a => {
+              const tb = TYPE_BADGE[a.lesson_type ?? 'text'];
+              return (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--line-2)', cursor: 'pointer' }}
+                  onClick={() => { setActiveCourse(a.folder); setActiveLesson(a); }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', background: tb.bg, color: tb.color, padding: '2px 7px', borderRadius: 10 }}>{tb.label}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{a.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{a.folder}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Folder cards grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
-        {folderStats.map((f) => (
-          <div
-            key={f.name}
-            onClick={() => setActiveFolder(f.name)}
-            style={{
-              background: `linear-gradient(135deg, oklch(0.96 0.04 ${f.hue}), oklch(0.93 0.06 ${f.hue + 20}))`,
-              border: `1px solid oklch(0.88 0.07 ${f.hue})`,
-              borderRadius: 14, padding: '20px 18px', cursor: 'pointer',
-              transition: 'transform .12s, box-shadow .12s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = ''; }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 10 }}>{f.icon}</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: `oklch(0.30 0.10 ${f.hue})`, marginBottom: 4 }}>{f.name}</div>
-            <div style={{ fontSize: 11, color: `oklch(0.48 0.08 ${f.hue})`, marginBottom: 14 }}>{f.count} articles · {f.access}</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-sm"
-                style={{ background: `oklch(0.88 0.08 ${f.hue})`, color: `oklch(0.30 0.12 ${f.hue})`, border: 'none', flex: 1 }}
-                onClick={e => { e.stopPropagation(); setActiveFolder(f.name); }}
-              >
-                Open Folder →
-              </button>
-              {isMgmt && (
-                <button
-                  className="btn btn-sm"
-                  style={{ background: `oklch(0.88 0.08 ${f.hue})`, color: `oklch(0.30 0.12 ${f.hue})`, border: 'none' }}
-                  onClick={e => { e.stopPropagation(); setActiveFolder(f.name); setNewArticleModal(true); }}
-                >
-                  +
-                </button>
-              )}
+      {/* Course cards grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+        {folderStats.map(f => {
+          const pct = f.count > 0 ? Math.round((f.completed / f.count) * 100) : 0;
+          return (
+            <div key={f.name} onClick={() => setActiveCourse(f.name)}
+              style={{ background: 'white', border: '1.5px solid var(--line)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'transform .12s, box-shadow .12s, border-color .12s', boxShadow: 'var(--sh-1)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; (e.currentTarget as HTMLDivElement).style.borderColor = `oklch(0.82 0.08 ${f.hue})`; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-1)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--line)'; }}
+            >
+              <div style={{ height: 88, background: `linear-gradient(135deg, oklch(0.42 0.18 ${f.hue}), oklch(0.28 0.20 ${f.hue + 30}))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>
+                {f.icon}
+              </div>
+              <div style={{ padding: '14px 16px 16px' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 3 }}>{f.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: f.count > 0 ? 10 : 0 }}>
+                  {f.count} lesson{f.count !== 1 ? 's' : ''} · {f.access}
+                </div>
+                {f.count > 0 && (
+                  <>
+                    <div style={{ height: 5, background: 'var(--line)', borderRadius: 3, marginBottom: 5, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? 'oklch(0.55 0.16 145)' : `oklch(0.52 0.18 ${f.hue})`, borderRadius: 3, transition: 'width 0.4s' }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: pct === 100 ? 'oklch(0.45 0.15 145)' : 'var(--ink-5)', fontWeight: 600 }}>
+                      {pct === 100 ? '✓ All complete' : `${f.completed}/${f.count} done`}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Folder contents modal */}
-      {activeFolder && selectedFolderData && !viewArticle && (
-        <div className="mb">
-          <div className="md" style={{ width: 560 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{selectedFolderData.icon} {selectedFolderData.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>Access: <strong>{selectedFolderData.access}</strong> · {selectedFolderData.count} articles</div>
-              </div>
-              {isMgmt && (
-                <button className="btn btn-acc btn-sm" onClick={() => setNewArticleModal(true)}>+ Add Article</button>
+      {showNew && <LessonModal {...modalProps()} />}
+      {showNewCourse && <CourseModal onSubmit={handleCreateCourse} onClose={() => setShowNewCourse(false)} />}
+    </div>
+  );
+}
+
+/* ── Lesson modal (create / edit) ────────────────────────────── */
+function LessonModal({
+  editArticle, formFolder, formTitle, formContent, formAccess,
+  formType, formDuration, formVideoUrl, formLessonFile, formOrderIndex,
+  folders, saving, fileInputRef,
+  setFormFolder, setFormTitle, setFormContent, setFormAccess,
+  setFormType, setFormDuration, setFormVideoUrl, setFormLessonFile, setFormOrderIndex,
+  handleFileSelect, handleSave, onDelete, onClose, isMgmt,
+}: any) {
+  return (
+    <div className="mb" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="md" style={{ width: 560, maxHeight: '92vh', overflowY: 'auto' }}>
+        <div className="md-t">{editArticle ? 'Edit Lesson' : 'New Lesson'}</div>
+        <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.zip" style={{ display: 'none' }} onChange={handleFileSelect} />
+
+        <div className="pv-fld">
+          <label>Course</label>
+          <select value={formFolder} onChange={e => setFormFolder(e.target.value)}>
+            {folders.map((f: any) => <option key={f.name} value={f.name}>{f.icon} {f.name}</option>)}
+          </select>
+        </div>
+        <div className="pv-fld">
+          <label>Title</label>
+          <input type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="Lesson title…" autoFocus />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: 12 }}>
+          <div className="pv-fld">
+            <label>Type</label>
+            <select value={formType} onChange={e => { setFormType(e.target.value as any); setFormLessonFile(null); }}>
+              <option value="text">📝 TEXT</option>
+              <option value="video">▶ VIDEO</option>
+              <option value="pdf">📕 PDF</option>
+            </select>
+          </div>
+          <div className="pv-fld">
+            <label>Duration</label>
+            <input value={formDuration} onChange={e => setFormDuration(e.target.value)} placeholder="e.g. 5 min" />
+          </div>
+          <div className="pv-fld">
+            <label>Order</label>
+            <input type="number" value={formOrderIndex} onChange={e => setFormOrderIndex(Number(e.target.value))} min={0} />
+          </div>
+        </div>
+
+        {formType === 'video' && (
+          <div className="pv-fld">
+            <label>Video URL (YouTube or direct link)</label>
+            <input value={formVideoUrl} onChange={e => setFormVideoUrl(e.target.value)} placeholder="https://youtube.com/watch?v=…" />
+          </div>
+        )}
+
+        {formType === 'pdf' && (
+          <div className="pv-fld">
+            <label>File (PDF, Word, PowerPoint…)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button type="button" className="btn btn-sec btn-sm" onClick={() => fileInputRef.current?.click()}>
+                📎 {formLessonFile ? 'Change file' : 'Upload file'}
+              </button>
+              {formLessonFile && (
+                <span style={{ fontSize: 12, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {formLessonFile.name}
+                  <button onClick={() => setFormLessonFile(null)} style={{ background: 'none', border: 'none', color: 'var(--err)', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                </span>
               )}
             </div>
-
-            {selectedFolderData.items.length === 0 ? (
-              <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No articles in this folder yet.</div>
-            ) : (
-              selectedFolderData.items.map(a => (
-                <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--line-2)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 16 }}>📄</span>
-                  <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setViewArticle(a)}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{a.title}</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>Updated {new Date(a.created_at).toLocaleDateString()}</div>
-                  </div>
-                  <button className="btn btn-sec btn-sm" onClick={() => setViewArticle(a)}>View</button>
-                  {isMgmt && (
-                    <button
-                      onClick={() => handleDeleteArticle(a.id)}
-                      disabled={deleting === a.id}
-                      style={{ background: 'none', border: 'none', color: 'var(--err)', cursor: 'pointer', fontSize: 14, padding: '4px' }}
-                    >✕</button>
-                  )}
-                </div>
-              ))
-            )}
-
-            <div style={{ marginTop: 16 }}>
-              <button className="btn btn-sec" onClick={() => setActiveFolder(null)}>Close</button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Article view modal */}
-      {viewArticle && (
-        <div className="mb">
-          <div className="md" style={{ width: 680, maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, flex: 1 }}>{viewArticle.title}</div>
-              {isMgmt && (
-                <button
-                  onClick={() => handleDeleteArticle(viewArticle.id)}
-                  disabled={deleting === viewArticle.id}
-                  className="btn btn-sm"
-                  style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)', marginLeft: 12 }}
-                >
-                  {deleting === viewArticle.id ? 'Deleting…' : 'Delete'}
-                </button>
-              )}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 20 }}>
-              {viewArticle.folder} · Access: {viewArticle.access_level} · {new Date(viewArticle.created_at).toLocaleDateString()}
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.8, whiteSpace: 'pre-wrap', background: 'var(--surface-2)', padding: 16, borderRadius: 10 }}>
-              {viewArticle.content}
-            </div>
-            <div style={{ marginTop: 20 }}>
-              <button className="btn btn-sec" onClick={() => setViewArticle(null)}>← Back</button>
-            </div>
-          </div>
+        <div className="pv-fld">
+          <label>{formType === 'video' ? 'Description' : formType === 'pdf' ? 'Description (optional)' : 'Content'}</label>
+          <textarea rows={7} value={formContent} onChange={e => setFormContent(e.target.value)}
+            placeholder={formType === 'video' ? 'What will viewers learn?' : formType === 'pdf' ? 'Brief description of the document…' : 'Write the lesson content…'}
+            style={{ resize: 'vertical' }} />
         </div>
-      )}
 
-      {/* New Article modal */}
-      {newArticleModal && (
-        <div className="mb">
-          <div className="md" style={{ width: 520 }}>
-            <div className="md-t">New Article</div>
-            <form onSubmit={handleCreateArticle}>
-              <div className="pv-fld">
-                <label>Folder</label>
-                <select name="folder" required defaultValue={activeFolder || folders[0].name}>
-                  {folders.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
-                </select>
-              </div>
-              <div className="pv-fld"><label>Title</label><input type="text" name="title" required /></div>
-              <div className="pv-fld">
-                <label>Content</label>
-                <textarea name="content" rows={8} placeholder="Write your article…" required style={{ resize: 'vertical' }} />
-              </div>
-              <div className="pv-fld">
-                <label>Visibility</label>
-                <select name="access">
-                  <option>Everyone</option>
-                  <option>Sales + Mgmt</option>
-                  <option>CX + Mgmt</option>
-                  <option>Mgmt only</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="btn btn-acc" disabled={saving}>{saving ? 'Publishing…' : 'Publish Article'}</button>
-                <button type="button" className="btn btn-sec" onClick={() => setNewArticleModal(false)}>Cancel</button>
-              </div>
-            </form>
-          </div>
+        <div className="pv-fld">
+          <label>Visibility</label>
+          <select value={formAccess} onChange={e => setFormAccess(e.target.value)}>
+            <option>Everyone</option>
+            <option>Sales + Mgmt</option>
+            <option>CX + Mgmt</option>
+            <option>Mgmt only</option>
+          </select>
         </div>
-      )}
 
-      {/* New Folder modal */}
-      {newFolderModal && (
-        <div className="mb">
-          <div className="md" style={{ width: 420 }}>
-            <div className="md-t">New Folder</div>
-            <form onSubmit={handleCreateFolder}>
-              <div className="pv-fld"><label>Folder Name</label><input type="text" name="name" required placeholder="e.g. Training Materials" /></div>
-              <div className="pv-fld"><label>Icon (emoji)</label><input type="text" name="icon" placeholder="📁" maxLength={4} defaultValue="📁" /></div>
-              <div className="pv-fld">
-                <label>Access Level</label>
-                <select name="access">
-                  <option>Everyone</option>
-                  <option>Sales + Mgmt</option>
-                  <option>CX + Mgmt</option>
-                  <option>Mgmt only</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="btn btn-acc">Create Folder</button>
-                <button type="button" className="btn btn-sec" onClick={() => setNewFolderModal(false)}>Cancel</button>
-              </div>
-            </form>
-          </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn btn-acc" onClick={handleSave} disabled={saving || !formTitle.trim()}>
+            {saving ? 'Saving…' : editArticle ? 'Update Lesson' : 'Add Lesson'}
+          </button>
+          <button className="btn btn-sec" onClick={onClose}>Cancel</button>
+          {editArticle && isMgmt && onDelete && (
+            <button className="btn btn-sm" style={{ marginLeft: 'auto', background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)' }}
+              onClick={() => { if (confirm('Delete this lesson?')) onDelete(); }}>
+              Delete
+            </button>
+          )}
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+/* ── New Course modal ────────────────────────────────────────── */
+function CourseModal({ onSubmit, onClose }: { onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; onClose: () => void }) {
+  return (
+    <div className="mb" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="md" style={{ width: 420 }}>
+        <div className="md-t">New Course</div>
+        <form onSubmit={onSubmit}>
+          <div className="pv-fld"><label>Course Name</label><input type="text" name="name" required placeholder="e.g. Leadership Training" autoFocus /></div>
+          <div className="pv-fld"><label>Icon (emoji)</label><input type="text" name="icon" placeholder="📁" maxLength={4} defaultValue="📁" /></div>
+          <div className="pv-fld">
+            <label>Access Level</label>
+            <select name="access">
+              <option>Everyone</option><option>Sales + Mgmt</option>
+              <option>CX + Mgmt</option><option>Mgmt only</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit" className="btn btn-acc">Create Course</button>
+            <button type="button" className="btn btn-sec" onClick={onClose}>Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
