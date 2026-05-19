@@ -1,30 +1,33 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { dbOp } from '@/utils/db';
 
 const DEFAULT_FOLDERS = [
-  { name: 'Sales Playbook',       access: 'Sales + Mgmt', icon: '📘', hue: 75  },
-  { name: 'CX Procedures',        access: 'CX + Mgmt',    icon: '📗', hue: 145 },
-  { name: 'Company Policies',     access: 'Everyone',     icon: '📋', hue: 268 },
-  { name: 'Onboarding',           access: 'New hires',    icon: '🎯', hue: 200 },
-  { name: 'Compliance & Legal',   access: 'Mgmt only',    icon: '⚖',  hue: 25  },
-  { name: 'Product Documentation',access: 'Everyone',     icon: '📚', hue: 155 },
+  { name: 'Sales Playbook',       access: 'Sales + Mgmt',    icon: '📘', hue: 75  },
+  { name: 'CX Procedures',        access: 'CX + Mgmt',       icon: '📗', hue: 145 },
+  { name: 'Company Policies',     access: 'Everyone',        icon: '📋', hue: 268 },
+  { name: 'Onboarding',           access: 'New hires',       icon: '🎯', hue: 200 },
+  { name: 'Compliance & Legal',   access: 'Management Only', icon: '⚖',  hue: 25  },
+  { name: 'Product Documentation',access: 'Everyone',        icon: '📚', hue: 155 },
+];
+
+const ACCESS_LEVELS = [
+  'Everyone', 'Management Only', 'Sales + Mgmt', 'CX + Mgmt',
+  'HR + Mgmt', 'Sales & CX + Mgmt', 'New hires',
 ];
 
 const TYPE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   text:  { label: 'TEXT',  bg: 'oklch(0.94 0.04 145)', color: 'oklch(0.35 0.14 145)' },
   video: { label: 'VIDEO', bg: 'oklch(0.94 0.04 268)', color: 'oklch(0.35 0.14 268)' },
-  pdf:   { label: 'PDF',   bg: 'oklch(0.94 0.04 25)',  color: 'oklch(0.35 0.14 25)'  },
+  pdf:   { label: 'FILE',  bg: 'oklch(0.94 0.04 25)',  color: 'oklch(0.35 0.14 25)'  },
 };
 
-function buildFolderList(savedCustom: any[], articles: any[]) {
-  const all = [...DEFAULT_FOLDERS];
-  for (const cf of savedCustom) {
-    if (!all.find(f => f.name === cf.name)) all.push(cf);
-  }
+function buildFolderList(savedFolders: any[] | null, articles: any[]) {
+  const base = savedFolders ?? DEFAULT_FOLDERS;
+  const all = [...base];
   for (const a of articles) {
-    if (a.folder && !all.find(f => f.name === a.folder)) {
+    if (a.folder && !all.find((f: any) => f.name === a.folder)) {
       all.push({ name: a.folder, access: 'Everyone', icon: '📁', hue: 200 });
     }
   }
@@ -43,21 +46,115 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function getFileIcon(name: string): string {
+  const ext = name?.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'pdf')              return '📕';
+  if (['doc','docx'].includes(ext)) return '📝';
+  if (['xls','xlsx'].includes(ext)) return '📊';
+  if (['ppt','pptx'].includes(ext)) return '📊';
+  return '📄';
+}
+
+/* ── PDF inline viewer (blob URL avoids Chrome data: block) ─── */
+function PdfEmbed({ dataUrl }: { dataUrl: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const [, b64] = dataUrl.split(',');
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    setBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [dataUrl]);
+  if (!blobUrl) return (
+    <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13, background: 'var(--surface-2)', borderRadius: 12, marginBottom: 16 }}>
+      Loading PDF…
+    </div>
+  );
+  return (
+    <iframe src={blobUrl} title="PDF viewer"
+      style={{ width: '100%', height: 640, border: 'none', borderRadius: 12, marginBottom: 16, display: 'block' }} />
+  );
+}
+
+/* ── Inline file/video embed ─────────────────────────────────── */
+function FileEmbed({ lesson }: { lesson: any }) {
+  const { lesson_type, lesson_file, video_url, title } = lesson;
+
+  if (lesson_type === 'video') {
+    if (lesson_file?.dataUrl) {
+      return (
+        <video controls style={{ width: '100%', borderRadius: 12, marginBottom: 16 }}>
+          <source src={lesson_file.dataUrl} type={lesson_file.type} />
+        </video>
+      );
+    }
+    if (video_url) {
+      const embedUrl = getYouTubeEmbed(video_url);
+      if (embedUrl) {
+        return (
+          <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 12, overflow: 'hidden', marginBottom: 16, background: '#000' }}>
+            <iframe src={embedUrl} title={title} allowFullScreen
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} />
+          </div>
+        );
+      }
+      return (
+        <video controls style={{ width: '100%', borderRadius: 12, marginBottom: 16 }}>
+          <source src={video_url} />
+        </video>
+      );
+    }
+    return (
+      <div style={{ padding: '40px 20px', background: 'var(--surface-2)', borderRadius: 12, textAlign: 'center', color: 'var(--ink-4)', fontSize: 13, marginBottom: 16 }}>
+        No video provided.
+      </div>
+    );
+  }
+
+  if (lesson_type === 'pdf' && lesson_file) {
+    const mime = lesson_file.type || '';
+    if (mime === 'application/pdf') {
+      return <PdfEmbed dataUrl={lesson_file.dataUrl} />;
+    }
+    if (mime.startsWith('image/')) {
+      return <img src={lesson_file.dataUrl} alt={lesson_file.name} style={{ width: '100%', borderRadius: 12, marginBottom: 16 }} />;
+    }
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: 'oklch(0.97 0.02 25)', border: '1px solid oklch(0.90 0.06 25)', borderRadius: 12, marginBottom: 16 }}>
+        <span style={{ fontSize: 36 }}>{getFileIcon(lesson_file.name)}</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{lesson_file.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{formatFileSize(lesson_file.size)}</div>
+        </div>
+        <a href={lesson_file.dataUrl} download={lesson_file.name}
+          style={{ padding: '10px 20px', background: 'var(--accent)', color: 'white', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+          ↓ Download
+        </a>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function KBClient({
   initialArticles,
   userRole,
   currentUserId,
-  savedCustomFolders = [],
+  savedFolders = null,
   initialProgress = [],
 }: {
   initialArticles: any[];
   userRole: string;
   currentUserId: string;
-  savedCustomFolders?: any[];
+  savedFolders?: any[] | null;
   initialProgress?: number[];
 }) {
   const [articles, setArticles]         = useState(initialArticles);
-  const [folders,  setFolders]          = useState(() => buildFolderList(savedCustomFolders, initialArticles));
+  const [folders,  setFolders]          = useState(() => buildFolderList(savedFolders, initialArticles));
   const [completedIds, setCompletedIds] = useState<Set<number>>(() => new Set(initialProgress));
   const [activeCourse, setActiveCourse] = useState<string | null>(null);
   const [activeLesson, setActiveLesson] = useState<any>(null);
@@ -77,7 +174,8 @@ export default function KBClient({
   const [formLessonFile, setFormLessonFile] = useState<any>(null);
   const [formOrderIndex, setFormOrderIndex] = useState(0);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const isMgmt  = ['owner', 'admin', 'supervisor'].includes(userRole);
   const isOwner = userRole === 'owner';
 
@@ -112,10 +210,11 @@ export default function KBClient({
     setShowNew(true);
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, isVideo?: boolean) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 20 * 1024 * 1024) { alert('Max file size is 20 MB'); return; }
+    const maxMB = isVideo ? 50 : 20;
+    if (file.size > maxMB * 1024 * 1024) { alert(`Max file size is ${maxMB} MB`); return; }
     const reader = new FileReader();
     reader.onload = ev => setFormLessonFile({ name: file.name, type: file.type, size: file.size, dataUrl: ev.target?.result as string });
     reader.readAsDataURL(file);
@@ -129,8 +228,8 @@ export default function KBClient({
       folder: formFolder, title: formTitle, content: formContent,
       access_level: formAccess, lesson_type: formType,
       duration: formDuration, order_index: formOrderIndex,
-      video_url: formType === 'video' ? formVideoUrl : null,
-      lesson_file: formType === 'pdf' ? formLessonFile : null,
+      video_url: formType === 'video' && !formLessonFile ? formVideoUrl : null,
+      lesson_file: formLessonFile ?? null,
     };
     if (editArticle) {
       await dbOp('knowledge_base', 'update', payload, { id: editArticle.id });
@@ -151,18 +250,35 @@ export default function KBClient({
     if (activeLesson?.id === id) setActiveLesson(null);
   };
 
+  const handleDeleteFolder = async (folderName: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const count = articles.filter(a => a.folder === folderName).length;
+    const msg = count > 0
+      ? `Delete "${folderName}" and its ${count} lesson${count !== 1 ? 's' : ''}? This cannot be undone.`
+      : `Delete the folder "${folderName}"? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    const toDelete = articles.filter(a => a.folder === folderName);
+    await Promise.all(toDelete.map(a => dbOp('knowledge_base', 'delete', undefined, { id: a.id })));
+    const newFolders  = folders.filter((f: any) => f.name !== folderName);
+    const newArticles = articles.filter(a => a.folder !== folderName);
+    setFolders(newFolders);
+    setArticles(newArticles);
+    await dbOp('global_settings', 'upsert', { key: 'kb_folders', value: newFolders });
+    if (activeCourse === folderName) setActiveCourse(null);
+    if (activeLesson?.folder === folderName) setActiveLesson(null);
+  };
+
   const handleCreateCourse = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const name = fd.get('name') as string;
+    const name   = fd.get('name') as string;
     const access = fd.get('access') as string;
-    const icon = fd.get('icon') as string || '📁';
-    if (name && !folders.find(f => f.name === name)) {
+    const icon   = fd.get('icon') as string || '📁';
+    if (name && !folders.find((f: any) => f.name === name)) {
       const nf = { name, access, icon, hue: Math.floor(Math.random() * 360) };
       const updated = [...folders, nf];
       setFolders(updated);
-      const customOnly = updated.filter(f => !DEFAULT_FOLDERS.find(df => df.name === f.name));
-      await dbOp('global_settings', 'upsert', { key: 'kb_folders', value: customOnly });
+      await dbOp('global_settings', 'upsert', { key: 'kb_folders', value: updated });
     }
     setShowNewCourse(false);
   };
@@ -171,7 +287,13 @@ export default function KBClient({
   if (activeLesson) {
     const done = completedIds.has(activeLesson.id);
     const tb   = TYPE_BADGE[activeLesson.lesson_type ?? 'text'];
-    const embedUrl = activeLesson.lesson_type === 'video' ? getYouTubeEmbed(activeLesson.video_url ?? '') : null;
+
+    const courseLessons = articles
+      .filter(a => a.folder === activeCourse)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const lessonIdx  = courseLessons.findIndex(l => l.id === activeLesson.id);
+    const prevLesson = lessonIdx > 0 ? courseLessons[lessonIdx - 1] : null;
+    const nextLesson = lessonIdx < courseLessons.length - 1 ? courseLessons[lessonIdx + 1] : null;
 
     return (
       <div className="page-fade">
@@ -180,7 +302,9 @@ export default function KBClient({
           <button className="btn btn-sec btn-sm" onClick={() => setActiveLesson(null)}>← {activeCourse}</button>
           {isMgmt && <>
             <button className="btn btn-sec btn-sm" onClick={() => openEdit(activeLesson)}>⚙ Edit</button>
-            <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)' }} onClick={() => { handleDelete(activeLesson.id); }}>Delete</button>
+            <button className="btn btn-sm"
+              style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)' }}
+              onClick={() => handleDelete(activeLesson.id)}>Delete</button>
           </>}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             {done ? (
@@ -208,34 +332,8 @@ export default function KBClient({
           </div>
 
           <div style={{ padding: '22px 24px' }}>
-            {/* Video embed */}
-            {activeLesson.lesson_type === 'video' && (
-              embedUrl
-                ? <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 12, overflow: 'hidden', marginBottom: 16, background: '#000' }}>
-                    <iframe src={embedUrl} title={activeLesson.title} allowFullScreen
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} />
-                  </div>
-                : activeLesson.video_url
-                  ? <video controls style={{ width: '100%', borderRadius: 12, marginBottom: 16 }}>
-                      <source src={activeLesson.video_url} />
-                    </video>
-                  : <div style={{ padding: '40px 20px', background: 'var(--surface-2)', borderRadius: 12, textAlign: 'center', color: 'var(--ink-4)', fontSize: 13, marginBottom: 16 }}>No video URL provided.</div>
-            )}
-
-            {/* PDF download */}
-            {activeLesson.lesson_type === 'pdf' && activeLesson.lesson_file && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: 'oklch(0.97 0.02 25)', border: '1px solid oklch(0.90 0.06 25)', borderRadius: 12, marginBottom: 16 }}>
-                <span style={{ fontSize: 36 }}>📕</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{activeLesson.lesson_file.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>{formatFileSize(activeLesson.lesson_file.size)}</div>
-                </div>
-                <a href={activeLesson.lesson_file.dataUrl} download={activeLesson.lesson_file.name}
-                  style={{ padding: '10px 20px', background: 'var(--accent)', color: 'white', borderRadius: 8, fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
-                  ↓ Download
-                </a>
-              </div>
-            )}
+            {/* Inline file/video embed */}
+            <FileEmbed lesson={activeLesson} />
 
             {/* Text content */}
             {activeLesson.content && (
@@ -249,15 +347,33 @@ export default function KBClient({
           </div>
         </div>
 
+        {/* Mark complete */}
         {!done && (
-          <div style={{ textAlign: 'center', paddingBottom: 24 }}>
+          <div style={{ textAlign: 'center', paddingBottom: 8 }}>
             <button className="btn btn-acc" style={{ padding: '12px 36px', fontSize: 15 }} onClick={() => markComplete(activeLesson.id)}>
               ✓ Mark as Complete
             </button>
           </div>
         )}
 
-        {/* Modals */}
+        {/* Prev / Next navigation */}
+        {(prevLesson || nextLesson) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 20, paddingBottom: 24 }}>
+            {prevLesson ? (
+              <button className="btn btn-sec" onClick={() => setActiveLesson(prevLesson)}
+                style={{ maxWidth: '45%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                ← {prevLesson.title}
+              </button>
+            ) : <div />}
+            {nextLesson ? (
+              <button className="btn btn-acc" onClick={() => setActiveLesson(nextLesson)}
+                style={{ maxWidth: '45%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {nextLesson.title} →
+              </button>
+            ) : <div />}
+          </div>
+        )}
+
         {showNew && <LessonModal {...modalProps()} />}
       </div>
     );
@@ -265,7 +381,7 @@ export default function KBClient({
 
   /* ── COURSE VIEW ────────────────────────────────────────────── */
   if (activeCourse) {
-    const folder  = folders.find(f => f.name === activeCourse);
+    const folder  = folders.find((f: any) => f.name === activeCourse);
     const hue     = folder?.hue ?? 200;
     const icon    = folder?.icon ?? '📁';
     const lessons = articles
@@ -277,9 +393,16 @@ export default function KBClient({
     return (
       <div className="page-fade">
         {/* Nav */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           <button className="btn btn-sec btn-sm" onClick={() => setActiveCourse(null)}>← Knowledge Base</button>
           {isMgmt && <button className="btn btn-acc btn-sm" onClick={() => openCreate(activeCourse)}>+ Add Lesson</button>}
+          {isOwner && (
+            <button className="btn btn-sm"
+              style={{ marginLeft: 'auto', background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)' }}
+              onClick={() => handleDeleteFolder(activeCourse)}>
+              🗑 Delete Folder
+            </button>
+          )}
         </div>
 
         {/* Banner */}
@@ -365,18 +488,17 @@ export default function KBClient({
       )
     : [];
 
-  const folderStats = folders.map(f => ({
+  const folderStats = folders.map((f: any) => ({
     ...f,
     count:     articles.filter(a => a.folder === f.name).length,
     completed: articles.filter(a => a.folder === f.name && completedIds.has(a.id)).length,
   }));
 
-  /* Helper to build modal props (avoids repetition) */
   function modalProps() {
     return {
       editArticle, formFolder, formTitle, formContent, formAccess,
       formType, formDuration, formVideoUrl, formLessonFile, formOrderIndex,
-      folders, saving, fileInputRef,
+      folders, saving, fileInputRef, videoInputRef,
       setFormFolder, setFormTitle, setFormContent, setFormAccess,
       setFormType, setFormDuration, setFormVideoUrl, setFormLessonFile, setFormOrderIndex,
       handleFileSelect, handleSave,
@@ -391,10 +513,10 @@ export default function KBClient({
       {/* Stats */}
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         {[
-          { l: 'TOTAL LESSONS', v: articles.length,     f: 'Across all courses',  g: '📚', i: 'ind' },
-          { l: 'COURSES',       v: folders.length,      f: 'Knowledge tracks',    g: '📁', i: 'acc' },
-          { l: 'COMPLETED',     v: completedIds.size,   f: 'By you',              g: '✓',  i: 'ok'  },
-          { l: 'MGMT ONLY',     v: articles.filter(a => a.access_level === 'Mgmt only').length, f: 'Restricted', g: '🔒', i: 'wn' },
+          { l: 'TOTAL LESSONS', v: articles.length,     f: 'Across all courses', g: '📚', i: 'ind' },
+          { l: 'COURSES',       v: folders.length,      f: 'Knowledge tracks',   g: '📁', i: 'acc' },
+          { l: 'COMPLETED',     v: completedIds.size,   f: 'By you',             g: '✓',  i: 'ok'  },
+          { l: 'MGMT ONLY',     v: articles.filter(a => ['Mgmt only','Management Only'].includes(a.access_level ?? '')).length, f: 'Restricted', g: '🔒', i: 'wn' },
         ].map(s => (
           <div key={s.l} className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className={`stat-ico ${s.i}`}>{s.g}</div></div>
@@ -437,14 +559,19 @@ export default function KBClient({
 
       {/* Course cards grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
-        {folderStats.map(f => {
+        {folderStats.map((f: any) => {
           const pct = f.count > 0 ? Math.round((f.completed / f.count) * 100) : 0;
           return (
             <div key={f.name} onClick={() => setActiveCourse(f.name)}
-              style={{ background: 'white', border: '1.5px solid var(--line)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'transform .12s, box-shadow .12s, border-color .12s', boxShadow: 'var(--sh-1)' }}
+              style={{ background: 'white', border: '1.5px solid var(--line)', borderRadius: 14, overflow: 'hidden', cursor: 'pointer', transition: 'transform .12s, box-shadow .12s, border-color .12s', boxShadow: 'var(--sh-1)', position: 'relative' }}
               onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; (e.currentTarget as HTMLDivElement).style.borderColor = `oklch(0.82 0.08 ${f.hue})`; }}
               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-1)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--line)'; }}
             >
+              {isOwner && (
+                <button onClick={e => handleDeleteFolder(f.name, e)}
+                  style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.35)', color: 'white', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                  title="Delete folder">✕</button>
+              )}
               <div style={{ height: 88, background: `linear-gradient(135deg, oklch(0.42 0.18 ${f.hue}), oklch(0.28 0.20 ${f.hue + 30}))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 38 }}>
                 {f.icon}
               </div>
@@ -479,7 +606,7 @@ export default function KBClient({
 function LessonModal({
   editArticle, formFolder, formTitle, formContent, formAccess,
   formType, formDuration, formVideoUrl, formLessonFile, formOrderIndex,
-  folders, saving, fileInputRef,
+  folders, saving, fileInputRef, videoInputRef,
   setFormFolder, setFormTitle, setFormContent, setFormAccess,
   setFormType, setFormDuration, setFormVideoUrl, setFormLessonFile, setFormOrderIndex,
   handleFileSelect, handleSave, onDelete, onClose, isMgmt,
@@ -488,7 +615,14 @@ function LessonModal({
     <div className="mb" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="md" style={{ width: 560, maxHeight: '92vh', overflowY: 'auto' }}>
         <div className="md-t">{editArticle ? 'Edit Lesson' : 'New Lesson'}</div>
-        <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.zip" style={{ display: 'none' }} onChange={handleFileSelect} />
+
+        {/* Hidden file inputs */}
+        <input ref={fileInputRef} type="file"
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+          style={{ display: 'none' }} onChange={e => handleFileSelect(e, false)} />
+        <input ref={videoInputRef} type="file"
+          accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,.mp4,.webm,.mov,.avi"
+          style={{ display: 'none' }} onChange={e => handleFileSelect(e, true)} />
 
         <div className="pv-fld">
           <label>Course</label>
@@ -507,7 +641,7 @@ function LessonModal({
             <select value={formType} onChange={e => { setFormType(e.target.value as any); setFormLessonFile(null); }}>
               <option value="text">📝 TEXT</option>
               <option value="video">▶ VIDEO</option>
-              <option value="pdf">📕 PDF</option>
+              <option value="pdf">📄 FILE</option>
             </select>
           </div>
           <div className="pv-fld">
@@ -521,15 +655,33 @@ function LessonModal({
         </div>
 
         {formType === 'video' && (
-          <div className="pv-fld">
-            <label>Video URL (YouTube or direct link)</label>
-            <input value={formVideoUrl} onChange={e => setFormVideoUrl(e.target.value)} placeholder="https://youtube.com/watch?v=…" />
-          </div>
+          <>
+            <div className="pv-fld">
+              <label>YouTube / Direct URL</label>
+              <input value={formVideoUrl} onChange={e => setFormVideoUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=…"
+                disabled={!!formLessonFile} style={{ opacity: formLessonFile ? 0.45 : 1 }} />
+            </div>
+            <div className="pv-fld">
+              <label>— or upload a video file (max 50 MB) —</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button type="button" className="btn btn-sec btn-sm" onClick={() => videoInputRef.current?.click()}>
+                  📎 {formLessonFile ? 'Change video file' : 'Upload video file'}
+                </button>
+                {formLessonFile && (
+                  <span style={{ fontSize: 12, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {formLessonFile.name}
+                    <button onClick={() => setFormLessonFile(null)} style={{ background: 'none', border: 'none', color: 'var(--err)', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                  </span>
+                )}
+              </div>
+            </div>
+          </>
         )}
 
         {formType === 'pdf' && (
           <div className="pv-fld">
-            <label>File (PDF, Word, PowerPoint…)</label>
+            <label>File (PDF, Word, Excel, PowerPoint, Image…)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button type="button" className="btn btn-sec btn-sm" onClick={() => fileInputRef.current?.click()}>
                 📎 {formLessonFile ? 'Change file' : 'Upload file'}
@@ -554,10 +706,7 @@ function LessonModal({
         <div className="pv-fld">
           <label>Visibility</label>
           <select value={formAccess} onChange={e => setFormAccess(e.target.value)}>
-            <option>Everyone</option>
-            <option>Sales + Mgmt</option>
-            <option>CX + Mgmt</option>
-            <option>Mgmt only</option>
+            {ACCESS_LEVELS.map(l => <option key={l}>{l}</option>)}
           </select>
         </div>
 
@@ -590,8 +739,7 @@ function CourseModal({ onSubmit, onClose }: { onSubmit: (e: React.FormEvent<HTML
           <div className="pv-fld">
             <label>Access Level</label>
             <select name="access">
-              <option>Everyone</option><option>Sales + Mgmt</option>
-              <option>CX + Mgmt</option><option>Mgmt only</option>
+              {ACCESS_LEVELS.map(l => <option key={l}>{l}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
