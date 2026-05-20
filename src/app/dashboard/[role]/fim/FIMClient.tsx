@@ -30,21 +30,22 @@ type FaultCode = {
   created_at: string;
 };
 
+/* ── Types ───────────────────────────────────────────────────────────── */
+
+type Category = { series: number; label: string; hue: number };
+
 /* ── Constants ───────────────────────────────────────────────────────── */
 
-const SERIES: Record<number, { label: string; hue: number }> = {
-  100: { label: 'Impression / Technical',      hue: 240 },
-  200: { label: 'Customer Sentiment / Financials', hue: 15 },
-  300: { label: 'Operational / Internal',      hue: 55 },
-};
+const DEFAULT_CATEGORIES: Category[] = [
+  { series: 100, label: 'Impression / Technical',         hue: 240 },
+  { series: 200, label: 'Customer Sentiment / Financials', hue: 15  },
+  { series: 300, label: 'Operational / Internal',          hue: 55  },
+];
+
+// Hue cycle for auto-assigning new categories
+const HUE_CYCLE = [145, 290, 180, 320, 210, 90, 0, 270];
 
 const SOP_CATEGORIES = ['Impression', 'Sentiment', 'Financial', 'Operations'];
-
-const CATEGORY_OPTIONS = [
-  '100 · Impression / Technical',
-  '200 · Customer Sentiment / Financials',
-  '300 · Operational / Internal',
-];
 
 const ESCALATION_OPTIONS = [
   { value: 'none',        label: 'None — no manager involvement' },
@@ -53,9 +54,7 @@ const ESCALATION_OPTIONS = [
 ];
 
 function getSeries(code: number) {
-  if (code < 200) return 100;
-  if (code < 300) return 200;
-  return 300;
+  return Math.floor(code / 100) * 100;
 }
 
 function escalationColor(type: string) {
@@ -120,12 +119,14 @@ export default function FIMClient({
   userRole,
   currentUserId,
   currentUserName,
+  savedCategories,
 }: {
   initialCodes: FaultCode[];
   initialSops: SOP[];
   userRole: string;
   currentUserId: string;
   currentUserName: string;
+  savedCategories: Category[] | null;
 }) {
   const isOwner = ['owner', 'admin', 'supervisor'].includes(userRole);
 
@@ -139,15 +140,21 @@ export default function FIMClient({
   const [selectedCode, setSelectedCode] = useState<FaultCode | null>(null);
   const [selectedSop,  setSelectedSop]  = useState<SOP | null>(null);
 
-  const [showAddCode, setShowAddCode] = useState(false);
-  const [showAddSop,  setShowAddSop]  = useState(false);
-  const [editingCode, setEditingCode] = useState<FaultCode | null>(null);
-  const [editingSop,  setEditingSop]  = useState<SOP | null>(null);
+  const [showAddCode, setShowAddCode]         = useState(false);
+  const [showAddSop,  setShowAddSop]          = useState(false);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [editingCode, setEditingCode]         = useState<FaultCode | null>(null);
+  const [editingSop,  setEditingSop]          = useState<SOP | null>(null);
 
   const [codeForm, setCodeForm] = useState({ ...EMPTY_CODE_FORM });
   const [sopForm,  setSopForm]  = useState({ ...EMPTY_SOP_FORM });
-  const [saving, setSaving]    = useState(false);
-  const [err, setErr]          = useState('');
+  const [catForm,  setCatForm]  = useState({ series: '', label: '' });
+  const [saving,    setSaving]    = useState(false);
+  const [savingCat, setSavingCat] = useState(false);
+  const [err, setErr]             = useState('');
+  const [catErr, setCatErr]       = useState('');
+
+  const [categories, setCategories] = useState<Category[]>(savedCategories ?? DEFAULT_CATEGORIES);
 
   /* ── Derived ── */
   const filteredCodes = useMemo(() => {
@@ -196,10 +203,16 @@ export default function FIMClient({
     immediate:   codes.filter(c => c.escalation_type === 'immediate').length,
   }), [codes]);
 
+  const categoryMap = useMemo(() => {
+    const m: Record<number, Category> = {};
+    for (const c of categories) m[c.series] = c;
+    return m;
+  }, [categories]);
+
   /* ── Helpers ── */
   function openEditCode(fc: FaultCode) {
     const seriesNum = getSeries(fc.code);
-    const seriesLabel = SERIES[seriesNum]?.label ?? fc.category;
+    const seriesLabel = categoryMap[seriesNum]?.label ?? fc.category;
     setCodeForm({
       code: String(fc.code),
       category: seriesLabel,
@@ -303,6 +316,27 @@ export default function FIMClient({
     setSelectedSop(null);
   }
 
+  /* ── Save category ── */
+  async function saveCategory() {
+    const seriesNum = Number(catForm.series);
+    if (!catForm.label.trim() || !seriesNum || seriesNum < 100) {
+      setCatErr('Series number (≥ 100) and label are required.'); return;
+    }
+    if (categories.some(c => c.series === seriesNum)) {
+      setCatErr(`Series ${seriesNum} already exists.`); return;
+    }
+    setSavingCat(true); setCatErr('');
+    const hue = HUE_CYCLE[(categories.length - DEFAULT_CATEGORIES.length) % HUE_CYCLE.length];
+    const newCat: Category = { series: seriesNum, label: catForm.label.trim(), hue };
+    const updated = [...categories, newCat].sort((a, b) => a.series - b.series);
+    const { error } = await dbOp('global_settings', 'upsert', { key: 'fim_categories', value: JSON.stringify(updated) });
+    if (error) { setCatErr(error); setSavingCat(false); return; }
+    setCategories(updated);
+    setShowAddCategory(false);
+    setCatForm({ series: '', label: '' });
+    setSavingCat(false);
+  }
+
   /* ════════════════════════════════════════════════════════════════════
      Render
   ═══════════════════════════════════════════════════════════════════ */
@@ -319,7 +353,7 @@ export default function FIMClient({
         </div>
         <p style={{ margin: '0 0 16px', fontSize: 15, color: 'oklch(0.45 0.02 260)', lineHeight: 1.5 }}>
           <strong style={{ color: 'oklch(0.55 0.18 240)' }}>{codes.length} fault codes</strong> across{' '}
-          <strong style={{ color: 'oklch(0.55 0.18 240)' }}>{Object.keys(SERIES).length} categories</strong> ·{' '}
+          <strong style={{ color: 'oklch(0.55 0.18 240)' }}>{categories.length} categories</strong> ·{' '}
           <strong style={{ color: 'oklch(0.55 0.18 240)' }}>{sops.length} SOPs</strong> indexed.{' '}
           When a fault occurs, look up the code, follow the agent action, and escalate only if the manual says so.
         </p>
@@ -328,6 +362,17 @@ export default function FIMClient({
             <button onClick={() => { setCodeForm({ ...EMPTY_CODE_FORM }); setShowAddCode(true); }}
               style={{ padding: '8px 16px', borderRadius: 8, background: 'oklch(0.55 0.18 240)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
               + Add fault code
+            </button>
+          )}
+          {isOwner && tab === 'codes' && (
+            <button onClick={() => {
+              const nextSeries = Math.max(...categories.map(c => c.series)) + 100;
+              setCatForm({ series: String(nextSeries), label: '' });
+              setCatErr('');
+              setShowAddCategory(true);
+            }}
+              style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', color: 'oklch(0.45 0.18 240)', border: '1px solid oklch(0.80 0.08 240)', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+              + Add category
             </button>
           )}
           {isOwner && tab === 'sops' && (
@@ -380,7 +425,7 @@ export default function FIMClient({
         <div>
           {Object.entries(groupedCodes).map(([seriesStr, items]) => {
             const series = Number(seriesStr);
-            const { label, hue } = SERIES[series];
+            const { label, hue } = categoryMap[series] ?? { label: `${series} Series`, hue: 240 };
             return (
               <div key={series} style={{ marginBottom: 32 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -474,11 +519,11 @@ export default function FIMClient({
             {/* header */}
             <div style={{ background: 'oklch(0.96 0.04 240)', padding: '18px 22px', borderRadius: '12px 12px 0 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: `oklch(0.50 0.18 ${SERIES[getSeries(selectedCode.code)]?.hue ?? 240})`, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: `oklch(0.50 0.18 ${categoryMap[getSeries(selectedCode.code)]?.hue ?? 240})`, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 4 }}>
                   {selectedCode.category}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                  <span style={{ fontSize: 40, fontWeight: 900, color: `oklch(0.40 0.18 ${SERIES[getSeries(selectedCode.code)]?.hue ?? 240})`, lineHeight: 1 }}>{selectedCode.code}</span>
+                  <span style={{ fontSize: 40, fontWeight: 900, color: `oklch(0.40 0.18 ${categoryMap[getSeries(selectedCode.code)]?.hue ?? 240})`, lineHeight: 1 }}>{selectedCode.code}</span>
                   <span style={{ fontSize: 20, fontWeight: 700, color: 'oklch(0.25 0.02 260)' }}>{selectedCode.condition_text}</span>
                 </div>
               </div>
@@ -661,7 +706,7 @@ export default function FIMClient({
               <div>
                 <label style={labelStyle}>Category</label>
                 <select value={codeForm.category} onChange={e => setCodeForm(p => ({ ...p, category: e.target.value }))} style={inputStyle}>
-                  {CATEGORY_OPTIONS.map(o => <option key={o} value={o.replace(/^\d+\s·\s/, '')}>{o}</option>)}
+                  {categories.map(c => <option key={c.series} value={c.label}>{c.series} · {c.label}</option>)}
                 </select>
               </div>
             </div>
@@ -715,6 +760,53 @@ export default function FIMClient({
               <button onClick={saveCode} disabled={saving}
                 style={{ padding: '8px 20px', borderRadius: 8, background: 'oklch(0.55 0.18 240)', color: '#fff', border: 'none', cursor: saving ? 'wait' : 'pointer', fontWeight: 600, fontSize: 13, opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Saving…' : editingCode ? 'Save changes' : 'Add code'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ════════════════════ ADD CATEGORY MODAL ════════════════════ */}
+      {showAddCategory && (
+        <Modal onClose={() => setShowAddCategory(false)}>
+          <div style={{ minWidth: 380, maxWidth: 460 }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: 'oklch(0.20 0.02 260)', marginBottom: 3 }}>Add category</div>
+              <div style={{ fontSize: 12, color: 'oklch(0.55 0.02 260)' }}>
+                A new series will appear in the fault codes list. Codes in that range (e.g. 400–499) will group automatically.
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px 16px', marginBottom: 14 }}>
+              <div>
+                <label style={labelStyle}>Series number</label>
+                <input
+                  type="number" step={100} min={100}
+                  value={catForm.series}
+                  onChange={e => setCatForm(p => ({ ...p, series: e.target.value }))}
+                  placeholder="400" style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Category label</label>
+                <input
+                  value={catForm.label}
+                  onChange={e => setCatForm(p => ({ ...p, label: e.target.value }))}
+                  placeholder="e.g. Quality / Lab" style={inputStyle}
+                />
+              </div>
+            </div>
+
+            {catErr && <div style={{ marginBottom: 12, fontSize: 12, color: 'oklch(0.50 0.22 15)', padding: '8px 12px', background: 'oklch(0.97 0.04 15)', borderRadius: 6 }}>{catErr}</div>}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
+              <button onClick={() => setShowAddCategory(false)}
+                style={{ padding: '8px 18px', borderRadius: 8, background: '#fff', border: '1px solid oklch(0.85 0.01 260)', color: 'oklch(0.35 0.02 260)', cursor: 'pointer', fontWeight: 500, fontSize: 13 }}>
+                Cancel
+              </button>
+              <button onClick={saveCategory} disabled={savingCat}
+                style={{ padding: '8px 20px', borderRadius: 8, background: 'oklch(0.55 0.18 240)', color: '#fff', border: 'none', cursor: savingCat ? 'wait' : 'pointer', fontWeight: 600, fontSize: 13, opacity: savingCat ? 0.7 : 1 }}>
+                {savingCat ? 'Saving…' : 'Add category'}
               </button>
             </div>
           </div>

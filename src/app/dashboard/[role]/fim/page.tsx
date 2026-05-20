@@ -13,10 +13,12 @@ export default async function FIMPage() {
     { data: profile },
     { data: faultCodes },
     { data: sops },
+    { data: categoriesRow },
   ] = await Promise.all([
     admin.from('profiles').select('role, name').eq('id', user.id).single(),
     admin.from('fim_fault_codes').select('*').order('code', { ascending: true }),
     admin.from('fim_sops').select('*').order('name', { ascending: true }),
+    admin.from('global_settings').select('value').eq('key', 'fim_categories').single(),
   ]);
 
   return (
@@ -26,6 +28,7 @@ export default async function FIMPage() {
       userRole={profile?.role ?? 'cx'}
       currentUserId={user.id}
       currentUserName={profile?.name ?? ''}
+      savedCategories={categoriesRow?.value ?? null}
     />
   );
 }
