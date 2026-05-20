@@ -8,6 +8,7 @@ const ALLOWED_TABLES = [
   'contracts', 'payrolls', 'sales_logs', 'attendance_logs',
   'profiles', 'hr_applicants', 'policies', 'company_policies', 'audit_logs',
   'brand_settings', 'targets', 'finance_entries', 'permissions', 'planning_documents', 'notes', 'channel_memberships', 'channels', 'violations', 'access_requests', 'reports', 'inbox_folders', 'ticket_replies', 'notifications', 'global_settings', 'daily_updates', 'kb_progress', 'cx_cases', 'cx_updates',
+  'fim_fault_codes', 'fim_sops',
 ];
 
 export async function POST(req: NextRequest) {
