@@ -70,7 +70,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [filterMode,  setFilterMode]  = useState<'all'|'mine'>('all');
+  const [section,     setSection]     = useState<'agents'|'admin'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -94,8 +94,10 @@ export default function CXClient({
   const todayUpdatedIds = new Set(updates.filter((u: any) => u.update_date === today).map((u: any) => u.case_id));
   const needsUpdate = (c: any) => !c.on_hold && !todayUpdatedIds.has(c.id);
 
+  const escalatedCount = cases.filter(c => c.escalated).length;
+
   const filtered = cases.filter(c => {
-    if (filterMode === 'mine' && c.assigned_to !== currentUserId) return false;
+    if (section === 'admin' && !c.escalated) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return c.customer_name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.issue?.toLowerCase().includes(q);
@@ -253,20 +255,28 @@ export default function CXClient({
 
   /* ── Owner quick-look banner ────────────────────────────────── */
   const banner = (
-    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {userRole.toUpperCase()} QUICK-LOOK
+    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : 'var(--ink-4)', marginBottom: 6 }}>
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : 'AGENTS — ALL CUSTOMERS'}
       </div>
-      <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
-        Tracking{' '}
-        <strong style={{ color: 'var(--accent)' }}>{cases.length} active customer{cases.length !== 1 ? 's' : ''}</strong>{' '}
-        across{' '}
-        <strong style={{ color: 'var(--accent)' }}>{stages.length} pipeline stage{stages.length !== 1 ? 's' : ''}</strong>.{' '}
-        {needActionCount > 0 && (
-          <><strong style={{ color: 'oklch(0.45 0.20 25)' }}>{needActionCount}</strong> need{needActionCount === 1 ? 's' : ''} an update today.{' '}</>
-        )}
-        {totalOutstanding > 0 && <>Total outstanding: <strong style={{ color: 'oklch(0.38 0.18 145)' }}>${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.</>}
-      </div>
+      {section === 'agents' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          Tracking{' '}
+          <strong style={{ color: 'var(--accent)' }}>{cases.length} active customer{cases.length !== 1 ? 's' : ''}</strong>{' '}
+          across{' '}
+          <strong style={{ color: 'var(--accent)' }}>{stages.length} pipeline stage{stages.length !== 1 ? 's' : ''}</strong>.{' '}
+          {needActionCount > 0 && (
+            <><strong style={{ color: 'oklch(0.45 0.20 25)' }}>{needActionCount}</strong> need{needActionCount === 1 ? 's' : ''} an update today.{' '}</>
+          )}
+          {totalOutstanding > 0 && <>Total outstanding: <strong style={{ color: 'oklch(0.38 0.18 145)' }}>${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.</>}
+        </div>
+      ) : (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {escalatedCount === 0
+            ? 'No escalated cases. All customers are being handled by agents.'
+            : <><strong style={{ color: 'oklch(0.40 0.20 25)' }}>{escalatedCount} case{escalatedCount !== 1 ? 's' : ''}</strong> escalated and waiting for admin review. These have been flagged by agents and require management action.</>}
+        </div>
+      )}
     </div>
   );
 
@@ -274,14 +284,20 @@ export default function CXClient({
   const toolbar = (
     <div className="card" style={{ marginBottom: 16 }}>
       <div style={{ padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className={`btn btn-sm${filterMode === 'mine' ? ' btn-acc' : ' btn-sec'}`} onClick={() => setFilterMode(filterMode === 'mine' ? 'all' : 'mine')}>
-          Agent
-        </button>
-        <button className={`btn btn-sm${filterMode === 'all' ? ' btn-acc' : ' btn-sec'}`} onClick={() => setFilterMode('all')}>
-          Admin
-        </button>
-        <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>
-        {isOwner && <button className="btn btn-sec btn-sm" onClick={() => setShowAddCol(true)}>+ Add column</button>}
+        {/* Section tabs */}
+        <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 2 }}>
+          <button onClick={() => setSection('agents')}
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'agents' ? 'white' : 'transparent', color: section === 'agents' ? 'var(--ink)' : 'var(--ink-4)', boxShadow: section === 'agents' ? 'var(--sh-1)' : 'none' }}>
+            Agents · {cases.filter(c => !c.escalated).length}
+          </button>
+          <button onClick={() => setSection('admin')}
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.92 0.06 25)' : 'white') : 'transparent', color: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.38 0.20 25)' : 'var(--ink)') : (escalatedCount > 0 ? 'oklch(0.45 0.18 25)' : 'var(--ink-4)'), boxShadow: section === 'admin' ? 'var(--sh-1)' : 'none' }}>
+            {escalatedCount > 0 ? '⚠ ' : ''}Admin · {escalatedCount}
+          </button>
+        </div>
+        <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
+        {section === 'agents' && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
+        {isOwner && section === 'agents' && <button className="btn btn-sec btn-sm" onClick={() => setShowAddCol(true)}>+ Add column</button>}
         <button className="btn btn-sec btn-sm" onClick={exportCSV}>Export CSV</button>
         <div style={{ flex: 1 }} />
         <input type="text" placeholder="Search name, phone, issue…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -303,7 +319,7 @@ export default function CXClient({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          No customer cases found.
+          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
@@ -340,6 +356,12 @@ export default function CXClient({
             {c.issue && (
               <div style={{ padding: '0 16px 10px', fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {c.issue}
+              </div>
+            )}
+            {section === 'admin' && c.escalation_note && (
+              <div style={{ margin: '0 16px 10px', padding: '8px 12px', background: 'oklch(0.96 0.04 25)', borderRadius: 8, borderLeft: '3px solid oklch(0.55 0.20 25)' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: 'oklch(0.45 0.20 25)', letterSpacing: '0.06em', marginBottom: 3 }}>⚠ ESCALATION REASON</div>
+                <div style={{ fontSize: 12, color: 'oklch(0.30 0.05 25)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.escalation_note}</div>
               </div>
             )}
             {latest && (
@@ -698,8 +720,14 @@ export default function CXClient({
       {statStrip}
       {banner}
       <div style={{ marginBottom: 6 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>Customer cases</div>
-        <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>Color-coded · filter by status · click any customer to log dated updates</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
+          {section === 'agents' ? 'Agents — All customers' : 'Admin — Escalated cases'}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+          {section === 'agents'
+            ? 'Every customer is visible here — color-coded by status · click any to log updates'
+            : 'Cases flagged by agents that require management review or action'}
+        </div>
       </div>
       {toolbar}
       {viewMode === 'overview' && overviewView}
