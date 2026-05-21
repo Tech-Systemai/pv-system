@@ -23,6 +23,7 @@ const TICKET_ICON: Record<string, string> = {
   ticket_resolved:  '✅',
   task_assigned:    '☑',
   timeoff_request:  '🏖',
+  schedule_added:   '📅',
 };
 
 export default function NotificationBell({ userId, userRole }: { userId: string; userRole: string }) {
@@ -194,6 +195,8 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
       router.push(`/dashboard/${userRole}/tasks`);
     } else if (n.type === 'timeoff_request') {
       router.push(`/dashboard/${userRole}/approvals`);
+    } else if (n.type === 'schedule_added') {
+      router.push(`/dashboard/${userRole}/schedule`);
     } else if (n._kind === 'ticket') {
       router.push(`/dashboard/${userRole}/tickets`);
     } else if (n._kind === 'inbox') {

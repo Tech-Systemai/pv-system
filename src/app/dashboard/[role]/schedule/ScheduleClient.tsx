@@ -105,7 +105,17 @@ export default function ScheduleClient({
         } else {
           const { data, error } = await dbOp('schedules', 'insert', payload);
           if (error) throw new Error(error);
-          if (data?.[0]) setShifts(prev => [...prev, data[0]]);
+          if (data?.[0]) {
+            setShifts(prev => [...prev, data[0]]);
+            if (editCell.userId !== currentUserId) {
+              await dbOp('notifications', 'insert', {
+                user_id: editCell.userId,
+                title: 'New shift scheduled',
+                body: `${editCell.day} · ${editStart}–${editEnd} · week of ${monday.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`,
+                type: 'schedule_added',
+              });
+            }
+          }
         }
         setSaveSuccess(`Shift saved: ${editStart}–${editEnd}`);
       }
