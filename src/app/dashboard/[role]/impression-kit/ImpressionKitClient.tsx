@@ -14,7 +14,6 @@ const PHOTO_SLOTS = [
   { key: 'gum_line',   label: 'Gum Line',          short: 'GUM LINE',   bg: 'oklch(0.94 0.04 305)', stripeBg: 'oklch(0.87 0.06 305)' },
 ] as const;
 
-type SlotKey = typeof PHOTO_SLOTS[number]['key'];
 
 const KIT_STAGES = ['IMP KIT SENT', 'IMP KIT DEL', 'POST-CARE'];
 
@@ -71,7 +70,7 @@ function getKitStats(kitId: number, photos: any[]) {
 /* ── Main component ───────────────────────────────────────── */
 export default function ImpressionKitClient({
   initialKits, initialPhotos, allProfiles,
-  userRole, currentUserId, currentUserName,
+  userRole, currentUserId,
 }: {
   initialKits: any[]; initialPhotos: any[]; allProfiles: any[];
   userRole: string; currentUserId: string; currentUserName: string;
@@ -89,6 +88,16 @@ export default function ImpressionKitClient({
   const [showNewKit,  setShowNewKit]  = useState(false);
   const [newKitForm,  setNewKitForm]  = useState({ patient_name: '', phone: '', kit_stage: 'IMP KIT SENT' });
   const [savingKit,   setSavingKit]   = useState(false);
+
+  // Edit kit modal
+  const [showEditKit,  setShowEditKit]  = useState(false);
+  const [editKitForm,  setEditKitForm]  = useState({ patient_name: '', phone: '', kit_stage: 'IMP KIT SENT', notes: '' });
+  const [savingEdit,   setSavingEdit]   = useState(false);
+
+  // Remake modal
+  const [showRemake,   setShowRemake]   = useState(false);
+  const [remakeForm,   setRemakeForm]   = useState({ patient_name: '', phone: '', kit_stage: 'IMP KIT SENT', notes: '' });
+  const [savingRemake, setSavingRemake] = useState(false);
 
   // Decline modal
   const [declineTarget,   setDeclineTarget]   = useState<{ photo: any } | null>(null);
@@ -234,6 +243,62 @@ export default function ImpressionKitClient({
     setDecliningPhoto(false);
   }
 
+  function openEditKit() {
+    setEditKitForm({
+      patient_name: selectedKit.patient_name ?? '',
+      phone:        selectedKit.phone ?? '',
+      kit_stage:    selectedKit.kit_stage ?? 'IMP KIT SENT',
+      notes:        selectedKit.notes ?? '',
+    });
+    setShowEditKit(true);
+  }
+
+  async function saveEditKit() {
+    if (!editKitForm.patient_name.trim()) return;
+    setSavingEdit(true);
+    const payload = {
+      patient_name: editKitForm.patient_name.trim(),
+      phone:        editKitForm.phone.trim(),
+      kit_stage:    editKitForm.kit_stage,
+      notes:        editKitForm.notes.trim() || null,
+      updated_at:   new Date().toISOString(),
+    };
+    await dbOp('impression_kits', 'update', payload, { id: selectedKit.id });
+    const updated = { ...selectedKit, ...payload };
+    setKits(prev => prev.map(k => k.id === selectedKit.id ? updated : k));
+    setSelectedKit(updated);
+    setSavingEdit(false);
+    setShowEditKit(false);
+  }
+
+  async function deleteKit() {
+    if (!confirm(`Delete ${selectedKit.patient_name}'s impression kit and all photos? This cannot be undone.`)) return;
+    await dbOp('impression_kits', 'delete', undefined, { id: selectedKit.id });
+    setKits(prev => prev.filter(k => k.id !== selectedKit.id));
+    setPhotos(prev => prev.filter(p => p.kit_id !== selectedKit.id));
+    setSelectedKit(null);
+  }
+
+  async function createRemake() {
+    if (!remakeForm.patient_name.trim()) return;
+    setSavingRemake(true);
+    const { data } = await dbOp('impression_kits', 'insert', {
+      patient_name:  remakeForm.patient_name.trim(),
+      phone:         remakeForm.phone.trim(),
+      kit_stage:     remakeForm.kit_stage,
+      notes:         remakeForm.notes.trim() || null,
+      created_by:    currentUserId,
+      assigned_to:   currentUserId,
+      parent_kit_id: selectedKit.id,
+    }, undefined, '*');
+    if (data?.[0]) {
+      setKits(prev => [data[0], ...prev]);
+      setSelectedKit(data[0]);
+    }
+    setShowRemake(false);
+    setSavingRemake(false);
+  }
+
   function exportCSV() {
     const rows = [
       ['Patient Name', 'Phone', 'Stage', 'Approved', 'Declined', 'Awaiting Review', 'Not Uploaded', 'Complete'],
@@ -284,10 +349,10 @@ export default function ImpressionKitClient({
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 20 }}>{selectedKit.patient_name}</div>
-              <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2, display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                 {selectedKit.phone}
                 {selectedKit.created_by && (
-                  <span>· Uploaded by <strong>{nameMap[selectedKit.created_by] ?? 'Unknown'}</strong></span>
+                  <span>· Added by <strong>{nameMap[selectedKit.created_by] ?? 'Unknown'}</strong></span>
                 )}
                 <span style={{
                   padding: '2px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
@@ -295,7 +360,17 @@ export default function ImpressionKitClient({
                 }}>
                   {selectedKit.kit_stage}
                 </span>
+                {selectedKit.parent_kit_id && (
+                  <span style={{ padding: '2px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', background: 'oklch(0.92 0.05 268)', color: 'oklch(0.38 0.14 268)' }}>
+                    ↺ REMAKE
+                  </span>
+                )}
               </div>
+              {selectedKit.notes && (
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                  {selectedKit.notes}
+                </div>
+              )}
             </div>
             <div style={{
               padding: '14px 20px', background: 'var(--surface-2)', borderRadius: 12,
@@ -313,6 +388,21 @@ export default function ImpressionKitClient({
             </div>
           </div>
         </div>
+
+        {/* Owner action bar */}
+        {isOwner && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+            <button className="btn btn-sec btn-sm" onClick={openEditKit}>✎ Edit info</button>
+            <button className="btn btn-sec btn-sm" onClick={() => {
+              setRemakeForm({ patient_name: selectedKit.patient_name, phone: selectedKit.phone ?? '', kit_stage: 'IMP KIT SENT', notes: '' });
+              setShowRemake(true);
+            }}>↺ Log Remake</button>
+            <div style={{ flex: 1 }} />
+            <button className="btn btn-sm" style={{ color: 'oklch(0.40 0.20 25)', background: 'oklch(0.96 0.04 25)', border: '1px solid oklch(0.88 0.08 25)' }} onClick={deleteKit}>
+              🗑 Delete patient
+            </button>
+          </div>
+        )}
 
         {/* 6-slot photo grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
@@ -421,12 +511,20 @@ export default function ImpressionKitClient({
                   </div>
 
                   {/* Metadata line */}
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: photo?.feedback ? 10 : 6 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: photo?.feedback ? 10 : 4 }}>
                     {status === 'approved'        && <>Approved {fmtDateTime(photo.reviewed_at)} · {shortName(photo.reviewed_by)}</>}
                     {status === 'declined'        && <>Declined {fmtDateTime(photo.reviewed_at)} · {shortName(photo.reviewed_by)}</>}
                     {status === 'awaiting_review' && <>Uploaded {fmtDateTime(photo.uploaded_at)} · {shortName(photo.uploaded_by)}</>}
                     {status === 'not_uploaded'    && '—'}
                   </div>
+                  {history.length > 1 && (
+                    <div
+                      style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 6, cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={e => { e.stopPropagation(); photo && setLightbox({ photo, slot, history }); }}
+                    >
+                      {history.length} version{history.length !== 1 ? 's' : ''} saved — view history
+                    </div>
+                  )}
 
                   {/* Owner feedback box */}
                   {status === 'declined' && photo?.feedback && (
@@ -546,6 +644,87 @@ export default function ImpressionKitClient({
                 <button className="btn btn-ghost btn-sm" onClick={() => { setDeclineTarget(null); setDeclineFeedback(''); }}>
                   Cancel
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Edit kit modal ────────────────────────────────── */}
+        {showEditKit && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.52)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 28, maxWidth: 440, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.20)' }}>
+              <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 20 }}>Edit Patient Info</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Patient Name *</label>
+                  <input autoFocus type="text" value={editKitForm.patient_name} onChange={e => setEditKitForm(p => ({ ...p, patient_name: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 14 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Phone</label>
+                  <input type="text" value={editKitForm.phone} onChange={e => setEditKitForm(p => ({ ...p, phone: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 14 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Kit Stage</label>
+                  <select value={editKitForm.kit_stage} onChange={e => setEditKitForm(p => ({ ...p, kit_stage: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 14 }}>
+                    {KIT_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Notes</label>
+                  <textarea rows={2} value={editKitForm.notes} onChange={e => setEditKitForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional internal notes…"
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button className="btn btn-pri btn-sm" style={{ flex: 1 }} disabled={savingEdit || !editKitForm.patient_name.trim()} onClick={saveEditKit}>
+                  {savingEdit ? 'Saving…' : 'Save changes'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowEditKit(false)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Remake modal ──────────────────────────────────── */}
+        {showRemake && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.52)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div style={{ background: 'var(--surface)', borderRadius: 16, padding: 28, maxWidth: 440, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.20)' }}>
+              <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>Log Remake Kit</div>
+              <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 20, lineHeight: 1.6 }}>
+                A new impression kit entry will be created for this patient. The original kit and all its photos are preserved.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Patient Name *</label>
+                  <input autoFocus type="text" value={remakeForm.patient_name} onChange={e => setRemakeForm(p => ({ ...p, patient_name: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 14 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Phone</label>
+                  <input type="text" value={remakeForm.phone} onChange={e => setRemakeForm(p => ({ ...p, phone: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 14 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Kit Stage</label>
+                  <select value={remakeForm.kit_stage} onChange={e => setRemakeForm(p => ({ ...p, kit_stage: e.target.value }))}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 14 }}>
+                    {KIT_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-3)', display: 'block', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Reason / Notes</label>
+                  <textarea rows={2} value={remakeForm.notes} onChange={e => setRemakeForm(p => ({ ...p, notes: e.target.value }))} placeholder="e.g. Patient wasn't happy with fit, full remake requested…"
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface-2)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                <button className="btn btn-pri btn-sm" style={{ flex: 1 }} disabled={savingRemake || !remakeForm.patient_name.trim()} onClick={createRemake}>
+                  {savingRemake ? 'Creating…' : '↺ Create remake kit'}
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowRemake(false)}>Cancel</button>
               </div>
             </div>
           </div>
@@ -808,7 +987,14 @@ export default function ImpressionKitClient({
                     {initials(kit.patient_name)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{kit.patient_name}</div>
+                    <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {kit.patient_name}
+                      {kit.parent_kit_id && (
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 6, background: 'oklch(0.92 0.05 268)', color: 'oklch(0.38 0.14 268)', letterSpacing: '0.06em' }}>
+                          ↺ REMAKE
+                        </span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>{kit.phone}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
