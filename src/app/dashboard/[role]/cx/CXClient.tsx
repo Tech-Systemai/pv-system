@@ -70,7 +70,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'agents'|'admin'>('agents');
+  const [section,     setSection]     = useState<'agents'|'admin'|'no_update'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -92,12 +92,15 @@ export default function CXClient({
 
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));
   const todayUpdatedIds = new Set(updates.filter((u: any) => u.update_date === today).map((u: any) => u.case_id));
-  const needsUpdate = (c: any) => !c.on_hold && !todayUpdatedIds.has(c.id);
+  const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !todayUpdatedIds.has(c.id);
 
   const escalatedCount = cases.filter(c => c.escalated).length;
+  const noUpdateCount  = cases.filter(c => c.no_update_needed && !c.escalated).length;
 
   const filtered = cases.filter(c => {
-    if (section === 'admin' && !c.escalated) return false;
+    if (section === 'admin'     && !c.escalated)                      return false;
+    if (section === 'agents'    && (c.escalated || c.no_update_needed)) return false;
+    if (section === 'no_update' && (!c.no_update_needed || c.escalated)) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return c.customer_name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.issue?.toLowerCase().includes(q);
@@ -185,6 +188,14 @@ export default function CXClient({
     setSavingUpdate(false);
   }, [updateText, selectedCase, today, currentUserId]);
 
+  const handleToggleNoUpdate = async (c: any) => {
+    const newVal = !c.no_update_needed;
+    const payload = { no_update_needed: newVal, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: c.id });
+    setCases(prev => prev.map(x => x.id === c.id ? { ...x, ...payload } : x));
+    if (selectedCase?.id === c.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
   const handleToggleHold = async (c: any, reason?: string) => {
     const newHold = !c.on_hold;
     const payload = { on_hold: newHold, hold_reason: newHold ? (reason ?? '') : null, updated_at: new Date().toISOString() };
@@ -255,9 +266,9 @@ export default function CXClient({
 
   /* ── Owner quick-look banner ────────────────────────────────── */
   const banner = (
-    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : 'AGENTS — ALL CUSTOMERS'}
+    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : 'var(--ink-4)', marginBottom: 6 }}>
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : 'AGENTS — ALL CUSTOMERS'}
       </div>
       {section === 'agents' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
@@ -269,6 +280,12 @@ export default function CXClient({
             <><strong style={{ color: 'oklch(0.45 0.20 25)' }}>{needActionCount}</strong> need{needActionCount === 1 ? 's' : ''} an update today.{' '}</>
           )}
           {totalOutstanding > 0 && <>Total outstanding: <strong style={{ color: 'oklch(0.38 0.18 145)' }}>${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>.</>}
+        </div>
+      ) : section === 'no_update' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {noUpdateCount === 0
+            ? 'No cases marked as no update needed.'
+            : <><strong style={{ color: 'oklch(0.36 0.15 145)' }}>{noUpdateCount} case{noUpdateCount !== 1 ? 's' : ''}</strong> marked as no update needed. These customers do not require daily update logs and are excluded from the update-due counter.</>}
         </div>
       ) : (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
@@ -293,6 +310,10 @@ export default function CXClient({
           <button onClick={() => setSection('admin')}
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.92 0.06 25)' : 'white') : 'transparent', color: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.38 0.20 25)' : 'var(--ink)') : (escalatedCount > 0 ? 'oklch(0.45 0.18 25)' : 'var(--ink-4)'), boxShadow: section === 'admin' ? 'var(--sh-1)' : 'none' }}>
             {escalatedCount > 0 ? '⚠ ' : ''}Admin · {escalatedCount}
+          </button>
+          <button onClick={() => setSection('no_update')}
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'no_update' ? 'oklch(0.93 0.05 145)' : 'transparent', color: section === 'no_update' ? 'oklch(0.36 0.15 145)' : 'var(--ink-4)', boxShadow: section === 'no_update' ? 'var(--sh-1)' : 'none' }}>
+            ✓ No Update Needed · {noUpdateCount}
           </button>
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
@@ -319,7 +340,7 @@ export default function CXClient({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : 'No customer cases found.'}
+          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
@@ -344,6 +365,7 @@ export default function CXClient({
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: pm.bg, color: pm.color }}>{c.priority}</span>
                   {c.escalated && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.06 25)', color: 'oklch(0.40 0.20 25)' }}>⚠ ESCALATED</span>}
                   {c.on_hold && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0 0)', color: 'oklch(0.45 0 0)' }}>🔒 ON HOLD</span>}
+                  {c.no_update_needed && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.05 145)', color: 'oklch(0.36 0.15 145)' }}>✓ NO UPDATE</span>}
                   {updateDue && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.94 0.06 80)', color: 'oklch(0.40 0.18 80)' }}>⚠ UPDATE DUE</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>{c.phone}</div>
@@ -611,6 +633,11 @@ export default function CXClient({
           {!selectedCase.on_hold && !showHoldInput && (
             <button className="btn btn-sec btn-sm" onClick={() => setShowHoldInput(true)}>🔒 Put on hold</button>
           )}
+          <button className="btn btn-sec btn-sm"
+            style={selectedCase.no_update_needed ? { background: 'oklch(0.92 0.05 145)', color: 'oklch(0.36 0.15 145)', border: '1px solid oklch(0.82 0.08 145)' } : {}}
+            onClick={() => handleToggleNoUpdate(selectedCase)}>
+            {selectedCase.no_update_needed ? '↩ Reactivate updates' : '✓ No update needed'}
+          </button>
           {showHoldInput && (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input type="text" placeholder="Hold reason (e.g. waiting for lab)…" value={holdInputText} onChange={e => setHoldInputText(e.target.value)}
@@ -721,12 +748,14 @@ export default function CXClient({
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
-          {section === 'agents' ? 'Agents — All customers' : 'Admin — Escalated cases'}
+          {section === 'agents' ? 'Agents — All customers' : section === 'admin' ? 'Admin — Escalated cases' : 'No Update Needed'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
           {section === 'agents'
             ? 'Every customer is visible here — color-coded by status · click any to log updates'
-            : 'Cases flagged by agents that require management review or action'}
+            : section === 'admin'
+            ? 'Cases flagged by agents that require management review or action'
+            : 'Customers that do not need a daily update — click to manage or reactivate'}
         </div>
       </div>
       {toolbar}
