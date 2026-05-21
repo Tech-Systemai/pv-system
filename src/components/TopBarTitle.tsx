@@ -39,7 +39,8 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   mytimeoff:   { title: 'Time-Off Requests', sub: 'Submit and track your leave' },
   mytarget:    { title: 'My Targets',        sub: 'Your personal performance goals' },
   mydash:      { title: 'My Dashboard',      sub: 'Personal overview and quick actions' },
-  collections: { title: 'Collections',      sub: 'Active accounts and follow-up queue' },
+  collections:      { title: 'Collections',      sub: 'Active accounts and follow-up queue' },
+  'impression-kit': { title: 'Impression Kit',   sub: 'Dentist approves or declines patient photos · feedback to agents' },
 };
 
 export default function TopBarTitle({ role }: { role: string }) {
