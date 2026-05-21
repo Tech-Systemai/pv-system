@@ -166,7 +166,6 @@ export default function NotificationBell({ userId, userRole }: { userId: string;
         .update({ is_read: true })
         .eq('user_id', userId)
         .eq('is_read', false)
-        .like('type', 'ticket%')
         .then(() => {});
     }
     setChatNotifs([]);
