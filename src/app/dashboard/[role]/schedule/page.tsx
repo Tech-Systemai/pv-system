@@ -20,7 +20,7 @@ export default async function SchedulePage() {
   const isMgmt = isAdminView(viewType);
 
   const [{ data: users }, { data: schedules }] = await Promise.all([
-    admin.from('profiles').select('id, name, role').in('role', ['sales', 'cx', 'supervisor']),
+    admin.from('profiles').select('id, name, role').order('name'),
     isMgmt
       ? admin.from('schedules').select('*').order('created_at', { ascending: false })
       : admin.from('schedules').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
