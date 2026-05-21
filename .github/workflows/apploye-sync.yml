@@ -11,6 +11,7 @@ jobs:
     steps:
       - name: Trigger Apploye sync
         run: |
-          curl -s -X POST https://system-psi-sable.vercel.app/api/cron/apploye-pull \
+          curl -X POST https://portal.pioneersveneers.com/api/cron/apploye-pull \
             -H "Content-Type: application/json" \
-            --fail-with-body
+            --fail-with-body \
+            --max-time 30
