@@ -3,11 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
-import {
-  saveAnnouncement,
-  clearAnnouncement,
-  getAcknowledgments,
-} from '@/app/actions/announcements';
 
 type Announcement = {
   type: 'meeting' | 'announcement';
@@ -30,13 +25,21 @@ type AckRecord = {
 
 const EMPTY = { type: 'meeting' as 'meeting' | 'announcement', title: '', message: '', meeting_link: '' };
 
+async function annApi(body: object): Promise<{ ok?: boolean; data?: any; error?: string }> {
+  const res = await fetch('/api/ann', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
 export default function AnnouncementManager({ userName, initialProfiles }: { userName: string; initialProfiles: Profile[] }) {
   const supabase = useRef(createClient()).current;
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<Announcement | null>(null);
-  const [allProfiles, setAllProfiles] = useState<Profile[]>(initialProfiles);
-  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [allProfiles] = useState<Profile[]>(initialProfiles);
   const [form, setForm] = useState(EMPTY);
   const [targetMode, setTargetMode] = useState<'all' | 'specific'>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -50,31 +53,25 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
 
   const fetchAcks = useCallback(async (ts: string) => {
     setAcksLoading(true);
-    try {
-      const data = await getAcknowledgments(ts);
-      setAcks(data);
-    } catch { /* ignore */ }
+    const result = await annApi({ action: 'acks', ts });
+    if (result.data) setAcks(result.data as AckRecord[]);
     setAcksLoading(false);
   }, []);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const { data: setting } = await supabase
-        .from('global_settings')
-        .select('value')
-        .eq('key', 'active_announcement')
-        .maybeSingle();
-      const ann = setting?.value ? (setting.value as Announcement) : null;
-      setActive(ann);
-      if (ann) fetchAcks(ann.created_at);
-    } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to load data');
-    }
+  const fetchActive = useCallback(async () => {
+    const { data: setting } = await supabase
+      .from('global_settings')
+      .select('value')
+      .eq('key', 'active_announcement')
+      .maybeSingle();
+    const ann = setting?.value ? (setting.value as Announcement) : null;
+    setActive(ann);
+    if (ann) fetchAcks(ann.created_at);
   }, [supabase, fetchAcks]);
 
   useEffect(() => {
     if (open) {
-      fetchData();
+      fetchActive();
       setForm(EMPTY);
       setTargetMode('all');
       setSelectedUsers([]);
@@ -83,20 +80,15 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
     } else {
       setAcks([]);
     }
-  }, [open, fetchData]);
+  }, [open, fetchActive]);
 
   // Live ack updates while modal is open
   useEffect(() => {
     if (!open || !active) return;
     const ch = supabase
       .channel('ann-acks-mgr')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcement_acknowledgments' }, (payload) => {
-        const row = payload.new as any;
-        if (row.announcement_ts === active.created_at) fetchAcks(active.created_at);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcement_acknowledgments' }, (payload) => {
-        const row = payload.new as any;
-        if (row.announcement_ts === active.created_at) fetchAcks(active.created_at);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcement_acknowledgments' }, () => {
+        fetchAcks(active.created_at);
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -131,36 +123,36 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
       message: form.message.trim(),
       ...(form.type === 'meeting' && form.meeting_link.trim() ? { meeting_link: form.meeting_link.trim() } : {}),
       created_at: new Date().toISOString(),
-      created_by_name: userName || '',
+      created_by_name: userName,
       target_user_ids: targetMode === 'specific' ? selectedUsers : null,
     };
-    try {
-      await saveAnnouncement(payload);
+    const result = await annApi({ action: 'save', payload });
+    if (result.error) {
+      setSaveError(result.error);
+    } else {
       setActive(payload);
       setAcks([]);
       setForm(EMPTY);
       setTargetMode('all');
       setSelectedUsers([]);
-    } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to send announcement');
     }
     setSaving(false);
   };
 
   const handleClear = async () => {
-    try {
-      await clearAnnouncement();
+    const result = await annApi({ action: 'clear' });
+    if (result.error) {
+      setSaveError(result.error);
+    } else {
       setActive(null);
       setAcks([]);
-    } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to clear announcement');
     }
   };
 
   const isMeeting = form.type === 'meeting';
   const canSend = form.title.trim() && form.message.trim() && (targetMode === 'all' || selectedUsers.length > 0);
 
-  // Ack tracking derived data
+  // Ack tracking
   const ackedIds = new Set(acks.map(a => a.user_id));
   const targetedProfiles = active?.target_user_ids
     ? allProfiles.filter(p => active.target_user_ids!.includes(p.id))
@@ -212,7 +204,7 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
             flexShrink: 0,
           }}>
             {/* Header */}
-            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)' }}>
               <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)' }}>Announcements & Meetings</div>
               <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 3 }}>
                 Send a live pop-up to all staff or specific people — requires acknowledgment.
@@ -272,8 +264,7 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                   marginBottom: 16, padding: '12px 14px', borderRadius: 10,
                   background: 'var(--surface-2)', border: '1px solid var(--line)',
                 }}>
-                  {/* Summary row */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: acksLoading || acks.length > 0 || pendingProfiles.length > 0 ? 10 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: acks.length > 0 || pendingProfiles.length > 0 ? 10 : 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', flex: 1 }}>
                       RESPONSES
                     </div>
@@ -302,7 +293,6 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                     )}
                   </div>
 
-                  {/* Responded list */}
                   {acks.length > 0 && (
                     <div style={{ marginBottom: pendingProfiles.length > 0 ? 8 : 0 }}>
                       {acks.map(ack => (
@@ -330,12 +320,8 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                     </div>
                   )}
 
-                  {/* Pending list */}
                   {!acksLoading && pendingProfiles.length > 0 && (
-                    <div style={{
-                      padding: '8px 10px', borderRadius: 8,
-                      background: 'white', border: '1px dashed var(--line)',
-                    }}>
+                    <div style={{ padding: '8px 10px', borderRadius: 8, background: 'white', border: '1px dashed var(--line)' }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-5)', marginBottom: 6, letterSpacing: '0.06em' }}>
                         PENDING ({pendingProfiles.length})
                       </div>
@@ -351,21 +337,15 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                       </div>
                     </div>
                   )}
-
-                  {!acksLoading && acks.length === 0 && targetedProfiles.length === 0 && (
-                    <div style={{ fontSize: 12, color: 'var(--ink-5)', textAlign: 'center', padding: '4px 0' }}>
-                      Loading recipients…
-                    </div>
-                  )}
                 </div>
               )}
 
-              {/* New announcement form */}
+              {/* Form label */}
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 10 }}>
                 {active ? 'REPLACE WITH NEW' : 'NEW ANNOUNCEMENT'}
               </div>
 
-              {/* Type selector */}
+              {/* Type */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 {(['meeting', 'announcement'] as const).map(t => (
                   <button key={t} onClick={() => setForm(p => ({ ...p, type: t }))}
@@ -383,42 +363,25 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
 
               <div className="pv-fld">
                 <label>Title</label>
-                <input
-                  value={form.title}
-                  onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder={isMeeting ? 'e.g. Emergency Team Meeting' : 'e.g. Important Policy Update'}
-                  autoFocus
-                />
+                <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder={isMeeting ? 'e.g. Emergency Team Meeting' : 'e.g. Important Policy Update'} autoFocus />
               </div>
               <div className="pv-fld">
                 <label>Message</label>
-                <textarea
-                  rows={3}
-                  value={form.message}
-                  onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
-                  placeholder={isMeeting
-                    ? 'e.g. All staff please join immediately.'
-                    : 'e.g. Please review the updated attendance policy.'}
-                  style={{ resize: 'vertical' }}
-                />
+                <textarea rows={3} value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
+                  placeholder={isMeeting ? 'e.g. All staff please join immediately.' : 'e.g. Please review the updated policy.'} style={{ resize: 'vertical' }} />
               </div>
               {isMeeting && (
                 <div className="pv-fld">
                   <label>Meeting Link</label>
-                  <input
-                    value={form.meeting_link}
-                    onChange={e => setForm(p => ({ ...p, meeting_link: e.target.value }))}
-                    placeholder="https://meet.google.com/xxx-yyy-zzz"
-                    type="url"
-                  />
+                  <input value={form.meeting_link} onChange={e => setForm(p => ({ ...p, meeting_link: e.target.value }))}
+                    placeholder="https://meet.google.com/xxx-yyy-zzz" type="url" />
                 </div>
               )}
 
               {/* Audience */}
-              <div style={{ marginBottom: 4 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 8 }}>
-                  SEND TO
-                </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 8 }}>SEND TO</div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   {(['all', 'specific'] as const).map(m => (
                     <button key={m} onClick={() => setTargetMode(m)}
@@ -437,14 +400,9 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                 {targetMode === 'specific' && (
                   <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
                     <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line-2)', display: 'flex', gap: 8, alignItems: 'center', background: 'var(--surface-2)' }}>
-                      <input
-                        type="text"
-                        placeholder="Search by name or role…"
-                        value={profileSearch}
-                        onChange={e => setProfileSearch(e.target.value)}
-                        className="fld-input"
-                        style={{ flex: 1, height: 30, fontSize: 12 }}
-                      />
+                      <input type="text" placeholder="Search by name or role…" value={profileSearch}
+                        onChange={e => setProfileSearch(e.target.value)} className="fld-input"
+                        style={{ flex: 1, height: 30, fontSize: 12 }} />
                       <button onClick={toggleAll}
                         style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--line)', background: 'white', cursor: 'pointer', color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>
                         {allFilteredSelected ? 'Deselect all' : 'Select all'}
@@ -456,32 +414,20 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                       )}
                     </div>
                     <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                      {profilesLoading ? (
-                        <div style={{ padding: '18px', textAlign: 'center', fontSize: 12, color: 'var(--ink-5)' }}>
-                          Loading staff…
-                        </div>
-                      ) : filteredProfiles.length === 0 ? (
+                      {filteredProfiles.length === 0 ? (
                         <div style={{ padding: '18px', textAlign: 'center', fontSize: 12, color: 'var(--ink-5)' }}>
                           {profileSearch ? 'No matches' : 'No staff found'}
                         </div>
                       ) : filteredProfiles.map((p, i) => {
                         const checked = selectedUsers.includes(p.id);
                         return (
-                          <label key={p.id}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 10,
-                              padding: '9px 14px',
-                              borderBottom: i < filteredProfiles.length - 1 ? '1px solid var(--line-2)' : 'none',
-                              cursor: 'pointer',
-                              background: checked ? 'oklch(0.97 0.03 260)' : 'white',
-                              transition: 'background 0.1s',
-                            }}>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleUser(p.id)}
-                              style={{ width: 15, height: 15, accentColor: 'oklch(0.48 0.22 260)', cursor: 'pointer', flexShrink: 0 }}
-                            />
+                          <label key={p.id} style={{
+                            display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+                            borderBottom: i < filteredProfiles.length - 1 ? '1px solid var(--line-2)' : 'none',
+                            cursor: 'pointer', background: checked ? 'oklch(0.97 0.03 260)' : 'white', transition: 'background 0.1s',
+                          }}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleUser(p.id)}
+                              style={{ width: 15, height: 15, accentColor: 'oklch(0.48 0.22 260)', cursor: 'pointer', flexShrink: 0 }} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: checked ? 700 : 500, color: 'var(--ink)' }}>{p.name}</div>
                             </div>
@@ -495,34 +441,30 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                   </div>
                 )}
               </div>
-
             </div>
 
             {/* Footer */}
-            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', flexShrink: 0, background: 'white' }}>
+            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', background: 'white' }}>
               {saveError && (
                 <div style={{
                   marginBottom: 10, padding: '10px 14px', borderRadius: 8,
                   background: 'oklch(0.96 0.04 25)', border: '1px solid oklch(0.84 0.09 25)',
-                  fontSize: 12, color: 'oklch(0.40 0.20 25)', fontWeight: 500,
+                  fontSize: 12, color: 'oklch(0.40 0.20 25)', fontWeight: 600,
                 }}>
                   ⚠ {saveError}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={handleSend}
-                  disabled={saving || !canSend}
-                  style={{
-                    flex: 1, padding: '11px 20px', borderRadius: 10, border: 'none',
-                    background: isMeeting
-                      ? 'linear-gradient(135deg, oklch(0.48 0.22 260), oklch(0.44 0.24 280))'
-                      : 'linear-gradient(135deg, oklch(0.48 0.22 25), oklch(0.44 0.24 10))',
-                    color: 'white', fontWeight: 700, fontSize: 13,
-                    cursor: saving || !canSend ? 'not-allowed' : 'pointer',
-                    opacity: saving || !canSend ? 0.55 : 1,
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.14)',
-                  }}>
+                <button onClick={handleSend} disabled={saving || !canSend} style={{
+                  flex: 1, padding: '11px 20px', borderRadius: 10, border: 'none',
+                  background: isMeeting
+                    ? 'linear-gradient(135deg, oklch(0.48 0.22 260), oklch(0.44 0.24 280))'
+                    : 'linear-gradient(135deg, oklch(0.48 0.22 25), oklch(0.44 0.24 10))',
+                  color: 'white', fontWeight: 700, fontSize: 13,
+                  cursor: saving || !canSend ? 'not-allowed' : 'pointer',
+                  opacity: saving || !canSend ? 0.55 : 1,
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.14)',
+                }}>
                   {saving ? 'Sending…' : targetMode === 'all'
                     ? `Send ${isMeeting ? 'Meeting Alert' : 'Announcement'} to Everyone`
                     : `Send to ${selectedUsers.length} Person${selectedUsers.length !== 1 ? 's' : ''}`}

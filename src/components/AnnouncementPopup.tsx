@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
-import { acknowledgeAnnouncement } from '@/app/actions/announcements';
 
 type Announcement = {
   type: 'meeting' | 'announcement';
@@ -76,7 +75,11 @@ export default function AnnouncementPopup({ userId }: { userId: string }) {
   const saveAck = async (action: 'acknowledged' | 'joined') => {
     if (!ann) return;
     try {
-      await acknowledgeAnnouncement(ann.created_at, action);
+      await fetch('/api/ann', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ack', userId, ts: ann.created_at, ackAction: action }),
+      });
     } catch { /* fail silently — popup already dismissed locally */ }
   };
 
