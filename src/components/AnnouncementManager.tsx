@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
+import {
+  saveAnnouncement,
+  clearAnnouncement,
+  getProfiles,
+  getAcknowledgments,
+} from '@/app/actions/announcements';
 
 type Announcement = {
   type: 'meeting' | 'announcement';
@@ -45,26 +51,32 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
 
   const fetchAcks = useCallback(async (ts: string) => {
     setAcksLoading(true);
-    const { data } = await supabase
-      .from('announcement_acknowledgments')
-      .select('user_id, action, responded_at, profiles(name)')
-      .eq('announcement_ts', ts)
-      .order('responded_at');
-    setAcks((data as AckRecord[]) ?? []);
+    try {
+      const data = await getAcknowledgments(ts);
+      setAcks(data);
+    } catch { /* ignore */ }
     setAcksLoading(false);
-  }, [supabase]);
+  }, []);
 
   const fetchData = useCallback(async () => {
     setProfilesLoading(true);
-    const [{ data: setting }, { data: profiles }] = await Promise.all([
-      supabase.from('global_settings').select('value').eq('key', 'active_announcement').maybeSingle(),
-      supabase.from('profiles').select('id, name, role').order('name'),
-    ]);
-    const ann = setting?.value ? (setting.value as Announcement) : null;
-    setActive(ann);
-    setAllProfiles(profiles ?? []);
+    try {
+      // Use browser client only for reading global_settings (public SELECT policy)
+      const { data: setting } = await supabase
+        .from('global_settings')
+        .select('value')
+        .eq('key', 'active_announcement')
+        .maybeSingle();
+      const ann = setting?.value ? (setting.value as Announcement) : null;
+      setActive(ann);
+      // Use server action for profiles (bypasses any RLS auth issues)
+      const profiles = await getProfiles();
+      setAllProfiles(profiles);
+      if (ann) fetchAcks(ann.created_at);
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to load data');
+    }
     setProfilesLoading(false);
-    if (ann) fetchAcks(ann.created_at);
   }, [supabase, fetchAcks]);
 
   useEffect(() => {
@@ -129,24 +141,27 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
       created_by_name: userName,
       target_user_ids: targetMode === 'specific' ? selectedUsers : null,
     };
-    const { error } = await supabase.from('global_settings').upsert({ key: 'active_announcement', value: payload });
-    if (error) {
-      setSaveError(error.message);
-      setSaving(false);
-      return;
+    try {
+      await saveAnnouncement(payload);
+      setActive(payload);
+      setAcks([]);
+      setForm(EMPTY);
+      setTargetMode('all');
+      setSelectedUsers([]);
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to send announcement');
     }
-    setActive(payload);
-    setAcks([]);
-    setForm(EMPTY);
-    setTargetMode('all');
-    setSelectedUsers([]);
     setSaving(false);
   };
 
   const handleClear = async () => {
-    await supabase.from('global_settings').delete().eq('key', 'active_announcement');
-    setActive(null);
-    setAcks([]);
+    try {
+      await clearAnnouncement();
+      setActive(null);
+      setAcks([]);
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to clear announcement');
+    }
   };
 
   const isMeeting = form.type === 'meeting';
