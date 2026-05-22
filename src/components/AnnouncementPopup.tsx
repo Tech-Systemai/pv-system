@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { createClient } from '@/utils/supabase/client';
 
 type Announcement = {
   type: 'meeting' | 'announcement';
@@ -15,7 +14,6 @@ type Announcement = {
 };
 
 export default function AnnouncementPopup({ userId }: { userId: string }) {
-  const supabase = useRef(createClient()).current;
   const [ann, setAnn] = useState<Announcement | null>(null);
   const [mounted, setMounted] = useState(false);
   const [acting, setActing] = useState(false);
@@ -25,75 +23,45 @@ export default function AnnouncementPopup({ userId }: { userId: string }) {
   useEffect(() => {
     let cancelled = false;
 
-    const checkAndApply = async (val: unknown) => {
-      if (!val) { if (!cancelled) setAnn(null); return; }
-      const a = val as Announcement;
-      if (a.target_user_ids && !a.target_user_ids.includes(userId)) {
-        if (!cancelled) setAnn(null);
-        return;
-      }
-      // Check DB — if already acknowledged, suppress popup permanently for this announcement
-      const { data } = await supabase
-        .from('announcement_acknowledgments')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('announcement_ts', a.created_at)
-        .maybeSingle();
-      if (!cancelled) setAnn(data ? null : a);
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/ann?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        if (cancelled) return;
+
+        if (!json.active) { setAnn(null); return; }
+
+        const a = json.active as Announcement;
+        if (a.target_user_ids && !a.target_user_ids.includes(userId)) { setAnn(null); return; }
+        if (json.acked) { setAnn(null); return; }
+
+        setAnn(a);
+      } catch { /* network blip — keep current state, retry on next tick */ }
     };
 
-    const load = async () => {
-      const { data } = await supabase
-        .from('global_settings')
-        .select('value')
-        .eq('key', 'active_announcement')
-        .maybeSingle();
-      await checkAndApply(data?.value ?? null);
-    };
+    check();
+    const timer = setInterval(check, 8_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [userId]);
 
-    load();
-    const timer = setInterval(load, 30_000);
-
-    const ch = supabase
-      .channel('ann-popup')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'global_settings' }, async (payload) => {
-        const row = payload.new as any;
-        if (row?.key === 'active_announcement') await checkAndApply(row.value ?? null);
-        if ((payload as any).old?.key === 'active_announcement' && payload.eventType === 'DELETE') {
-          if (!cancelled) setAnn(null);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-      supabase.removeChannel(ch);
-    };
-  }, [supabase, userId]);
-
-  const saveAck = async (action: 'acknowledged' | 'joined') => {
-    if (!ann) return;
-    try {
-      await fetch('/api/ann', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'ack', userId, ts: ann.created_at, ackAction: action }),
-      });
-    } catch { /* fail silently — popup already dismissed locally */ }
-  };
-
-  const dismiss = async () => {
+  const ack = async (action: 'acknowledged' | 'joined') => {
+    if (!ann || acting) return;
     setActing(true);
-    await saveAck('acknowledged');
+    const ts = ann.created_at;
     setAnn(null);
+    await fetch('/api/ann', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ack', userId, ts, ackAction: action }),
+    }).catch(() => {});
+    setActing(false);
   };
 
+  const dismiss = () => ack('acknowledged');
   const join = async () => {
-    setActing(true);
     if (ann?.meeting_link) window.open(ann.meeting_link, '_blank', 'noopener');
-    await saveAck('joined');
-    setAnn(null);
+    await ack('joined');
   };
 
   if (!mounted || !ann) return null;
