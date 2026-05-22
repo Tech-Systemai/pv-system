@@ -9,6 +9,8 @@ import TopBarTitle from '@/components/TopBarTitle';
 import TopBarClock from '@/components/TopBarClock';
 import { getPermMatrix, resolveViewType, PERM_DEFAULTS } from '@/utils/getPermissions';
 import DailyUpdatePrompt from '@/components/DailyUpdatePrompt';
+import AnnouncementPopup from '@/components/AnnouncementPopup';
+import AnnouncementManager from '@/components/AnnouncementManager';
 
 export default async function DashboardLayout({
   children,
@@ -82,6 +84,7 @@ export default async function DashboardLayout({
   return (
     <div className="pv">
       <DailyUpdatePrompt userId={user.id} />
+      <AnnouncementPopup />
       <div className="pv-grid">
         <Sidebar role={urlRole} allowedModules={allowedModules} userName={profile?.name ?? ''} />
 
@@ -103,6 +106,7 @@ export default async function DashboardLayout({
 
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <TopBarClock />
+              {isManagement && <AnnouncementManager userName={profile?.name ?? ''} />}
               {isManagement && <PortalSwitcher currentRole={urlRole} />}
 <NotificationBell userId={user.id} userRole={effectiveRole} />
               <ProfileButton
