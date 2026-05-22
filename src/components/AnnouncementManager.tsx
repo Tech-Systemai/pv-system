@@ -496,38 +496,39 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
                 )}
               </div>
 
-              {saveError && (
-                <div style={{
-                  marginTop: 12, padding: '10px 14px', borderRadius: 8,
-                  background: 'oklch(0.96 0.04 25)', border: '1px solid oklch(0.84 0.09 25)',
-                  fontSize: 12, color: 'oklch(0.40 0.20 25)', fontWeight: 500,
-                }}>
-                  ⚠ Failed to send: {saveError}
-                </div>
-              )}
-
             </div>
 
             {/* Footer */}
-            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', flexShrink: 0, display: 'flex', gap: 8, background: 'white' }}>
-              <button
-                onClick={handleSend}
-                disabled={saving || !canSend}
-                style={{
-                  flex: 1, padding: '11px 20px', borderRadius: 10, border: 'none',
-                  background: isMeeting
-                    ? 'linear-gradient(135deg, oklch(0.48 0.22 260), oklch(0.44 0.24 280))'
-                    : 'linear-gradient(135deg, oklch(0.48 0.22 25), oklch(0.44 0.24 10))',
-                  color: 'white', fontWeight: 700, fontSize: 13,
-                  cursor: saving || !canSend ? 'not-allowed' : 'pointer',
-                  opacity: saving || !canSend ? 0.55 : 1,
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.14)',
+            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', flexShrink: 0, background: 'white' }}>
+              {saveError && (
+                <div style={{
+                  marginBottom: 10, padding: '10px 14px', borderRadius: 8,
+                  background: 'oklch(0.96 0.04 25)', border: '1px solid oklch(0.84 0.09 25)',
+                  fontSize: 12, color: 'oklch(0.40 0.20 25)', fontWeight: 500,
                 }}>
-                {saving ? 'Sending…' : targetMode === 'all'
-                  ? `Send ${isMeeting ? 'Meeting Alert' : 'Announcement'} to Everyone`
-                  : `Send to ${selectedUsers.length} Person${selectedUsers.length !== 1 ? 's' : ''}`}
-              </button>
-              <button className="btn btn-sec" onClick={() => setOpen(false)}>Cancel</button>
+                  ⚠ {saveError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleSend}
+                  disabled={saving || !canSend}
+                  style={{
+                    flex: 1, padding: '11px 20px', borderRadius: 10, border: 'none',
+                    background: isMeeting
+                      ? 'linear-gradient(135deg, oklch(0.48 0.22 260), oklch(0.44 0.24 280))'
+                      : 'linear-gradient(135deg, oklch(0.48 0.22 25), oklch(0.44 0.24 10))',
+                    color: 'white', fontWeight: 700, fontSize: 13,
+                    cursor: saving || !canSend ? 'not-allowed' : 'pointer',
+                    opacity: saving || !canSend ? 0.55 : 1,
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.14)',
+                  }}>
+                  {saving ? 'Sending…' : targetMode === 'all'
+                    ? `Send ${isMeeting ? 'Meeting Alert' : 'Announcement'} to Everyone`
+                    : `Send to ${selectedUsers.length} Person${selectedUsers.length !== 1 ? 's' : ''}`}
+                </button>
+                <button className="btn btn-sec" onClick={() => setOpen(false)}>Cancel</button>
+              </div>
             </div>
           </div>
         </div>,
