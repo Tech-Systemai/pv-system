@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
 
 type Announcement = {
@@ -13,22 +14,33 @@ type Announcement = {
   target_user_ids: string[] | null;
 };
 
-const ACK_KEY = (ts: string) => `pv_ann_ack_${ts}`;
-
 export default function AnnouncementPopup({ userId }: { userId: string }) {
   const supabase = useRef(createClient()).current;
   const [ann, setAnn] = useState<Announcement | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [acting, setActing] = useState(false);
 
-  const apply = (val: unknown) => {
-    if (!val) { setAnn(null); return; }
-    const a = val as Announcement;
-    if (localStorage.getItem(ACK_KEY(a.created_at))) return;
-    if (a.target_user_ids && !a.target_user_ids.includes(userId)) return;
-    setAnn(a);
-  };
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval>;
+    let cancelled = false;
+
+    const checkAndApply = async (val: unknown) => {
+      if (!val) { if (!cancelled) setAnn(null); return; }
+      const a = val as Announcement;
+      if (a.target_user_ids && !a.target_user_ids.includes(userId)) {
+        if (!cancelled) setAnn(null);
+        return;
+      }
+      // Check DB — if already acknowledged, suppress popup permanently for this announcement
+      const { data } = await supabase
+        .from('announcement_acknowledgments')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('announcement_ts', a.created_at)
+        .maybeSingle();
+      if (!cancelled) setAnn(data ? null : a);
+    };
 
     const load = async () => {
       const { data } = await supabase
@@ -36,38 +48,55 @@ export default function AnnouncementPopup({ userId }: { userId: string }) {
         .select('value')
         .eq('key', 'active_announcement')
         .maybeSingle();
-      apply(data?.value ?? null);
+      await checkAndApply(data?.value ?? null);
     };
 
     load();
-    timer = setInterval(load, 30_000);
+    const timer = setInterval(load, 30_000);
 
     const ch = supabase
       .channel('ann-popup')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'global_settings' }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'global_settings' }, async (payload) => {
         const row = payload.new as any;
-        if (row?.key === 'active_announcement') apply(row.value ?? null);
-        if ((payload as any).old?.key === 'active_announcement' && payload.eventType === 'DELETE') setAnn(null);
+        if (row?.key === 'active_announcement') await checkAndApply(row.value ?? null);
+        if ((payload as any).old?.key === 'active_announcement' && payload.eventType === 'DELETE') {
+          if (!cancelled) setAnn(null);
+        }
       })
       .subscribe();
 
-    return () => { clearInterval(timer); supabase.removeChannel(ch); };
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      supabase.removeChannel(ch);
+    };
   }, [supabase, userId]);
 
-  const dismiss = () => {
-    if (ann) localStorage.setItem(ACK_KEY(ann.created_at), '1');
+  const saveAck = async (action: 'acknowledged' | 'joined') => {
+    if (!ann) return;
+    await supabase.from('announcement_acknowledgments').upsert(
+      { user_id: userId, announcement_ts: ann.created_at, action },
+      { onConflict: 'user_id,announcement_ts' }
+    );
+  };
+
+  const dismiss = async () => {
+    setActing(true);
+    await saveAck('acknowledged');
     setAnn(null);
   };
 
-  const join = () => {
+  const join = async () => {
+    setActing(true);
     if (ann?.meeting_link) window.open(ann.meeting_link, '_blank', 'noopener');
-    dismiss();
+    await saveAck('joined');
+    setAnn(null);
   };
 
-  if (!ann) return null;
+  if (!mounted || !ann) return null;
   const isMeeting = ann.type === 'meeting';
 
-  return (
+  return createPortal(
     <>
       <style>{`
         @keyframes ann-in {
@@ -138,28 +167,34 @@ export default function AnnouncementPopup({ userId }: { userId: string }) {
 
             {isMeeting ? (
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={join} style={{
+                <button onClick={join} disabled={acting} style={{
                   flex: 1, padding: '13px 20px', borderRadius: 10, border: 'none',
                   background: 'linear-gradient(135deg, oklch(0.48 0.22 260), oklch(0.44 0.24 280))',
-                  color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                  color: 'white', fontWeight: 700, fontSize: 14,
+                  cursor: acting ? 'not-allowed' : 'pointer',
+                  opacity: acting ? 0.7 : 1,
                   boxShadow: '0 4px 20px oklch(0.48 0.22 260 / 0.42)',
                   letterSpacing: '0.01em',
                 }}>
                   📹 Join Meeting
                 </button>
-                <button onClick={dismiss} style={{
+                <button onClick={dismiss} disabled={acting} style={{
                   padding: '13px 18px', borderRadius: 10,
                   border: '1.5px solid var(--line)', background: 'white',
-                  color: 'var(--ink-4)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                  color: 'var(--ink-4)', fontWeight: 600, fontSize: 13,
+                  cursor: acting ? 'not-allowed' : 'pointer',
+                  opacity: acting ? 0.7 : 1,
                 }}>
                   Dismiss
                 </button>
               </div>
             ) : (
-              <button onClick={dismiss} style={{
+              <button onClick={dismiss} disabled={acting} style={{
                 width: '100%', padding: '13px 20px', borderRadius: 10, border: 'none',
                 background: 'linear-gradient(135deg, oklch(0.48 0.22 25), oklch(0.44 0.24 10))',
-                color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                color: 'white', fontWeight: 700, fontSize: 14,
+                cursor: acting ? 'not-allowed' : 'pointer',
+                opacity: acting ? 0.7 : 1,
                 boxShadow: '0 4px 20px oklch(0.48 0.22 25 / 0.42)',
               }}>
                 ✓ Acknowledge
@@ -168,6 +203,7 @@ export default function AnnouncementPopup({ userId }: { userId: string }) {
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

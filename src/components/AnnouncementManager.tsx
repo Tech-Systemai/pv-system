@@ -14,6 +14,15 @@ type Announcement = {
   target_user_ids: string[] | null;
 };
 
+type Profile = { id: string; name: string; role: string };
+
+type AckRecord = {
+  user_id: string;
+  action: 'acknowledged' | 'joined';
+  responded_at: string;
+  profiles: { name: string } | null;
+};
+
 const EMPTY = { type: 'meeting' as 'meeting' | 'announcement', title: '', message: '', meeting_link: '' };
 
 export default function AnnouncementManager({ userName }: { userName: string }) {
@@ -21,23 +30,42 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<Announcement | null>(null);
-  const [allProfiles, setAllProfiles] = useState<any[]>([]);
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [targetMode, setTargetMode] = useState<'all' | 'specific'>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [profileSearch, setProfileSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [acks, setAcks] = useState<AckRecord[]>([]);
+  const [acksLoading, setAcksLoading] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const fetchAcks = useCallback(async (ts: string) => {
+    setAcksLoading(true);
+    const { data } = await supabase
+      .from('announcement_acknowledgments')
+      .select('user_id, action, responded_at, profiles(name)')
+      .eq('announcement_ts', ts)
+      .order('responded_at');
+    setAcks((data as AckRecord[]) ?? []);
+    setAcksLoading(false);
+  }, [supabase]);
 
   const fetchData = useCallback(async () => {
+    setProfilesLoading(true);
     const [{ data: setting }, { data: profiles }] = await Promise.all([
       supabase.from('global_settings').select('value').eq('key', 'active_announcement').maybeSingle(),
       supabase.from('profiles').select('id, name, role').order('name'),
     ]);
-    setActive(setting?.value ? (setting.value as Announcement) : null);
+    const ann = setting?.value ? (setting.value as Announcement) : null;
+    setActive(ann);
     setAllProfiles(profiles ?? []);
-  }, [supabase]);
-
-  useEffect(() => { setMounted(true); }, []);
+    setProfilesLoading(false);
+    if (ann) fetchAcks(ann.created_at);
+  }, [supabase, fetchAcks]);
 
   useEffect(() => {
     if (open) {
@@ -46,33 +74,52 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
       setTargetMode('all');
       setSelectedUsers([]);
       setProfileSearch('');
+      setSaveError(null);
+    } else {
+      setAcks([]);
     }
   }, [open, fetchData]);
 
-  const toggleUser = (id: string) => {
-    setSelectedUsers(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
+  // Live ack updates while modal is open
+  useEffect(() => {
+    if (!open || !active) return;
+    const ch = supabase
+      .channel('ann-acks-mgr')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcement_acknowledgments' }, (payload) => {
+        const row = payload.new as any;
+        if (row.announcement_ts === active.created_at) fetchAcks(active.created_at);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcement_acknowledgments' }, (payload) => {
+        const row = payload.new as any;
+        if (row.announcement_ts === active.created_at) fetchAcks(active.created_at);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [open, active?.created_at, supabase, fetchAcks]);
+
+  const toggleUser = (id: string) =>
+    setSelectedUsers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const matchesSearch = (p: Profile) =>
+    !profileSearch || p.name?.toLowerCase().includes(profileSearch.toLowerCase()) || p.role?.toLowerCase().includes(profileSearch.toLowerCase());
+
+  const filteredProfiles = allProfiles.filter(matchesSearch);
+  const allFilteredSelected = filteredProfiles.length > 0 && filteredProfiles.every(p => selectedUsers.includes(p.id));
 
   const toggleAll = () => {
-    const filtered = allProfiles.filter(p => matchesSearch(p));
-    const allSelected = filtered.every(p => selectedUsers.includes(p.id));
-    if (allSelected) {
-      setSelectedUsers(prev => prev.filter(id => !filtered.some(p => p.id === id)));
+    if (allFilteredSelected) {
+      setSelectedUsers(prev => prev.filter(id => !filteredProfiles.some(p => p.id === id)));
     } else {
-      const newIds = filtered.map(p => p.id).filter(id => !selectedUsers.includes(id));
+      const newIds = filteredProfiles.map(p => p.id).filter(id => !selectedUsers.includes(id));
       setSelectedUsers(prev => [...prev, ...newIds]);
     }
   };
-
-  const matchesSearch = (p: any) =>
-    !profileSearch || p.name?.toLowerCase().includes(profileSearch.toLowerCase()) || p.role?.toLowerCase().includes(profileSearch.toLowerCase());
 
   const handleSend = async () => {
     if (!form.title.trim() || !form.message.trim()) return;
     if (targetMode === 'specific' && selectedUsers.length === 0) return;
     setSaving(true);
+    setSaveError(null);
     const payload: Announcement = {
       type: form.type,
       title: form.title.trim(),
@@ -82,8 +129,14 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
       created_by_name: userName,
       target_user_ids: targetMode === 'specific' ? selectedUsers : null,
     };
-    await supabase.from('global_settings').upsert({ key: 'active_announcement', value: payload });
+    const { error } = await supabase.from('global_settings').upsert({ key: 'active_announcement', value: payload });
+    if (error) {
+      setSaveError(error.message);
+      setSaving(false);
+      return;
+    }
     setActive(payload);
+    setAcks([]);
     setForm(EMPTY);
     setTargetMode('all');
     setSelectedUsers([]);
@@ -93,12 +146,19 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
   const handleClear = async () => {
     await supabase.from('global_settings').delete().eq('key', 'active_announcement');
     setActive(null);
+    setAcks([]);
   };
 
   const isMeeting = form.type === 'meeting';
   const canSend = form.title.trim() && form.message.trim() && (targetMode === 'all' || selectedUsers.length > 0);
-  const filteredProfiles = allProfiles.filter(matchesSearch);
-  const allFilteredSelected = filteredProfiles.length > 0 && filteredProfiles.every(p => selectedUsers.includes(p.id));
+
+  // Ack tracking derived data
+  const ackedIds = new Set(acks.map(a => a.user_id));
+  const targetedProfiles = active?.target_user_ids
+    ? allProfiles.filter(p => active.target_user_ids!.includes(p.id))
+    : allProfiles;
+  const pendingProfiles = targetedProfiles.filter(p => !ackedIds.has(p.id));
+  const joinCount = acks.filter(a => a.action === 'joined').length;
 
   return (
     <>
@@ -143,20 +203,21 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
             display: 'flex', flexDirection: 'column',
             flexShrink: 0,
           }}>
-            {/* Fixed header */}
+            {/* Header */}
             <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)' }}>Announcements & Meetings</div>
               <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 3 }}>
-                Send a popup to all staff or specific people — they see it immediately.
+                Send a live pop-up to all staff or specific people — requires acknowledgment.
               </div>
             </div>
 
             {/* Body */}
             <div style={{ padding: '18px 24px' }}>
+
               {/* Active announcement */}
               {active ? (
                 <div style={{
-                  marginBottom: 16, padding: '12px 14px', borderRadius: 10,
+                  marginBottom: 12, padding: '12px 14px', borderRadius: 10,
                   background: active.type === 'meeting' ? 'oklch(0.96 0.04 260)' : 'oklch(0.96 0.04 25)',
                   border: `1.5px solid ${active.type === 'meeting' ? 'oklch(0.84 0.09 260)' : 'oklch(0.84 0.09 25)'}`,
                 }}>
@@ -177,18 +238,6 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                       </div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>{active.title}</div>
                       <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>{active.message}</div>
-                      {active.target_user_ids && (
-                        <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {active.target_user_ids.map(id => {
-                            const p = allProfiles.find(x => x.id === id);
-                            return p ? (
-                              <span key={id} style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'white', border: '1px solid var(--line)', color: 'var(--ink-3)' }}>
-                                {p.name}
-                              </span>
-                            ) : null;
-                          })}
-                        </div>
-                      )}
                     </div>
                     <button onClick={handleClear} style={{
                       flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '5px 12px',
@@ -205,15 +254,110 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                   background: 'var(--surface-2)', border: '1px dashed var(--line)',
                   fontSize: 13, color: 'var(--ink-5)', textAlign: 'center',
                 }}>
-                  No active announcement — all staff see normal view.
+                  No active announcement — staff see normal view.
                 </div>
               )}
 
+              {/* Acknowledgment tracker */}
+              {active && (
+                <div style={{
+                  marginBottom: 16, padding: '12px 14px', borderRadius: 10,
+                  background: 'var(--surface-2)', border: '1px solid var(--line)',
+                }}>
+                  {/* Summary row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: acksLoading || acks.length > 0 || pendingProfiles.length > 0 ? 10 : 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', flex: 1 }}>
+                      RESPONSES
+                    </div>
+                    {acksLoading ? (
+                      <span style={{ fontSize: 11, color: 'var(--ink-5)' }}>Loading…</span>
+                    ) : (
+                      <>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20,
+                          background: acks.length > 0 ? 'oklch(0.92 0.08 155)' : 'white',
+                          color: acks.length > 0 ? 'oklch(0.36 0.14 155)' : 'var(--ink-5)',
+                          border: '1px solid var(--line)',
+                        }}>
+                          {acks.length} / {targetedProfiles.length} responded
+                        </span>
+                        {active.type === 'meeting' && joinCount > 0 && (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20,
+                            background: 'oklch(0.92 0.08 260)', color: 'oklch(0.36 0.18 260)',
+                            border: '1px solid oklch(0.84 0.09 260)',
+                          }}>
+                            {joinCount} joined
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Responded list */}
+                  {acks.length > 0 && (
+                    <div style={{ marginBottom: pendingProfiles.length > 0 ? 8 : 0 }}>
+                      {acks.map(ack => (
+                        <div key={ack.user_id} style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '5px 8px', borderRadius: 7, marginBottom: 3,
+                          background: ack.action === 'joined' ? 'oklch(0.95 0.04 260)' : 'oklch(0.96 0.05 155)',
+                        }}>
+                          <span style={{ fontSize: 13 }}>{ack.action === 'joined' ? '📹' : '✓'}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', flex: 1 }}>
+                            {(ack.profiles as any)?.name ?? 'Unknown'}
+                          </span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10,
+                            background: 'white', border: '1px solid var(--line)',
+                            color: ack.action === 'joined' ? 'oklch(0.36 0.18 260)' : 'oklch(0.36 0.14 155)',
+                          }}>
+                            {ack.action === 'joined' ? 'Joined' : 'Acknowledged'}
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--ink-5)', fontFamily: 'var(--mono)' }}>
+                            {new Date(ack.responded_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pending list */}
+                  {!acksLoading && pendingProfiles.length > 0 && (
+                    <div style={{
+                      padding: '8px 10px', borderRadius: 8,
+                      background: 'white', border: '1px dashed var(--line)',
+                    }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-5)', marginBottom: 6, letterSpacing: '0.06em' }}>
+                        PENDING ({pendingProfiles.length})
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {pendingProfiles.map(p => (
+                          <span key={p.id} style={{
+                            fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 20,
+                            background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink-3)',
+                          }}>
+                            {p.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!acksLoading && acks.length === 0 && targetedProfiles.length === 0 && (
+                    <div style={{ fontSize: 12, color: 'var(--ink-5)', textAlign: 'center', padding: '4px 0' }}>
+                      Loading recipients…
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* New announcement form */}
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 10 }}>
                 {active ? 'REPLACE WITH NEW' : 'NEW ANNOUNCEMENT'}
               </div>
 
-              {/* Type */}
+              {/* Type selector */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 {(['meeting', 'announcement'] as const).map(t => (
                   <button key={t} onClick={() => setForm(p => ({ ...p, type: t }))}
@@ -245,8 +389,8 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                   value={form.message}
                   onChange={e => setForm(p => ({ ...p, message: e.target.value }))}
                   placeholder={isMeeting
-                    ? 'e.g. All staff please join immediately for an urgent discussion.'
-                    : 'e.g. Please review the updated attendance policy effective next week.'}
+                    ? 'e.g. All staff please join immediately.'
+                    : 'e.g. Please review the updated attendance policy.'}
                   style={{ resize: 'vertical' }}
                 />
               </div>
@@ -304,10 +448,15 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                       )}
                     </div>
                     <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                      {filteredProfiles.length === 0 && (
-                        <div style={{ padding: '18px', textAlign: 'center', fontSize: 12, color: 'var(--ink-5)' }}>No matches</div>
-                      )}
-                      {filteredProfiles.map((p, i) => {
+                      {profilesLoading ? (
+                        <div style={{ padding: '18px', textAlign: 'center', fontSize: 12, color: 'var(--ink-5)' }}>
+                          Loading staff…
+                        </div>
+                      ) : filteredProfiles.length === 0 ? (
+                        <div style={{ padding: '18px', textAlign: 'center', fontSize: 12, color: 'var(--ink-5)' }}>
+                          {profileSearch ? 'No matches' : 'No staff found'}
+                        </div>
+                      ) : filteredProfiles.map((p, i) => {
                         const checked = selectedUsers.includes(p.id);
                         return (
                           <label key={p.id}
@@ -339,9 +488,19 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                 )}
               </div>
 
+              {saveError && (
+                <div style={{
+                  marginTop: 12, padding: '10px 14px', borderRadius: 8,
+                  background: 'oklch(0.96 0.04 25)', border: '1px solid oklch(0.84 0.09 25)',
+                  fontSize: 12, color: 'oklch(0.40 0.20 25)', fontWeight: 500,
+                }}>
+                  ⚠ Failed to send: {saveError}
+                </div>
+              )}
+
             </div>
 
-            {/* Fixed footer */}
+            {/* Footer */}
             <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', flexShrink: 0, display: 'flex', gap: 8, background: 'white' }}>
               <button
                 onClick={handleSend}
