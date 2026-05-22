@@ -121,8 +121,22 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
       </button>
 
       {open && (
-        <div className="mb" onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="md" style={{ width: 580, maxHeight: '90vh', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div
+          onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'oklch(0.20 0.02 265 / 0.50)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}>
+          <div style={{
+            width: 580, maxWidth: '100%',
+            height: 'min(90vh, 680px)',
+            background: 'white', borderRadius: 14,
+            boxShadow: 'var(--sh-pop)', border: '1px solid var(--line)',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
             {/* Fixed header */}
             <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)' }}>Announcements & Meetings</div>
