@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { createClient } from '@/utils/supabase/client';
 
 type Announcement = {
   type: 'meeting' | 'announcement';
@@ -35,7 +34,6 @@ async function annApi(body: object): Promise<{ ok?: boolean; data?: any; error?:
 }
 
 export default function AnnouncementManager({ userName, initialProfiles }: { userName: string; initialProfiles: Profile[] }) {
-  const supabase = useRef(createClient()).current;
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<Announcement | null>(null);
@@ -59,15 +57,15 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
   }, []);
 
   const fetchActive = useCallback(async () => {
-    const { data: setting } = await supabase
-      .from('global_settings')
-      .select('value')
-      .eq('key', 'active_announcement')
-      .maybeSingle();
-    const ann = setting?.value ? (setting.value as Announcement) : null;
-    setActive(ann);
-    if (ann) fetchAcks(ann.created_at);
-  }, [supabase, fetchAcks]);
+    try {
+      const res = await fetch('/api/ann', { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json();
+      const ann = json.active ?? null;
+      setActive(ann);
+      if (ann) fetchAcks(ann.created_at);
+    } catch { /* ignore network errors */ }
+  }, [fetchAcks]);
 
   useEffect(() => {
     if (open) {
@@ -82,17 +80,12 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
     }
   }, [open, fetchActive]);
 
-  // Live ack updates while modal is open
+  // Poll for new acks every 5s while modal is open
   useEffect(() => {
     if (!open || !active) return;
-    const ch = supabase
-      .channel('ann-acks-mgr')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcement_acknowledgments' }, () => {
-        fetchAcks(active.created_at);
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [open, active?.created_at, supabase, fetchAcks]);
+    const timer = setInterval(() => fetchAcks(active.created_at), 5_000);
+    return () => clearInterval(timer);
+  }, [open, active?.created_at, fetchAcks]);
 
   const toggleUser = (id: string) =>
     setSelectedUsers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
