@@ -70,7 +70,7 @@ export async function getAcknowledgments(announcementTs: string) {
     .select('user_id, action, responded_at, profiles(name)')
     .eq('announcement_ts', announcementTs)
     .order('responded_at');
-  return (data ?? []) as Array<{
+  return (data ?? []) as unknown as Array<{
     user_id: string;
     action: 'acknowledged' | 'joined';
     responded_at: string;

@@ -15,7 +15,7 @@ type Announcement = {
   message: string;
   meeting_link?: string;
   created_at: string;
-  created_by_name?: string;
+  created_by_name: string;
   target_user_ids: string[] | null;
 };
 
@@ -131,7 +131,7 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
       message: form.message.trim(),
       ...(form.type === 'meeting' && form.meeting_link.trim() ? { meeting_link: form.meeting_link.trim() } : {}),
       created_at: new Date().toISOString(),
-      created_by_name: userName,
+      created_by_name: userName || '',
       target_user_ids: targetMode === 'specific' ? selectedUsers : null,
     };
     try {
