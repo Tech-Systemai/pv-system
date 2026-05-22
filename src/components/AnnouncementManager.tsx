@@ -127,15 +127,18 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
             position: 'fixed', inset: 0, zIndex: 9999,
             background: 'oklch(0.20 0.02 265 / 0.50)',
             backdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflowY: 'auto',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
             padding: 20,
           }}>
           <div style={{
             width: 580, maxWidth: '100%',
-            height: 'min(90vh, 680px)',
+            margin: 'auto',
             background: 'white', borderRadius: 14,
             boxShadow: 'var(--sh-pop)', border: '1px solid var(--line)',
-            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
+            maxHeight: 'calc(100vh - 40px)', overflow: 'hidden',
+            flexShrink: 0,
           }}>
             {/* Fixed header */}
             <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
