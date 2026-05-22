@@ -79,6 +79,8 @@ export default function CXClient({
   const [showAddCol,    setShowAddCol]    = useState(false);
   const [showHoldInput, setShowHoldInput] = useState(false);
   const [holdInputText, setHoldInputText] = useState('');
+  const [reassigningCaseId, setReassigningCaseId] = useState<number | null>(null);
+  const [reassignValue, setReassignValue] = useState('');
 
   const [form,      setForm]      = useState({ ...EMPTY_FORM });
   const [updateText, setUpdateText] = useState('');
@@ -86,8 +88,9 @@ export default function CXClient({
   const [savingCase,   setSavingCase]   = useState(false);
   const updateRef = useRef<HTMLTextAreaElement>(null);
 
-  const isMgmt  = ['owner', 'admin', 'supervisor'].includes(userRole);
-  const isOwner = userRole === 'owner';
+  const isMgmt         = ['owner', 'admin', 'supervisor'].includes(userRole);
+  const isOwner        = userRole === 'owner';
+  const isAdminOrOwner = isOwner || userRole === 'admin';
   const today   = todayStr();
 
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));
@@ -187,6 +190,22 @@ export default function CXClient({
     setUpdateText('');
     setSavingUpdate(false);
   }, [updateText, selectedCase, today, currentUserId]);
+
+  const handleClaimCase = async (c: any) => {
+    const payload = { assigned_to: currentUserId, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: c.id });
+    setCases(prev => prev.map(x => x.id === c.id ? { ...x, ...payload } : x));
+    if (selectedCase?.id === c.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
+  const handleReassignCase = async (c: any, newUserId: string) => {
+    const payload = { assigned_to: newUserId || null, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: c.id });
+    setCases(prev => prev.map(x => x.id === c.id ? { ...x, ...payload } : x));
+    if (selectedCase?.id === c.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
+    setReassigningCaseId(null);
+    setReassignValue('');
+  };
 
   const handleToggleNoUpdate = async (c: any) => {
     const newVal = !c.no_update_needed;
@@ -369,6 +388,43 @@ export default function CXClient({
                   {updateDue && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.94 0.06 80)', color: 'oklch(0.40 0.18 80)' }}>⚠ UPDATE DUE</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>{c.phone}</div>
+                {reassigningCaseId === c.id ? (
+                  <div onClick={e => e.stopPropagation()} style={{ marginTop: 6, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select value={reassignValue} onChange={e => setReassignValue(e.target.value)}
+                      style={{ fontSize: 11, height: 26, borderRadius: 6, border: '1px solid var(--line)', padding: '0 6px', color: 'var(--ink)' }}>
+                      <option value="">Unassigned</option>
+                      {allProfiles.filter((p: any) => ['cx','owner','admin','supervisor'].includes(p.role)).map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <button onClick={() => handleReassignCase(c, reassignValue)}
+                      style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'var(--accent)', color: 'white', border: 'none', cursor: 'pointer' }}>
+                      Assign
+                    </button>
+                    <button onClick={() => { setReassigningCaseId(null); setReassignValue(''); }}
+                      style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'none', border: '1px solid var(--line)', cursor: 'pointer', color: 'var(--ink-4)' }}>
+                      ✕
+                    </button>
+                  </div>
+                ) : c.assigned_to ? (
+                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-5)' }}>AGENT</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'oklch(0.94 0.05 260)', color: 'oklch(0.38 0.15 260)', border: '1px solid oklch(0.88 0.06 260)' }}>
+                      {nameMap[c.assigned_to] ?? 'Unknown'}
+                    </span>
+                    {isAdminOrOwner && (
+                      <button onClick={e => { e.stopPropagation(); setReassigningCaseId(c.id); setReassignValue(c.assigned_to ?? ''); }}
+                        style={{ fontSize: 10, background: 'none', border: '1px solid var(--line)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer', color: 'var(--ink-4)' }}>
+                        Reassign
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button onClick={e => { e.stopPropagation(); handleClaimCase(c); }}
+                    style={{ marginTop: 6, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'oklch(0.96 0.04 260)', color: 'oklch(0.38 0.16 260)', border: '1.5px dashed oklch(0.75 0.10 260)', cursor: 'pointer' }}>
+                    + Claim Customer Case
+                  </button>
+                )}
               </div>
             </div>
             <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -502,7 +558,7 @@ export default function CXClient({
 
   /* ── Case detail modal ──────────────────────────────────────── */
   const detailModal = selectedCase && (
-    <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setSelectedCase(null); setShowHoldInput(false); } }}>
+    <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); } }}>
       <div className="md" style={{ width: 820, maxHeight: '95vh', overflowY: 'auto', padding: 0 }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
@@ -515,13 +571,53 @@ export default function CXClient({
               <span>📞 {selectedCase.phone}</span>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: 'var(--surface-2)', border: '1px solid var(--line)' }}>{selectedCase.pipeline_stage}</span>
             </div>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {reassigningCaseId === selectedCase.id ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <select value={reassignValue} onChange={e => setReassignValue(e.target.value)}
+                    style={{ fontSize: 12, height: 28, borderRadius: 6, border: '1px solid var(--line)', padding: '0 8px', color: 'var(--ink)' }}>
+                    <option value="">Unassigned</option>
+                    {allProfiles.filter((p: any) => ['cx','owner','admin','supervisor'].includes(p.role)).map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <button className="btn btn-acc btn-sm" onClick={() => handleReassignCase(selectedCase, reassignValue)}>Assign</button>
+                  <button className="btn btn-sec btn-sm" onClick={() => { setReassigningCaseId(null); setReassignValue(''); }}>Cancel</button>
+                </div>
+              ) : selectedCase.assigned_to ? (
+                <>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-5)' }}>Agent:</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: 'oklch(0.94 0.05 260)', color: 'oklch(0.38 0.15 260)', border: '1px solid oklch(0.88 0.06 260)' }}>
+                    {nameMap[selectedCase.assigned_to] ?? 'Unknown'}
+                  </span>
+                  {isAdminOrOwner && (
+                    <button className="btn btn-sec btn-sm" onClick={() => { setReassigningCaseId(selectedCase.id); setReassignValue(selectedCase.assigned_to ?? ''); }}>
+                      Reassign
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: 11, color: 'var(--ink-5)' }}>Unassigned</span>
+                  <button className="btn btn-sm" style={{ background: 'oklch(0.94 0.05 260)', color: 'oklch(0.38 0.15 260)', border: '1px solid oklch(0.88 0.06 260)' }}
+                    onClick={() => handleClaimCase(selectedCase)}>
+                    Claim Customer Case
+                  </button>
+                  {isAdminOrOwner && (
+                    <button className="btn btn-sec btn-sm" onClick={() => { setReassigningCaseId(selectedCase.id); setReassignValue(''); }}>
+                      Assign to agent
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
             <div style={{ padding: '4px 12px', borderRadius: 8, border: `1.5px solid ${sColor(selectedCase.status)}`, background: sBg(selectedCase.status, 0.08), fontSize: 11, fontWeight: 700, color: sColor(selectedCase.status) }}>
               CURRENT STATUS<br />
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{selectedCase.status}</span>
             </div>
-            <button onClick={() => { setSelectedCase(null); setShowHoldInput(false); }} style={{ background: 'none', border: 'none', color: 'var(--ink-4)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>✕</button>
+            <button onClick={() => { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); }} style={{ background: 'none', border: 'none', color: 'var(--ink-4)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>✕</button>
           </div>
         </div>
 
@@ -648,7 +744,7 @@ export default function CXClient({
           )}
           {isMgmt && <button className="btn btn-sec btn-sm" onClick={() => { openEdit(selectedCase); setSelectedCase(null); }}>Edit case</button>}
           {isMgmt && <button className="btn btn-sm" style={{ color: 'var(--err)', background: 'var(--surface-2)', border: '1px solid var(--line)' }} onClick={() => handleDeleteCase(selectedCase.id)}>Delete</button>}
-          <button className="btn btn-acc btn-sm" style={{ marginLeft: 'auto' }} onClick={() => { setSelectedCase(null); setShowHoldInput(false); }}>Done</button>
+          <button className="btn btn-acc btn-sm" style={{ marginLeft: 'auto' }} onClick={() => { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); }}>Done</button>
         </div>
       </div>
 
