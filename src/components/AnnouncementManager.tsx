@@ -122,19 +122,21 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
 
       {open && (
         <div className="mb" onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}>
-          <div className="md" style={{ width: 580, maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-            <div style={{ padding: '22px 26px 18px', borderBottom: '1px solid var(--line)' }}>
+          <div className="md" style={{ width: 580, maxHeight: '90vh', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Fixed header */}
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)' }}>Announcements & Meetings</div>
               <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 3 }}>
                 Send a popup to all staff or specific people — they see it immediately.
               </div>
             </div>
 
-            <div style={{ padding: '20px 26px 26px' }}>
+            {/* Scrollable body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px' }}>
               {/* Active announcement */}
               {active ? (
                 <div style={{
-                  marginBottom: 24, padding: '14px 16px', borderRadius: 12,
+                  marginBottom: 16, padding: '12px 14px', borderRadius: 10,
                   background: active.type === 'meeting' ? 'oklch(0.96 0.04 260)' : 'oklch(0.96 0.04 25)',
                   border: `1.5px solid ${active.type === 'meeting' ? 'oklch(0.84 0.09 260)' : 'oklch(0.84 0.09 25)'}`,
                 }}>
@@ -179,7 +181,7 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                 </div>
               ) : (
                 <div style={{
-                  marginBottom: 24, padding: '12px 16px', borderRadius: 10,
+                  marginBottom: 16, padding: '10px 14px', borderRadius: 10,
                   background: 'var(--surface-2)', border: '1px dashed var(--line)',
                   fontSize: 13, color: 'var(--ink-5)', textAlign: 'center',
                 }}>
@@ -187,12 +189,12 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                 </div>
               )}
 
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 10 }}>
                 {active ? 'REPLACE WITH NEW' : 'NEW ANNOUNCEMENT'}
               </div>
 
               {/* Type */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 {(['meeting', 'announcement'] as const).map(t => (
                   <button key={t} onClick={() => setForm(p => ({ ...p, type: t }))}
                     style={{
@@ -241,11 +243,11 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
               )}
 
               {/* Audience */}
-              <div style={{ marginBottom: 18 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 10 }}>
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 8 }}>
                   SEND TO
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   {(['all', 'specific'] as const).map(m => (
                     <button key={m} onClick={() => setTargetMode(m)}
                       style={{
@@ -317,26 +319,28 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={handleSend}
-                  disabled={saving || !canSend}
-                  style={{
-                    flex: 1, padding: '11px 20px', borderRadius: 10, border: 'none',
-                    background: isMeeting
-                      ? 'linear-gradient(135deg, oklch(0.48 0.22 260), oklch(0.44 0.24 280))'
-                      : 'linear-gradient(135deg, oklch(0.48 0.22 25), oklch(0.44 0.24 10))',
-                    color: 'white', fontWeight: 700, fontSize: 13,
-                    cursor: saving || !canSend ? 'not-allowed' : 'pointer',
-                    opacity: saving || !canSend ? 0.55 : 1,
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.14)',
-                  }}>
-                  {saving ? 'Sending…' : targetMode === 'all'
-                    ? `Send ${isMeeting ? 'Meeting Alert' : 'Announcement'} to Everyone`
-                    : `Send to ${selectedUsers.length} Person${selectedUsers.length !== 1 ? 's' : ''}`}
-                </button>
-                <button className="btn btn-sec" onClick={() => setOpen(false)}>Cancel</button>
-              </div>
+            </div>
+
+            {/* Fixed footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', flexShrink: 0, display: 'flex', gap: 8, background: 'white' }}>
+              <button
+                onClick={handleSend}
+                disabled={saving || !canSend}
+                style={{
+                  flex: 1, padding: '11px 20px', borderRadius: 10, border: 'none',
+                  background: isMeeting
+                    ? 'linear-gradient(135deg, oklch(0.48 0.22 260), oklch(0.44 0.24 280))'
+                    : 'linear-gradient(135deg, oklch(0.48 0.22 25), oklch(0.44 0.24 10))',
+                  color: 'white', fontWeight: 700, fontSize: 13,
+                  cursor: saving || !canSend ? 'not-allowed' : 'pointer',
+                  opacity: saving || !canSend ? 0.55 : 1,
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.14)',
+                }}>
+                {saving ? 'Sending…' : targetMode === 'all'
+                  ? `Send ${isMeeting ? 'Meeting Alert' : 'Announcement'} to Everyone`
+                  : `Send to ${selectedUsers.length} Person${selectedUsers.length !== 1 ? 's' : ''}`}
+              </button>
+              <button className="btn btn-sec" onClick={() => setOpen(false)}>Cancel</button>
             </div>
           </div>
         </div>
