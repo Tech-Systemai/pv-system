@@ -6,7 +6,6 @@ import { createClient } from '@/utils/supabase/client';
 import {
   saveAnnouncement,
   clearAnnouncement,
-  getProfiles,
   getAcknowledgments,
 } from '@/app/actions/announcements';
 
@@ -31,12 +30,12 @@ type AckRecord = {
 
 const EMPTY = { type: 'meeting' as 'meeting' | 'announcement', title: '', message: '', meeting_link: '' };
 
-export default function AnnouncementManager({ userName }: { userName: string }) {
+export default function AnnouncementManager({ userName, initialProfiles }: { userName: string; initialProfiles: Profile[] }) {
   const supabase = useRef(createClient()).current;
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<Announcement | null>(null);
-  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+  const [allProfiles, setAllProfiles] = useState<Profile[]>(initialProfiles);
   const [profilesLoading, setProfilesLoading] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [targetMode, setTargetMode] = useState<'all' | 'specific'>('all');
@@ -59,9 +58,7 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
   }, []);
 
   const fetchData = useCallback(async () => {
-    setProfilesLoading(true);
     try {
-      // Use browser client only for reading global_settings (public SELECT policy)
       const { data: setting } = await supabase
         .from('global_settings')
         .select('value')
@@ -69,14 +66,10 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
         .maybeSingle();
       const ann = setting?.value ? (setting.value as Announcement) : null;
       setActive(ann);
-      // Use server action for profiles (bypasses any RLS auth issues)
-      const profiles = await getProfiles();
-      setAllProfiles(profiles);
       if (ann) fetchAcks(ann.created_at);
     } catch (e: any) {
       setSaveError(e?.message ?? 'Failed to load data');
     }
-    setProfilesLoading(false);
   }, [supabase, fetchAcks]);
 
   useEffect(() => {

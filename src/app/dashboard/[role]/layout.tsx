@@ -27,9 +27,10 @@ export default async function DashboardLayout({
   }
 
   const admin = createAdminClient();
-  const [{ data: profile, error: profileError }, matrix] = await Promise.all([
+  const [{ data: profile, error: profileError }, matrix, { data: allProfiles }] = await Promise.all([
     admin.from('profiles').select('role, name, username, email, contract_url, id_document_url').eq('id', user.id).single(),
     getPermMatrix(),
+    admin.from('profiles').select('id, name, role').order('name'),
   ]);
 
   // If profile is missing, auto-create it so the user isn't stuck
@@ -106,7 +107,7 @@ export default async function DashboardLayout({
 
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <TopBarClock />
-              {isManagement && <AnnouncementManager userName={profile?.name ?? ''} />}
+              {isManagement && <AnnouncementManager userName={profile?.name ?? ''} initialProfiles={allProfiles ?? []} />}
               {isManagement && <PortalSwitcher currentRole={urlRole} />}
 <NotificationBell userId={user.id} userRole={effectiveRole} />
               <ProfileButton
