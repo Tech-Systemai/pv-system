@@ -126,26 +126,34 @@ export default function AnnouncementManager({ userName, initialProfiles }: { use
       created_by_name: userName,
       target_user_ids: targetMode === 'specific' ? selectedUsers : null,
     };
-    const result = await annApi({ action: 'save', payload });
-    if (result.error) {
-      setSaveError(result.error);
-    } else {
-      setActive(payload);
-      setAcks([]);
-      setForm(EMPTY);
-      setTargetMode('all');
-      setSelectedUsers([]);
+    try {
+      const result = await annApi({ action: 'save', payload });
+      if (result.error) {
+        setSaveError(result.error);
+      } else {
+        await fetchActive();
+        setAcks([]);
+        setForm(EMPTY);
+        setTargetMode('all');
+        setSelectedUsers([]);
+      }
+    } catch (err: any) {
+      setSaveError(err?.message ?? 'Network error — could not reach server');
     }
     setSaving(false);
   };
 
   const handleClear = async () => {
-    const result = await annApi({ action: 'clear' });
-    if (result.error) {
-      setSaveError(result.error);
-    } else {
-      setActive(null);
-      setAcks([]);
+    try {
+      const result = await annApi({ action: 'clear' });
+      if (result.error) {
+        setSaveError(result.error);
+      } else {
+        setActive(null);
+        setAcks([]);
+      }
+    } catch (err: any) {
+      setSaveError(err?.message ?? 'Network error — could not reach server');
     }
   };
 
