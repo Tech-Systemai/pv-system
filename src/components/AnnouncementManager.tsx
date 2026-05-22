@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { createClient } from '@/utils/supabase/client';
 
 type Announcement = {
@@ -17,6 +18,7 @@ const EMPTY = { type: 'meeting' as 'meeting' | 'announcement', title: '', messag
 
 export default function AnnouncementManager({ userName }: { userName: string }) {
   const supabase = useRef(createClient()).current;
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<Announcement | null>(null);
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
@@ -34,6 +36,8 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
     setActive(setting?.value ? (setting.value as Announcement) : null);
     setAllProfiles(profiles ?? []);
   }, [supabase]);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (open) {
@@ -120,7 +124,7 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
         )}
       </button>
 
-      {open && (
+      {mounted && open && createPortal(
         <div
           onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
           style={{
@@ -129,15 +133,14 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
             backdropFilter: 'blur(6px)',
             overflowY: 'auto',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: 20,
+            padding: '32px 20px',
           }}>
           <div style={{
             width: 580, maxWidth: '100%',
-            margin: 'auto',
+            margin: '0 auto',
             background: 'white', borderRadius: 14,
             boxShadow: 'var(--sh-pop)', border: '1px solid var(--line)',
             display: 'flex', flexDirection: 'column',
-            maxHeight: 'calc(100vh - 40px)', overflow: 'hidden',
             flexShrink: 0,
           }}>
             {/* Fixed header */}
@@ -148,8 +151,8 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
               </div>
             </div>
 
-            {/* Scrollable body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px' }}>
+            {/* Body */}
+            <div style={{ padding: '18px 24px' }}>
               {/* Active announcement */}
               {active ? (
                 <div style={{
@@ -360,7 +363,8 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
               <button className="btn btn-sec" onClick={() => setOpen(false)}>Cancel</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
