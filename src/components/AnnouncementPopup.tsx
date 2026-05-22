@@ -10,11 +10,12 @@ type Announcement = {
   meeting_link?: string;
   created_at: string;
   created_by_name?: string;
+  target_user_ids: string[] | null;
 };
 
 const ACK_KEY = (ts: string) => `pv_ann_ack_${ts}`;
 
-export default function AnnouncementPopup() {
+export default function AnnouncementPopup({ userId }: { userId: string }) {
   const supabase = useRef(createClient()).current;
   const [ann, setAnn] = useState<Announcement | null>(null);
 
@@ -22,13 +23,14 @@ export default function AnnouncementPopup() {
     if (!val) { setAnn(null); return; }
     const a = val as Announcement;
     if (localStorage.getItem(ACK_KEY(a.created_at))) return;
+    if (a.target_user_ids && !a.target_user_ids.includes(userId)) return;
     setAnn(a);
   };
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
 
-    const fetch = async () => {
+    const load = async () => {
       const { data } = await supabase
         .from('global_settings')
         .select('value')
@@ -37,8 +39,8 @@ export default function AnnouncementPopup() {
       apply(data?.value ?? null);
     };
 
-    fetch();
-    timer = setInterval(fetch, 30_000);
+    load();
+    timer = setInterval(load, 30_000);
 
     const ch = supabase
       .channel('ann-popup')
@@ -50,7 +52,7 @@ export default function AnnouncementPopup() {
       .subscribe();
 
     return () => { clearInterval(timer); supabase.removeChannel(ch); };
-  }, [supabase]);
+  }, [supabase, userId]);
 
   const dismiss = () => {
     if (ann) localStorage.setItem(ACK_KEY(ann.created_at), '1');

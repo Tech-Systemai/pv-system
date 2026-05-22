@@ -84,7 +84,7 @@ export default async function DashboardLayout({
   return (
     <div className="pv">
       <DailyUpdatePrompt userId={user.id} />
-      <AnnouncementPopup />
+      <AnnouncementPopup userId={user.id} />
       <div className="pv-grid">
         <Sidebar role={urlRole} allowedModules={allowedModules} userName={profile?.name ?? ''} />
 
