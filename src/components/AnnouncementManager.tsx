@@ -124,7 +124,7 @@ export default function AnnouncementManager({ userName }: { userName: string }) 
         <div
           onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}
           style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
+            position: 'fixed', inset: 0, zIndex: 99999,
             background: 'oklch(0.20 0.02 265 / 0.50)',
             backdropFilter: 'blur(6px)',
             overflowY: 'auto',
