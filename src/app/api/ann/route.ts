@@ -45,6 +45,21 @@ export async function POST(req: NextRequest) {
         .from('global_settings')
         .upsert({ key: 'active_announcement', value: body.payload });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      try {
+        const p = body.payload;
+        await admin().from('activity_log').insert({
+          user_name: p.created_by_name ?? 'Management',
+          module: 'announcements',
+          action: 'sent',
+          description: `Sent ${p.type === 'meeting' ? 'meeting alert' : 'announcement'}: "${p.title}"`,
+          metadata: {
+            type: p.type,
+            to: p.target_user_ids ? `${p.target_user_ids.length} specific user(s)` : 'All staff',
+            message: p.message?.slice(0, 300),
+            ...(p.meeting_link ? { link: p.meeting_link } : {}),
+          },
+        });
+      } catch { /* never block */ }
       return NextResponse.json({ ok: true });
     }
 
@@ -54,6 +69,15 @@ export async function POST(req: NextRequest) {
         .delete()
         .eq('key', 'active_announcement');
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      try {
+        await admin().from('activity_log').insert({
+          user_name: 'Management',
+          module: 'announcements',
+          action: 'cleared',
+          description: 'Cleared active announcement',
+          metadata: {},
+        });
+      } catch { /* never block */ }
       return NextResponse.json({ ok: true });
     }
 

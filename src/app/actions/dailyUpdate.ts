@@ -73,5 +73,19 @@ export async function submitDailyUpdate(
   if (error && !error.message.toLowerCase().includes('duplicate') && !error.message.toLowerCase().includes('unique')) {
     return { error: error.message };
   }
+
+  try {
+    const { data: prof } = await admin.from('profiles').select('name').eq('id', userId).single();
+    const labels: Record<string, string> = { start: 'Start of Shift', midday: 'Mid-Shift Check-in', end: 'End of Shift' };
+    await admin.from('activity_log').insert({
+      user_id: userId,
+      user_name: (prof as any)?.name ?? 'Employee',
+      module: 'daily-updates',
+      action: 'submitted',
+      description: `Submitted ${labels[prompt] ?? prompt} daily update`,
+      metadata: { prompt, date: localDate, preview: answer.slice(0, 300) },
+    });
+  } catch { /* never block main operation */ }
+
   return { success: true };
 }
