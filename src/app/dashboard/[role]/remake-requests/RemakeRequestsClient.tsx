@@ -245,6 +245,7 @@ export default function RemakeRequestsClient({
     ];
     const { data, error } = await dbOp('remake_requests', 'insert', {
       ...newForm,
+      delivered_date: newForm.delivered_date || null,
       submitted_by: currentUserId,
       submitted_by_name: currentUserName,
       status: 'pending_review',
