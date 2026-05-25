@@ -16,6 +16,8 @@ type RemakeRequest = {
   original_case_id: string | null;
   delivered_date: string | null;
   reason_category: string;
+  veneer_set: string | null;
+  veneer_shade: string | null;
   complaint: string;
   status: RemakeStatus;
   submitted_by: string | null;
@@ -64,6 +66,9 @@ const REASON_CATEGORIES = [
   'Sizing issue',
   'Other',
 ];
+
+const VENEER_SETS   = ['Full set', 'Top only', 'Bottom only'];
+const VENEER_SHADES = ['Natural white', 'Super white'];
 
 const PHOTO_TYPES = ['FRONT', 'CLOSEUP', 'SIDE', 'LEFT', 'BITE', 'GUM'];
 
@@ -158,8 +163,10 @@ export default function RemakeRequestsClient({
   // New request form (CX)
   const [showNew, setShowNew] = useState(false);
   const [newForm, setNewForm] = useState({
-    patient_name: '', phone: '', original_case_id: '', delivered_date: '',
-    reason_category: REASON_CATEGORIES[0], complaint: '',
+    patient_name: '', phone: '', delivered_date: '',
+    reason_category: REASON_CATEGORIES[0],
+    veneer_set: VENEER_SETS[0], veneer_shade: VENEER_SHADES[0],
+    complaint: '',
   });
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [newPhotoTypes, setNewPhotoTypes] = useState<string[]>([]);
@@ -526,10 +533,18 @@ export default function RemakeRequestsClient({
                 <input type="text" placeholder="603-857-0010" value={newForm.phone} onChange={e => setNewForm(f => ({ ...f, phone: e.target.value }))} />
               </div>
               <div className="pv-fld" style={{ margin: 0 }}>
-                <label>Original Case ID</label>
-                <input type="text" placeholder="CASE-4471" value={newForm.original_case_id} onChange={e => setNewForm(f => ({ ...f, original_case_id: e.target.value }))} />
+                <label>Veneer Set</label>
+                <select value={newForm.veneer_set} onChange={e => setNewForm(f => ({ ...f, veneer_set: e.target.value }))}>
+                  {VENEER_SETS.map(s => <option key={s}>{s}</option>)}
+                </select>
               </div>
               <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Veneer Shade</label>
+                <select value={newForm.veneer_shade} onChange={e => setNewForm(f => ({ ...f, veneer_shade: e.target.value }))}>
+                  {VENEER_SHADES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="pv-fld" style={{ margin: 0, gridColumn: '1 / -1' }}>
                 <label>Reason Category</label>
                 <select value={newForm.reason_category} onChange={e => setNewForm(f => ({ ...f, reason_category: e.target.value }))}>
                   {REASON_CATEGORIES.map(r => <option key={r}>{r}</option>)}
@@ -582,7 +597,7 @@ export default function RemakeRequestsClient({
               Submit will queue this remake for dentist review. Customer is not yet notified.
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-sec" onClick={() => { setShowNew(false); setNewFiles([]); setNewPhotoTypes([]); setNewForm({ patient_name: '', phone: '', original_case_id: '', delivered_date: '', reason_category: REASON_CATEGORIES[0], complaint: '' }); }}>
+              <button className="btn btn-sec" onClick={() => { setShowNew(false); setNewFiles([]); setNewPhotoTypes([]); setNewForm({ patient_name: '', phone: '', delivered_date: '', reason_category: REASON_CATEGORIES[0], veneer_set: VENEER_SETS[0], veneer_shade: VENEER_SHADES[0], complaint: '' }); }}>
                 Cancel
               </button>
               <button className="btn btn-acc" disabled={!newForm.patient_name || !newForm.complaint || newFiles.length === 0 || busy} onClick={submitNew}>
@@ -659,7 +674,8 @@ function DetailView({
         {/* Meta */}
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: 'var(--ink-3)', marginBottom: 22 }}>
           {request.phone && <span>{request.phone}</span>}
-          {request.original_case_id && <span>Original case <strong style={{ color: 'var(--ink)' }}>{request.original_case_id}</strong></span>}
+          {request.veneer_set && <span>Set: <strong style={{ color: 'var(--ink)' }}>{request.veneer_set}</strong></span>}
+          {request.veneer_shade && <span>Shade: <strong style={{ color: 'var(--ink)' }}>{request.veneer_shade}</strong></span>}
           {request.delivered_date && <span>Delivered {new Date(request.delivered_date).toLocaleDateString()}</span>}
           {request.submitted_by_name && <span>Submitted by <strong style={{ color: 'var(--ink)' }}>{request.submitted_by_name}</strong></span>}
         </div>
