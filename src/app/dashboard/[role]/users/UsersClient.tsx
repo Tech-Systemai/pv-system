@@ -319,6 +319,7 @@ export default function UsersClient({
                   <option value="supervisor">Supervisor</option>
                   <option value="admin">Admin</option>
                   <option value="accountant">Accountant</option>
+                  <option value="dentist">Dentist</option>
                 </select>
               </div>
               <div className="pv-fld"><label>Department</label><input type="text" name="department" placeholder="e.g. Sales Team A" /></div>
@@ -503,6 +504,7 @@ export default function UsersClient({
                   <option value="supervisor">Supervisor</option>
                   <option value="admin">Admin</option>
                   <option value="accountant">Accountant</option>
+                  <option value="dentist">Dentist</option>
                   <option value="owner">Owner</option>
                 </select>
               </div>

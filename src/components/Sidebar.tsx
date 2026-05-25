@@ -581,6 +581,7 @@ export default function Sidebar({
               <option value="accountant">Accountant View</option>
               <option value="sales">Sales View</option>
               <option value="cx">CX View</option>
+              <option value="dentist">Dentist View</option>
             </select>
           </div>
         )}

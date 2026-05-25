@@ -8,6 +8,7 @@ export default function PortalSwitcher({ currentRole }: { currentRole: string })
     { id: 'sales', label: 'Sales Agent' },
     { id: 'cx', label: 'CX Agent' },
     { id: 'accountant', label: 'Finance/Accountant' },
+    { id: 'dentist', label: 'Dentist' },
   ];
 
   return (
