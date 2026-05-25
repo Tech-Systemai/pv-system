@@ -258,7 +258,7 @@ export default function RemakeRequestsClient({
     setPhotos(prev => [...prev, ...added]);
     setShowNew(false);
     setNewFiles([]); setNewPhotoTypes([]);
-    setNewForm({ patient_name: '', phone: '', original_case_id: '', delivered_date: '', reason_category: REASON_CATEGORIES[0], complaint: '' });
+    setNewForm({ patient_name: '', phone: '', delivered_date: '', reason_category: REASON_CATEGORIES[0], veneer_set: VENEER_SETS[0], veneer_shade: VENEER_SHADES[0], complaint: '' });
     setBusy(false);
   };
 
