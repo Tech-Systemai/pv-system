@@ -11,6 +11,7 @@ const ALLOWED_TABLES = [
   'fim_fault_codes', 'fim_sops', 'daily_task_responses',
   'impression_kits', 'impression_kit_photos',
   'remake_requests', 'remake_photos',
+  'condition_approvals',
 ];
 
 export async function POST(req: NextRequest) {
