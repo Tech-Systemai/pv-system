@@ -29,7 +29,7 @@ export default async function ApprovalsPage() {
     admin.from('schedules').select('*, profiles!schedules_user_id_fkey(name, role)').eq('status', 'Pending'),
     admin.from('payrolls').select('*, profiles!payrolls_user_id_fkey(name)').eq('status', 'Pending'),
     admin.from('inbox_documents').select('*, profiles!inbox_documents_user_id_fkey(name)').eq('approval_status', 'pending').order('created_at', { ascending: false }),
-    admin.from('profiles').select('id, username, name, role, department, created_at').eq('status', 'Pending').order('created_at', { ascending: false }),
+    admin.from('profiles').select('id, username, email, name, role, department, created_at').eq('status', 'Pending').order('created_at', { ascending: false }),
     admin.from('sales_logs').select('*, profiles!sales_logs_user_id_fkey(name)').eq('type', 'Collection').eq('status', 'Pending').order('created_at', { ascending: false }),
   ]);
 

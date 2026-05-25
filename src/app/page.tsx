@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { requestAccess } from './signup-action';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,8 +34,8 @@ export default function LoginPage() {
     setMsg(null);
 
     if (tab === 'register') {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) setMsg({ text: error.message, type: 'error' });
+      const result = await requestAccess(email, password);
+      if (result.error) setMsg({ text: result.error, type: 'error' });
       else setMsg({ text: 'Request submitted. An admin will review your account.', type: 'success' });
     } else {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -46,14 +47,14 @@ export default function LoginPage() {
           .select('role, status')
           .eq('id', data.user.id)
           .single();
-        if (profile?.status === 'Pending') {
+        if (!profile || profile.status === 'Pending') {
           await supabase.auth.signOut();
           setMsg({ text: 'Your access request is pending approval. You will be notified once reviewed.', type: 'error' });
-        } else if (profile?.status === 'Inactive' || profile?.status === 'Suspended') {
+        } else if (profile.status === 'Inactive' || profile.status === 'Suspended') {
           await supabase.auth.signOut();
           setMsg({ text: 'Your account has been deactivated. Contact an administrator.', type: 'error' });
         } else {
-          router.push(`/dashboard/${profile?.role ?? 'sales'}`);
+          router.push(`/dashboard/${profile.role ?? 'sales'}`);
         }
       }
     }

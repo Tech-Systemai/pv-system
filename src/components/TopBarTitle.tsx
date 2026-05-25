@@ -40,7 +40,8 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   mytarget:    { title: 'My Targets',        sub: 'Your personal performance goals' },
   mydash:      { title: 'My Dashboard',      sub: 'Personal overview and quick actions' },
   collections:      { title: 'Collections',      sub: 'Active accounts and follow-up queue' },
-  'impression-kit': { title: 'Impression Kit',   sub: 'Dentist approves or declines patient photos · feedback to agents' },
+  'impression-kit':    { title: 'Impression Kit',    sub: 'Dentist approves or declines patient photos · feedback to agents' },
+  'remake-requests':   { title: 'Remake Requests',   sub: 'Stage 3 · post-delivery · customer remake claims & production tracking' },
 };
 
 export default function TopBarTitle({ role }: { role: string }) {

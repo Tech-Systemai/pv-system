@@ -257,7 +257,7 @@ export default function ApprovalsClient({
                 : (
                   <div style={{ padding: '0 18px 18px' }}>
                     {signups.map((s: any) => {
-                      const email = s.username ?? '—';
+                      const email = s.email ?? s.username ?? '—';
                       return (
                         <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 14, marginBottom: 10, border: '1px solid var(--line)', borderRadius: 10 }}>
                           <div style={{ width: 38, height: 38, borderRadius: 9, background: 'oklch(0.94 0.05 35)', color: 'oklch(0.40 0.14 35)', display: 'grid', placeItems: 'center', fontSize: 18, flexShrink: 0 }}>👤</div>
