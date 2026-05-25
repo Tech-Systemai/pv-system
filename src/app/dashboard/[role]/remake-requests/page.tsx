@@ -15,7 +15,7 @@ export default async function RemakeRequestsPage() {
     admin.from('remake_photos').select('*').order('created_at', { ascending: true }),
   ]);
 
-  const isOwner = profile?.role === 'owner';
+  const isOwner = ['owner', 'dentist'].includes(profile?.role ?? '');
 
   return (
     <RemakeRequestsClient

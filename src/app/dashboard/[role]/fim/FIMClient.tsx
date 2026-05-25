@@ -120,6 +120,7 @@ export default function FIMClient({
   currentUserId,
   currentUserName,
   savedCategories,
+  section = 'cx',
 }: {
   initialCodes: FaultCode[];
   initialSops: SOP[];
@@ -127,8 +128,10 @@ export default function FIMClient({
   currentUserId: string;
   currentUserName: string;
   savedCategories: Category[] | null;
+  section?: string;
 }) {
-  const isOwner = ['owner', 'admin', 'supervisor'].includes(userRole);
+  const isOwner = ['owner', 'admin', 'supervisor', 'dentist'].includes(userRole);
+  const categoriesKey = section === 'lab' ? 'fim_categories_lab' : section === 'sales' ? 'fim_categories_sales' : 'fim_categories';
 
   /* ── State ── */
   const [codes, setCodes]   = useState<FaultCode[]>(initialCodes);
@@ -265,11 +268,12 @@ export default function FIMClient({
       linked_sop_id: codeForm.linked_sop_id ? Number(codeForm.linked_sop_id) : null,
     };
     if (editingCode) {
-      const { data, error } = await dbOp('fim_fault_codes', 'update', payload, { id: editingCode.id });
+      const { error } = await dbOp('fim_fault_codes', 'update', payload, { id: editingCode.id });
       if (error) { setErr(error); setSaving(false); return; }
       setCodes(prev => prev.map(c => c.id === editingCode.id ? { ...c, ...payload, id: editingCode.id } : c));
     } else {
       payload.created_by = currentUserId;
+      payload.section = section;
       const { data, error } = await dbOp('fim_fault_codes', 'insert', payload);
       if (error) { setErr(error); setSaving(false); return; }
       if (data?.[0]) setCodes(prev => [...prev, data[0]].sort((a, b) => a.code - b.code));
@@ -291,11 +295,12 @@ export default function FIMClient({
       updated_at: new Date().toISOString(),
     };
     if (editingSop) {
-      const { data, error } = await dbOp('fim_sops', 'update', payload, { id: editingSop.id });
+      const { error } = await dbOp('fim_sops', 'update', payload, { id: editingSop.id });
       if (error) { setErr(error); setSaving(false); return; }
       setSops(prev => prev.map(s => s.id === editingSop.id ? { ...s, ...payload } : s));
     } else {
       payload.created_by = currentUserId;
+      payload.section = section;
       const { data, error } = await dbOp('fim_sops', 'insert', payload);
       if (error) { setErr(error); setSaving(false); return; }
       if (data?.[0]) setSops(prev => [...prev, data[0]].sort((a, b) => a.name.localeCompare(b.name)));
@@ -329,7 +334,7 @@ export default function FIMClient({
     const hue = HUE_CYCLE[(categories.length - DEFAULT_CATEGORIES.length) % HUE_CYCLE.length];
     const newCat: Category = { series: seriesNum, label: catForm.label.trim(), hue };
     const updated = [...categories, newCat].sort((a, b) => a.series - b.series);
-    const { error } = await dbOp('global_settings', 'upsert', { key: 'fim_categories', value: JSON.stringify(updated) });
+    const { error } = await dbOp('global_settings', 'upsert', { key: categoriesKey, value: JSON.stringify(updated) });
     if (error) { setCatErr(error); setSavingCat(false); return; }
     setCategories(updated);
     setShowAddCategory(false);

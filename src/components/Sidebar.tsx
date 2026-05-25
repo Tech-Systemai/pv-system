@@ -6,11 +6,11 @@ import { createClient } from '@/utils/supabase/client';
 import { useEffect, useState } from 'react';
 
 const CHANNEL_ROLES: Record<string, string[]> = {
-  general:       ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'],
+  general:       ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant', 'dentist'],
   management:    ['owner', 'admin', 'supervisor', 'accountant'],
   'sales-team':  ['owner', 'admin', 'supervisor', 'sales'],
   'cx-team':     ['owner', 'admin', 'supervisor', 'cx'],
-  announcements: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'],
+  announcements: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant', 'dentist'],
 };
 
 const COUNT_ITEMS = new Set(['chat', 'inbox', 'tickets', 'hr', 'timeoff', 'approvals']);
@@ -57,7 +57,8 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'condition-approval',  label: 'Condition Approval',  icon: '✔', badge: 'LIVE', badgeType: 'live' },
       { id: 'impression-kit',      label: 'Impression Kit',      icon: '📦', badge: 'LIVE', badgeType: 'live' },
       { id: 'remake-requests',     label: 'Remake Requests',     icon: '↺',  badge: 'LIVE', badgeType: 'live' },
-      { id: 'fim',             label: 'FIM · Fault Manual',   icon: '⊘' },
+      { id: 'fim',             label: 'CS Fault Manual',      icon: '⊘' },
+      { id: 'lab-fim',         label: 'Lab Fault Manual',     icon: '⊘' },
       { id: 'tickets',         label: 'Claims',               icon: '🎫', module: 'tickets', badgeType: 'alert' },
       { id: 'coaching',        label: 'Coaching + QA',        icon: '🎯', module: 'coaching' },
     ]},
@@ -228,6 +229,27 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
     ]},
     { head: 'Access', items: [
       { id: 'request-access', label: 'Request Access',         icon: '🔑' },
+    ]},
+  ]},
+
+  dentist: { label: 'Dentist', sections: [
+    { head: 'Workspace', items: [
+      { id: 'inbox',       label: 'Inbox',            icon: '✉',  module: 'inbox' },
+      { id: 'chat',        label: 'Messages',          icon: '💬', module: 'chat' },
+      { id: 'performance', label: 'My Performance',    icon: '📈' },
+      { id: 'attendance',  label: 'Attendance Log',    icon: '📅', module: 'attendance' },
+      { id: 'schedule',    label: 'My Schedule',       icon: '⏱',  module: 'schedule', agentLabel: 'My Schedule' },
+      { id: 'tasks',       label: 'My Tasks',          icon: '✓',  module: 'tasks', agentLabel: 'My Tasks' },
+      { id: 'notes',       label: 'Personal Notes',    icon: '📝' },
+    ]},
+    { head: 'Clinical', items: [
+      { id: 'condition-approval', label: 'Condition Approval', icon: '✔', badge: 'LIVE', badgeType: 'live' },
+      { id: 'impression-kit',     label: 'Impression Kit',     icon: '📦', badge: 'LIVE', badgeType: 'live' },
+      { id: 'remake-requests',    label: 'Remake Requests',    icon: '↺',  badge: 'LIVE', badgeType: 'live' },
+      { id: 'tickets',            label: 'Claims',             icon: '🎫', module: 'tickets', badgeType: 'alert' },
+    ]},
+    { head: 'Lab', items: [
+      { id: 'lab-fim', label: 'Lab Fault Manual', icon: '⊘' },
     ]},
   ]},
 

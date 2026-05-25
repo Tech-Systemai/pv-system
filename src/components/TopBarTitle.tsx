@@ -43,6 +43,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   'impression-kit':       { title: 'Impression Kit',      sub: 'Dentist approves or declines patient photos · feedback to agents' },
   'remake-requests':      { title: 'Remake Requests',     sub: 'Stage 3 · post-delivery · customer remake claims & production tracking' },
   'condition-approval':   { title: 'Condition Approval',  sub: 'Stage 1 · pre-sale · dentist clears the patient as a veneer candidate' },
+  'lab-fim':              { title: 'Lab Fault Manual',    sub: 'Lab fault codes and SOPs for quality and production issues' },
 };
 
 export default function TopBarTitle({ role }: { role: string }) {

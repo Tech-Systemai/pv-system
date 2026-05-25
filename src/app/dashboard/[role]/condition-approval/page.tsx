@@ -13,7 +13,7 @@ export default async function ConditionApprovalPage() {
     admin.from('condition_approvals').select('*').order('created_at', { ascending: false }),
   ]);
 
-  const isOwner = profile?.role === 'owner';
+  const isOwner = ['owner', 'dentist'].includes(profile?.role ?? '');
 
   return (
     <ConditionApprovalClient

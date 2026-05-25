@@ -109,7 +109,7 @@ export default function ImpressionKitClient({
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const pendingUpload  = useRef<{ kitId: number; slot: string; version: number } | null>(null);
 
-  const isOwner = userRole === 'owner';
+  const isOwner = ['owner', 'dentist'].includes(userRole);
   const isCX    = !isOwner;
 
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));

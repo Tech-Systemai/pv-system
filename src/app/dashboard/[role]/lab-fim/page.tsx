@@ -1,8 +1,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
-import FIMClient from './FIMClient';
+import FIMClient from '../fim/FIMClient';
 
-export default async function FIMPage() {
+export default async function LabFIMPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -16,9 +16,9 @@ export default async function FIMPage() {
     { data: categoriesRow },
   ] = await Promise.all([
     admin.from('profiles').select('role, name').eq('id', user.id).single(),
-    admin.from('fim_fault_codes').select('*').eq('section', 'cx').order('code', { ascending: true }),
-    admin.from('fim_sops').select('*').eq('section', 'cx').order('name', { ascending: true }),
-    admin.from('global_settings').select('value').eq('key', 'fim_categories').single(),
+    admin.from('fim_fault_codes').select('*').eq('section', 'lab').order('code', { ascending: true }),
+    admin.from('fim_sops').select('*').eq('section', 'lab').order('name', { ascending: true }),
+    admin.from('global_settings').select('value').eq('key', 'fim_categories_lab').single(),
   ]);
 
   return (
@@ -29,7 +29,7 @@ export default async function FIMPage() {
       currentUserId={user.id}
       currentUserName={profile?.name ?? ''}
       savedCategories={categoriesRow?.value ?? null}
-      section="cx"
+      section="lab"
     />
   );
 }
