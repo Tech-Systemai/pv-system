@@ -10,7 +10,7 @@ export default async function TicketsPage() {
   const admin    = createAdminClient();
   const { data: profile } = await admin.from('profiles').select('name, role').eq('id', user.id).single();
   const userRole = profile?.role ?? '';
-  const isMgmt   = ['owner', 'admin', 'supervisor'].includes(userRole);
+  const isMgmt   = ['owner', 'admin', 'supervisor', 'dentist'].includes(userRole);
   const isCX     = userRole === 'cx';
 
   // Fetch tickets and profiles separately — avoids broken PostgREST FK join
