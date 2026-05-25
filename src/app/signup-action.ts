@@ -2,6 +2,23 @@
 
 import { createClient } from '@supabase/supabase-js';
 
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+export async function getProfileForUser(userId: string): Promise<{ role?: string; status?: string; error?: string }> {
+  const { data, error } = await adminClient()
+    .from('profiles')
+    .select('role, status')
+    .eq('id', userId)
+    .single();
+  if (error) return { error: error.message };
+  return { role: data.role, status: data.status };
+}
+
 export async function requestAccess(email: string, password: string): Promise<{ error?: string }> {
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

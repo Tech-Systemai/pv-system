@@ -131,13 +131,18 @@ export default function ApprovalsClient({
   const handleSignupApprove = async () => {
     if (!approvingSignup) return;
     setBusy(approvingSignup.id);
-    await dbOp('profiles', 'update', {
+    const { error } = await dbOp('profiles', 'update', {
       name: signupForm.name,
       role: signupForm.role,
       department: signupForm.department,
       salary: Number(signupForm.salary),
       status: 'Active',
     }, { id: approvingSignup.id });
+    if (error) {
+      alert(`Approval failed: ${error}`);
+      setBusy(null);
+      return;
+    }
     setSignups(prev => prev.filter((s: any) => s.id !== approvingSignup.id));
     addLog(signupForm.name || approvingSignup.username, 'Approved');
     setApprovingSignup(null);

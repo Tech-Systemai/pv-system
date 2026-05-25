@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { requestAccess } from './signup-action';
+import { requestAccess, getProfileForUser } from './signup-action';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,12 +42,13 @@ export default function LoginPage() {
       if (error) {
         setMsg({ text: error.message, type: 'error' });
       } else if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, status')
-          .eq('id', data.user.id)
-          .single();
-        if (!profile || profile.status === 'Pending') {
+        const profile = await getProfileForUser(data.user.id);
+        if (profile.error) {
+          await supabase.auth.signOut();
+          setMsg({ text: `Profile lookup failed: ${profile.error}`, type: 'error' });
+        } else if (profile.role === 'owner') {
+          router.push('/dashboard/owner');
+        } else if (!profile.status || profile.status === 'Pending') {
           await supabase.auth.signOut();
           setMsg({ text: 'Your access request is pending approval. You will be notified once reviewed.', type: 'error' });
         } else if (profile.status === 'Inactive' || profile.status === 'Suspended') {
