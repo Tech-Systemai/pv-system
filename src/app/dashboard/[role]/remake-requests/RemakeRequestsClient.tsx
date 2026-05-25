@@ -25,10 +25,9 @@ type RemakeRequest = {
   rejected_at: string | null;
   rejection_reason: string | null;
   remake_type: string | null;
-  priority: string | null;
   estimated_delivery: string | null;
-  lab_name: string | null;
   ship_impression_kit: boolean;
+  impression_kit_tracking: string | null;
   owner_notes: string | null;
   stage_case_at: string | null;
   stage_kit_at: string | null;
@@ -51,9 +50,7 @@ type RemakePhoto = {
 
 type ApproveForm = {
   remake_type: string;
-  priority: string;
   estimated_delivery: string;
-  lab_name: string;
   ship_impression_kit: boolean;
   owner_notes: string;
 };
@@ -70,20 +67,14 @@ const REASON_CATEGORIES = [
 
 const PHOTO_TYPES = ['FRONT', 'CLOSEUP', 'SIDE', 'LEFT', 'BITE', 'GUM'];
 
-const LAB_OPTIONS = [
-  'Westbridge Dental Lab',
-  'Precision Dental Lab',
-  'Summit Dental Lab',
-  'Other',
-];
-
+// role: who advances this stage
 const STAGES = [
-  { key: 'stage_case_at' as const,    label: 'Case created',         num: '1' },
-  { key: 'stage_kit_at' as const,     label: 'Impression kit',       num: '2' },
-  { key: 'stage_imp_at' as const,     label: 'Impressions received', num: '3' },
-  { key: 'stage_lab_at' as const,     label: 'Lab production',       num: '4' },
-  { key: 'stage_qc_at' as const,      label: 'Quality check',        num: '5' },
-  { key: 'stage_shipped_at' as const, label: 'Shipped to patient',   num: '6' },
+  { key: 'stage_case_at' as const,    label: 'Case created',         num: '1', role: 'cx'    as const },
+  { key: 'stage_kit_at' as const,     label: 'Impression sent',      num: '2', role: 'cx'    as const },
+  { key: 'stage_imp_at' as const,     label: 'Impressions received', num: '3', role: 'cx'    as const },
+  { key: 'stage_lab_at' as const,     label: 'In production',        num: '4', role: 'owner' as const },
+  { key: 'stage_qc_at' as const,      label: 'Quality check',        num: '5', role: 'owner' as const },
+  { key: 'stage_shipped_at' as const, label: 'Shipped to patient',   num: '6', role: 'owner' as const },
 ];
 
 const STORAGE_BUCKET = 'employee-docs';
@@ -136,9 +127,7 @@ function fmtDate(s: string) {
 
 const DEFAULT_APPROVE: ApproveForm = {
   remake_type: 'Full remake',
-  priority: 'Standard (4–6 weeks)',
   estimated_delivery: '',
-  lab_name: LAB_OPTIONS[0],
   ship_impression_kit: false,
   owner_notes: '',
 };
@@ -180,6 +169,10 @@ export default function RemakeRequestsClient({
   const [approveForm, setApproveForm] = useState<ApproveForm>(DEFAULT_APPROVE);
   const [showDecline, setShowDecline] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
+
+  // Kit tracking
+  const [kitTracking, setKitTracking] = useState('');
+  const [kitSaving, setKitSaving] = useState(false);
 
   // ─── Derived ───────────────────────────────────────────────────────────────
 
@@ -267,6 +260,7 @@ export default function RemakeRequestsClient({
     setApproveForm(DEFAULT_APPROVE);
     setShowDecline(false);
     setDeclineReason('');
+    setKitTracking(req.impression_kit_tracking ?? '');
   };
 
   const approve = async () => {
@@ -275,9 +269,9 @@ export default function RemakeRequestsClient({
     const now = new Date().toISOString();
     const activity: ActivityEntry[] = [
       ...selected.activity,
-      { user: currentUserName, text: `Approved — ${approveForm.remake_type}, ${approveForm.priority}. Lab: ${approveForm.lab_name}.${approveForm.ship_impression_kit ? ' New impression kit to be shipped.' : ''}`, at: now },
+      { user: currentUserName, text: `Approved — ${approveForm.remake_type}.${approveForm.ship_impression_kit ? ' New impression kit to be shipped.' : ''}`, at: now },
     ];
-    const patch = { status: 'in_production' as const, ...approveForm, approved_by: currentUserId, approved_at: now, stage_case_at: now, activity };
+    const patch = { status: 'in_production' as const, ...approveForm, approved_by: currentUserId, approved_at: now, activity };
     const { error } = await dbOp('remake_requests', 'update', patch, { id: selected.id });
     if (!error) {
       const updated = { ...selected, ...patch };
@@ -327,6 +321,19 @@ export default function RemakeRequestsClient({
     setBusy(false);
   };
 
+  const saveKitTracking = async () => {
+    if (!selected) return;
+    setKitSaving(true);
+    const val = kitTracking.trim() || null;
+    const { error } = await dbOp('remake_requests', 'update', { impression_kit_tracking: val }, { id: selected.id });
+    if (!error) {
+      const updated = { ...selected, impression_kit_tracking: val };
+      setRequests(prev => prev.map(r => r.id === selected.id ? updated : r));
+      setSelected(updated);
+    }
+    setKitSaving(false);
+  };
+
   // ─── Detail view ───────────────────────────────────────────────────────────
 
   if (selected) {
@@ -342,6 +349,10 @@ export default function RemakeRequestsClient({
           setShowDecline={setShowDecline}
           declineReason={declineReason}
           setDeclineReason={setDeclineReason}
+          kitTracking={kitTracking}
+          setKitTracking={setKitTracking}
+          kitSaving={kitSaving}
+          onSaveKitTracking={saveKitTracking}
           busy={busy}
           onApprove={approve}
           onDecline={decline}
@@ -463,6 +474,11 @@ export default function RemakeRequestsClient({
                     <span className="bdg" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', background: `oklch(0.93 0.05 ${rh})`, color: `oklch(0.38 0.15 ${rh})`, border: `1px solid oklch(0.84 0.09 ${rh})` }}>
                       {req.reason_category.split(' ')[0].toUpperCase()}
                     </span>
+                    {req.ship_impression_kit && (
+                      <span className="bdg" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', background: 'oklch(0.93 0.10 55)', color: 'oklch(0.38 0.18 55)', border: '1px solid oklch(0.82 0.14 55)' }}>
+                        📦 KIT REQUIRED
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{req.patient_name}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
@@ -472,7 +488,7 @@ export default function RemakeRequestsClient({
                   {req.status === 'in_production' && (
                     <>
                       <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4, fontFamily: 'var(--mono)' }}>
-                        Stage {stage}/6 · {req.priority}
+                        Stage {stage}/6
                         {req.estimated_delivery && ` · ETA ${new Date(req.estimated_delivery).toLocaleDateString([], { month: 'short', day: 'numeric' })}`}
                       </div>
                       <div style={{ display: 'flex', gap: 3, marginTop: 6 }}>
@@ -523,7 +539,7 @@ export default function RemakeRequestsClient({
             <div className="pv-fld" style={{ marginBottom: 16 }}>
               <label>Describe what the customer is reporting</label>
               <textarea rows={4} value={newForm.complaint}
-                placeholder="What did the patient tell you? Be specific about which tooth, what they're noticing, when it started. e.g. 'Patient reports the upper-right canine sits too low and catches the lip when smiling. Noticed within first week.'"
+                placeholder="What did the patient tell you? Be specific about which tooth, what they're noticing, when it started."
                 onChange={e => setNewForm(f => ({ ...f, complaint: e.target.value }))} style={{ resize: 'vertical' }} />
             </div>
 
@@ -587,6 +603,7 @@ function DetailView({
   approveForm, setApproveForm,
   showDecline, setShowDecline,
   declineReason, setDeclineReason,
+  kitTracking, setKitTracking, kitSaving, onSaveKitTracking,
   busy, onApprove, onDecline, onAdvanceStage, onBack,
 }: {
   request: RemakeRequest;
@@ -598,6 +615,10 @@ function DetailView({
   setShowDecline: (v: boolean) => void;
   declineReason: string;
   setDeclineReason: (v: string) => void;
+  kitTracking: string;
+  setKitTracking: (v: string) => void;
+  kitSaving: boolean;
+  onSaveKitTracking: () => void;
   busy: boolean;
   onApprove: () => void;
   onDecline: () => void;
@@ -609,6 +630,12 @@ function DetailView({
   const isProduction = request.status === 'in_production';
   const isApproved   = isProduction || request.status === 'delivered';
   const rh = reasonHue(request.reason_category);
+
+  const nextStage = STAGES[stage];
+  const canAdvance = stage < 6 && nextStage && (
+    (nextStage.role === 'cx' && !isOwner) ||
+    (nextStage.role === 'owner' && isOwner)
+  );
 
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -637,6 +664,46 @@ function DetailView({
           {request.submitted_by_name && <span>Submitted by <strong style={{ color: 'var(--ink)' }}>{request.submitted_by_name}</strong></span>}
         </div>
 
+        {/* Impression kit banner — prominent */}
+        {request.ship_impression_kit && (
+          <div style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden', border: '2px solid oklch(0.75 0.18 55)' }}>
+            <div style={{ background: 'oklch(0.55 0.20 55)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 24 }}>📦</span>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: '#fff', letterSpacing: '0.01em' }}>NEW IMPRESSION KIT REQUIRED</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.80)', marginTop: 2 }}>A replacement impression kit must be shipped to this patient before production can begin.</div>
+              </div>
+            </div>
+            <div style={{ background: 'oklch(0.97 0.05 55)', padding: '14px 20px' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'oklch(0.45 0.18 55)', marginBottom: 8 }}>KIT TRACKING NUMBER</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="fld-input"
+                  placeholder="e.g. 1Z999AA10123456784"
+                  value={kitTracking}
+                  onChange={e => setKitTracking(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && onSaveKitTracking()}
+                  style={{ flex: 1, fontFamily: 'var(--mono)', fontSize: 13 }}
+                />
+                <button
+                  className="btn btn-sm"
+                  style={{ background: 'oklch(0.50 0.20 55)', color: '#fff', border: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+                  disabled={kitSaving}
+                  onClick={onSaveKitTracking}
+                >
+                  {kitSaving ? '…' : request.impression_kit_tracking ? '✓ Update' : 'Save tracking'}
+                </button>
+              </div>
+              {request.impression_kit_tracking && (
+                <div style={{ fontSize: 11, color: 'oklch(0.40 0.16 55)', marginTop: 6, fontFamily: 'var(--mono)' }}>
+                  Saved: {request.impression_kit_tracking}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Production stages */}
         {isProduction && (
           <div style={{ marginBottom: 24, border: '1px solid var(--line)', borderRadius: 12, padding: 18 }}>
@@ -654,16 +721,24 @@ function DetailView({
                       {s.num}
                     </div>
                     <div style={{ fontSize: 10, fontWeight: (done || cur) ? 600 : 400, color: done ? 'oklch(0.35 0.16 265)' : cur ? 'var(--ink)' : 'var(--ink-4)', lineHeight: 1.3 }}>{s.label}</div>
+                    <div style={{ fontSize: 9, color: 'var(--ink-4)', marginTop: 3, fontFamily: 'var(--mono)' }}>
+                      {s.role === 'cx' ? 'CX' : 'Owner'}
+                    </div>
                     {ts && <div style={{ fontSize: 9, color: 'var(--ink-4)', fontFamily: 'var(--mono)', marginTop: 3 }}>{new Date(ts).toLocaleDateString([], { month: '2-digit', day: '2-digit' })} {new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>}
                   </div>
                 );
               })}
             </div>
-            {isOwner && stage < 6 && (
+            {canAdvance && (
               <div style={{ marginTop: 14 }}>
-                <button className="btn btn-acc btn-sm" disabled={busy} onClick={() => { const n = STAGES[stage]; if (n) onAdvanceStage(n.key); }}>
-                  {busy ? '…' : `Mark: ${STAGES[stage]?.label ?? 'Next stage'}`}
+                <button className="btn btn-acc btn-sm" disabled={busy} onClick={() => onAdvanceStage(nextStage.key)}>
+                  {busy ? '…' : `✓ Mark: ${nextStage.label}`}
                 </button>
+              </div>
+            )}
+            {!canAdvance && stage < 6 && nextStage && (
+              <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--ink-4)', fontStyle: 'italic' }}>
+                Next: <strong>{nextStage.label}</strong> — to be marked by {nextStage.role === 'cx' ? 'Customer Service' : 'Owner'}.
               </div>
             )}
           </div>
@@ -675,23 +750,17 @@ function DetailView({
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'oklch(0.45 0.12 145)', marginBottom: 14 }}>
               APPROVAL{request.approved_at ? ` · ${fmtDate(request.approved_at)}` : ''}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: request.lab_name ? 12 : 0 }}>
-              {([['TYPE', request.remake_type], ['PRIORITY', request.priority], ['ETA', request.estimated_delivery ? new Date(request.estimated_delivery).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '—']] as [string, string | null][]).map(([k, v]) => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12, marginBottom: request.owner_notes ? 12 : 0 }}>
+              {([
+                ['TYPE', request.remake_type],
+                ['ETA', request.estimated_delivery ? new Date(request.estimated_delivery).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : '—'],
+              ] as [string, string | null][]).map(([k, v]) => (
                 <div key={k}>
                   <div style={{ fontSize: 9, color: 'oklch(0.45 0.12 145)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
                   <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{v ?? '—'}</div>
                 </div>
               ))}
             </div>
-            {request.lab_name && (
-              <div style={{ marginBottom: request.owner_notes ? 12 : 0 }}>
-                <div style={{ fontSize: 9, color: 'oklch(0.45 0.12 145)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>LAB</div>
-                <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                  {request.lab_name}
-                  {request.ship_impression_kit && <span className="bdg bdg-ind" style={{ fontSize: 9 }}>+ KIT SHIPPED</span>}
-                </div>
-              </div>
-            )}
             {request.owner_notes && (
               <div>
                 <div style={{ fontSize: 9, color: 'oklch(0.45 0.12 145)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>DENTIST NOTES</div>
@@ -782,7 +851,7 @@ function DetailView({
         {isOwner && isPending && !showDecline && (
           <div style={{ border: '2px solid oklch(0.88 0.07 145)', borderRadius: 12, padding: 20, background: 'oklch(0.985 0.015 145)', marginTop: 8 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'oklch(0.45 0.12 145)', marginBottom: 18 }}>● APPROVE REMAKE – CONFIGURE CASE</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div>
                 <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 5 }}>REMAKE TYPE</div>
                 <select className="fld-input" style={{ width: '100%' }} value={approveForm.remake_type} onChange={e => setApproveForm(f => ({ ...f, remake_type: e.target.value }))}>
@@ -790,39 +859,31 @@ function DetailView({
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 5 }}>PRIORITY</div>
-                <select className="fld-input" style={{ width: '100%' }} value={approveForm.priority} onChange={e => setApproveForm(f => ({ ...f, priority: e.target.value }))}>
-                  <option>Standard (4–6 weeks)</option><option>Rush</option><option>Urgent</option>
-                </select>
-              </div>
-              <div>
                 <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 5 }}>ESTIMATED DELIVERY</div>
                 <input type="date" className="fld-input" style={{ width: '100%' }} value={approveForm.estimated_delivery} onChange={e => setApproveForm(f => ({ ...f, estimated_delivery: e.target.value }))} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 5 }}>LAB ASSIGNMENT</div>
-                <select className="fld-input" style={{ width: '100%' }} value={approveForm.lab_name} onChange={e => setApproveForm(f => ({ ...f, lab_name: e.target.value }))}>
-                  {LAB_OPTIONS.map(l => <option key={l}>{l}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 5 }}>REPLACEMENT KIT</div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={approveForm.ship_impression_kit} onChange={e => setApproveForm(f => ({ ...f, ship_impression_kit: e.target.checked }))} style={{ width: 15, height: 15 }} />
-                  Ship new impression kit to patient
-                </label>
-              </div>
+
+            {/* Impression kit — prominent toggle */}
+            <div style={{ marginBottom: 14, borderRadius: 10, border: `2px solid ${approveForm.ship_impression_kit ? 'oklch(0.70 0.18 55)' : 'var(--line)'}`, background: approveForm.ship_impression_kit ? 'oklch(0.96 0.06 55)' : 'var(--surface)', transition: 'all 0.15s' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={approveForm.ship_impression_kit} onChange={e => setApproveForm(f => ({ ...f, ship_impression_kit: e.target.checked }))} style={{ width: 18, height: 18, accentColor: 'oklch(0.55 0.20 55)', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: approveForm.ship_impression_kit ? 'oklch(0.38 0.20 55)' : 'var(--ink)' }}>
+                    📦 Ship new impression kit to patient
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>
+                    Check this if the patient needs a new kit before we can proceed with the remake.
+                  </div>
+                </div>
+              </label>
             </div>
+
             <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 5 }}>NOTES FOR LAB + AGENT (OPTIONAL)</div>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 5 }}>NOTES FOR AGENT (OPTIONAL)</div>
               <textarea className="fld-input" rows={3} style={{ width: '100%', resize: 'vertical' }}
                 placeholder="e.g. Replace #10 only. Verify occlusal contact ≤ 0.3mm."
                 value={approveForm.owner_notes} onChange={e => setApproveForm(f => ({ ...f, owner_notes: e.target.value }))} />
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 16 }}>
-              On approval: case opens, lab notified, impression kit ships today, patient receives confirmation.
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
               <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.88 0.06 25)' }} onClick={() => setShowDecline(true)}>
