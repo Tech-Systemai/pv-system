@@ -328,6 +328,19 @@ export default function RemakeRequestsClient({
     setBusy(false);
   };
 
+  const deleteRequest = async () => {
+    if (!selected) return;
+    if (!confirm(`Delete remake request RM-${selected.id} for ${selected.patient_name}? This cannot be undone.`)) return;
+    setBusy(true);
+    const { error } = await dbOp('remake_requests', 'delete', {}, { id: selected.id });
+    if (!error) {
+      setRequests(prev => prev.filter(r => r.id !== selected.id));
+      setPhotos(prev => prev.filter(p => p.request_id !== selected.id));
+      setSelected(null);
+    }
+    setBusy(false);
+  };
+
   const saveKitTracking = async () => {
     if (!selected) return;
     setKitSaving(true);
@@ -364,6 +377,7 @@ export default function RemakeRequestsClient({
           onApprove={approve}
           onDecline={decline}
           onAdvanceStage={advanceStage}
+          onDelete={deleteRequest}
           onBack={() => setSelected(null)}
         />
       </div>
@@ -619,7 +633,7 @@ function DetailView({
   showDecline, setShowDecline,
   declineReason, setDeclineReason,
   kitTracking, setKitTracking, kitSaving, onSaveKitTracking,
-  busy, onApprove, onDecline, onAdvanceStage, onBack,
+  busy, onApprove, onDecline, onAdvanceStage, onDelete, onBack,
 }: {
   request: RemakeRequest;
   photos: RemakePhoto[];
@@ -638,6 +652,7 @@ function DetailView({
   onApprove: () => void;
   onDecline: () => void;
   onAdvanceStage: (key: string) => void;
+  onDelete: () => void;
   onBack: () => void;
 }) {
   const stage = getStage(request);
@@ -668,6 +683,12 @@ function DetailView({
           </div>
           <div style={{ fontWeight: 700, fontSize: 16, marginTop: 3 }}>{request.patient_name}</div>
         </div>
+        {isOwner && (
+          <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.88 0.06 25)', flexShrink: 0 }}
+            disabled={busy} onClick={onDelete}>
+            🗑 Delete
+          </button>
+        )}
       </div>
 
       <div style={{ padding: '6px 24px 32px', maxWidth: 820 }}>
