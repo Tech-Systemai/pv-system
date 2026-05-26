@@ -1,7 +1,7 @@
 -- v65: Seed CX FIM - all fault codes (F-01 to F-44) and SOPs from the Pioneers Veneers Operations Manual.
 -- F-06/07/08/09 are conceptually identical to existing codes 101/102/103/104 - skipped to avoid duplicates.
 -- Each SOP uses INSERT ... SELECT WHERE NOT EXISTS for safe re-runs.
--- Fault codes use ON CONFLICT (code) DO NOTHING.
+-- Fault codes split into one INSERT per category - ON CONFLICT (code) DO NOTHING on each.
 -- Run once in the Supabase SQL Editor.
 
 -- ============================================================
@@ -101,9 +101,9 @@ SELECT 'Post-Call Text Recap', 'General',
 STEPS:
 1. Within 5 minutes of ending the call, send a personalized text:
    Hi [Name]! This is [Agent] from Pioneers Veneers. Quick recap from our call:
-   - [Key point 1]
-   - [Key point 2]
-   Next step: [what happens next]
+   - Key point 1
+   - Key point 2
+   Next step: describe what happens next
    Feel free to reach out anytime - we have got you!
 2. Log the text as an action in CRM.
 3. If a next step has a specific date (appointment, shipment), add it to the shared calendar.
@@ -122,11 +122,11 @@ STEPS:
 2. Send calendar invite and Zoom link via both SMS and email.
 3. Before the session: review customer''s dental notes and any prior rejections.
 4. On Zoom:
-   a. Confirm good lighting and frontal camera angle.
-   b. Walk through putty mixing together - time it out loud.
-   c. Guide tray placement: upper lip pulled back, tray fully seated at gumline.
-   d. Count down hold time (90 seconds) together.
-   e. Have customer show impression on camera before ending session.
+   (a) Confirm good lighting and frontal camera angle.
+   (b) Walk through putty mixing together - time it out loud.
+   (c) Guide tray placement: upper lip pulled back, tray fully seated at gumline.
+   (d) Count down hold time (90 seconds) together.
+   (e) Have customer show impression on camera before ending session.
 5. If impression looks good: confirm next steps (ship to lab).
 6. If impression is poor: rebook immediately and document the reason.
 7. Send Post-Call Text Recap after the session.
@@ -136,7 +136,7 @@ WHY: Live Zoom coaching dramatically reduces re-kit waste and builds customer co
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'ZOOM Impression Protocol' AND section = 'cx');
 
 INSERT INTO public.fim_sops (name, category, when_to_use, body, section)
-SELECT 'Veneer Fit & Look Assessment', 'Veneers',
+SELECT 'Veneer Fit and Look Assessment', 'Veneers',
 'Customer complains that veneers do not fit correctly or do not look as expected.',
 'WHEN: Customer contacts us after receiving veneers with a fit or aesthetic complaint.
 
@@ -154,7 +154,7 @@ STEPS:
 
 WHY: Most fit/look complaints are addressable with targeted lab adjustments - full refunds are avoidable in the majority of cases.',
 'cx'
-WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx');
+WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx');
 
 INSERT INTO public.fim_sops (name, category, when_to_use, body, section)
 SELECT 'Refund De-escalation', 'Sentiment',
@@ -202,8 +202,8 @@ STEPS:
 2. Ask customer to check: front door, mailbox, back porch, neighbor''s porch, apartment office or mail room.
 3. Verify the delivery address in the system matches what the customer provided.
 4. If address was correct and customer confirms a thorough search:
-   a. File a carrier investigation via the carrier''s official website (USPS, FedEx, or UPS).
-   b. Record the investigation case number in CRM.
+   (a) File a carrier investigation via the carrier''s official website (USPS, FedEx, or UPS).
+   (b) Record the investigation case number in CRM.
 5. Notify Manager - they approve whether to reship.
 6. Do NOT promise a reship or refund without Manager approval.
 
@@ -248,303 +248,323 @@ WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Condition Approval
 
 
 -- ============================================================
--- Fault Codes
+-- Fault Codes - Category A: Impression / Technical (105-109)
 -- F-06/07/08/09 already covered by existing 101/102/103/104.
 -- ============================================================
 
 INSERT INTO public.fim_fault_codes
   (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
 VALUES
-
--- Category A: Impression Kit Issues (105-109)
-
 (105, 'Impression / Technical',
  'Customer needs help taking their impression kit.',
  'Schedule a Zoom coaching session (ZOOM Impression Protocol).',
  '["Review any prior impression notes in CRM before calling","Offer to book a Zoom session at the customer''s earliest availability","Walk customer through kit contents and putty basics via phone if Zoom is unavailable","Confirm appointment time via SMS and send calendar invite","Log appointment in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'ZOOM Impression Protocol' AND section = 'cx')),
-
 (106, 'Impression / Technical',
  'Customer is not answering at the impression kit stage.',
  'Apply Disconnected/Missed Call SOP - log all attempts and reattempt.',
- '["Send SMS: Hi [Name] from Pioneers Veneers! Just tried calling to check in on your impression kit. Give us a ring when you get a chance!","Attempt a second call the next business day","If no response after 3 attempts consider marking Unreachable","Log all attempts with dates and method in CRM"]',
+ '["Send SMS: Hi [Name] from Pioneers Veneers - just tried calling to check in on your impression kit. Give us a ring when you get a chance!","Attempt a second call the next business day","If no response after 3 attempts consider marking Unreachable","Log all attempts with dates and method in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Disconnected or Missed Call' AND section = 'cx')),
-
 (107, 'Impression / Technical',
  'Customer wants to cancel their order after receiving the impression kit.',
  'De-escalate with empathy and offer alternatives before any cancellation.',
  '["Acknowledge their concern and ask what is worrying them","Identify the real concern: fear of process, shipping delay, financial issue, or doubt","Offer a Zoom coaching session to address fear of the impression process","If financial: offer a payment plan adjustment or pause","Do NOT process any cancellation without Manager approval","Log conversation outcome and next step in CRM"]',
  'conditional', 'Customer insists on cancellation - escalate to Manager before processing.',
  (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx')),
-
 (108, 'Impression / Technical',
  'Customer doubts the quality or legitimacy of the impression kit.',
  'Reassure with product education and offer a live Zoom demo.',
  '["Acknowledge the doubt and offer to explain how the kit works","Walk them through the putty quality, lab certification, and fit guarantee","Offer to share before/after photos or customer testimonials","Book a Zoom to demonstrate the kit process live if needed","Log outcome in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Fraud Concern Response' AND section = 'cx')),
-
 (109, 'Impression / Technical',
  'Customer needs a new impression kit for a remake.',
  'Confirm remake approval and ship a new kit within 24 hours.',
  '["Verify that the remake is approved in the system (check lab notes and CRM)","Confirm the correct shipping address with the customer","Place new kit order and flag as REMAKE in the order notes","Send tracking update SMS once shipped","Log kit dispatch date and order number in CRM","Book a follow-up Zoom session for impression coaching"]',
  'none', NULL,
- (SELECT id FROM public.fim_sops WHERE name = 'ZOOM Impression Protocol' AND section = 'cx')),
+ (SELECT id FROM public.fim_sops WHERE name = 'ZOOM Impression Protocol' AND section = 'cx'))
+ON CONFLICT (code) DO NOTHING;
 
--- Category B: Veneers Fit (401-404)
+-- ============================================================
+-- Fault Codes - Category B: Veneers Fit (401-404)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (401, 'Veneers Fit',
  'Veneers do not fit right - general fit complaint.',
  'Request photos and apply Veneer Fit and Look Assessment SOP.',
  '["Acknowledge the concern empathetically","Request 3 photos: front, left side, right side - all with veneers in","Compare photos against original lab submission","Classify the issue: gap vs. bulk vs. length","Submit appropriate lab request based on classification","Confirm with customer within 24h of photo review"]',
  'conditional', 'Customer threatens dispute or refund.',
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
-
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx')),
 (402, 'Veneers Fit',
  'Veneers are too big - customer cannot fully close their mouth.',
  'Collect photos, classify as bulk/fit issue, submit lab adjustment request.',
  '["Request 3-angle photos and a short video of the customer attempting to close their mouth","Confirm: is it upper veneers extending too far or overall bulk?","If bulk: submit lab adjustment request for reduced thickness","If new impression is required: follow new kit process (code 109)","Provide ETA to customer and log in CRM"]',
  'conditional', 'Customer refuses remake and demands refund - escalate to Manager.',
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
-
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx')),
 (403, 'Veneers Fit',
  'Veneers are loose or popping out.',
  'Recommend dental adhesive; if structural, assess for remake.',
  '["Confirm looseness: does veneer pop out while eating, speaking, or both?","If mild: recommend dental adhesive as an immediate solution","If structural or repeated: request photos to assess impression quality","If impression was poor: approve remake and follow code 109 process","Ship dental adhesive if customer does not have it","Log resolution and next steps in CRM"]',
  'none', NULL,
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
-
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx')),
 (404, 'Veneers Fit',
  'Bottom teeth are hitting top veneers - customer cannot close their mouth.',
  'Request photos/video, assess for bulk reduction or new impression.',
  '["Request 3-angle photos plus a video of bite attempt","Assess: are veneers extending past the natural bite plane?","If yes: submit lab adjustment for height reduction","If new impression would resolve: approve new kit (code 109)","Advise customer not to force-bite - could crack veneers","Log findings and lab request reference in CRM"]',
  'conditional', 'Customer is in physical discomfort or demands refund.',
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx'))
+ON CONFLICT (code) DO NOTHING;
 
--- Category C: Veneers Look / Color (501-504)
+-- ============================================================
+-- Fault Codes - Category C: Veneers Look / Color (501-504)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (501, 'Veneers Look / Color',
  'Wrong color or shade was delivered.',
  'Request photos in natural light and submit color correction request to lab.',
  '["Acknowledge the concern and ask for 3 photos in natural lighting","Compare against the shade ordered in the CRM and lab notes","Confirm shade discrepancy vs. lighting difference","Submit color correction remake request to lab with original shade spec","Provide customer with a timeline for correction","Log lab request number in CRM"]',
  'conditional', 'Customer wants full refund instead of color correction.',
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
-
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx')),
 (502, 'Veneers Look / Color',
  'Customer is disappointed with the overall appearance of the veneers.',
  'Request photos and apply Veneer Fit and Look Assessment SOP.',
  '["Ask open-ended question: Can you describe what specifically does not look right?","Request 3 photos in natural daylight (front, left, right)","Identify specific issue: too white, wrong shape, gap, or length","Submit targeted lab correction request based on classification","If issue is subjective taste (not a defect): offer a Zoom consultation with Manager","Log all findings and outcome in CRM"]',
  'conditional', 'Customer insists on full refund citing appearance only - escalate to Manager.',
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
-
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx')),
 (503, 'Veneers Look / Color',
  'Veneers are too bulky or thick.',
  'Request photos and submit lab request for thickness reduction.',
  '["Request 3-angle photos with veneers in place","Confirm: is it visible thickness from the front or bite-related bulk?","Submit lab request specifying reduce thickness and maintain original shade","Follow up with customer once lab confirms feasibility","If new impression is needed: initiate code 109 process","Log lab request and expected turnaround in CRM"]',
  'none', NULL,
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
-
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx')),
 (504, 'Veneers Look / Color',
  'Follow-up color correction is still unsatisfactory after a prior attempt.',
  'Escalate to Manager for secondary lab review and resolution path.',
  '["Review full case history: what shade was ordered, delivered, and corrected","Request new photos in natural lighting for current state","Do NOT submit another lab request without Manager approval","Present all findings and photos to Manager","Manager decides: third correction attempt, refund credit, or alternative resolution","Communicate Manager decision to customer within 24h","Log all actions in CRM"]',
  'immediate', NULL,
- (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx')),
+ (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx'))
+ON CONFLICT (code) DO NOTHING;
 
--- Category D: Remakes (601-604)
+-- ============================================================
+-- Fault Codes - Category D: Remakes (601-604)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (601, 'Remakes',
  'Customer is approved for a remake.',
  'Initiate remake process: confirm details and submit lab order.',
  '["Confirm remake approval is documented in CRM by Manager or lab","Confirm with customer: will they send back current veneers? (required for most remakes)","Verify current shipping address for reshipping","Submit remake order to lab with all updated specs (shade, notes)","Provide customer with estimated production timeline","Set a follow-up reminder for midway through production","Log remake order number and specs in CRM"]',
  'none', NULL, NULL),
-
 (602, 'Remakes',
  'Second remake was delivered and the customer is still unhappy.',
  'Escalate to Manager - do not attempt a third remake without approval.',
  '["Acknowledge the customer ongoing frustration with genuine empathy","Request updated photos: front, left, right - in natural light","Do NOT promise another remake or refund without Manager involvement","Compile full case file: all remake notes, lab submissions, photos","Present to Manager for a formal resolution decision","Communicate outcome to the customer within 24h of Manager decision","Log all details in CRM"]',
  'immediate', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx')),
-
 (603, 'Remakes',
  'Customer paid for a remake but has not sent impression photos.',
  'Follow up for photos - no production begins without them.',
  '["Send a polite reminder SMS: Hi [Name] we have your remake order ready to go! We just need photos of your current veneers to get started. Can you send front, left, and right side shots?","Wait 48h and send a second reminder if no response","If no response after 3 attempts: consider marking Unreachable","Do NOT contact the lab or start production without receiving photos","Log all follow-up attempts in CRM"]',
  'none', NULL, NULL),
-
 (604, 'Remakes',
  'Customer''s veneer is cracked or broken.',
  'Confirm warranty coverage and initiate replacement process.',
  '["Ask customer how the crack occurred: normal wear, accidental drop, or biting hard food","Request a photo of the cracked veneer","Check warranty status in customer CRM file","If under warranty or remake coverage: approve replacement and initiate code 601 process","If outside warranty: offer a paid remake at a discounted rate","Advise customer to stop wearing the cracked veneer to avoid mouth injury","Log crack cause, photo, and resolution in CRM"]',
  'conditional', 'Customer disputes warranty terms or demands a free replacement outside coverage.',
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx'))
+ON CONFLICT (code) DO NOTHING;
 
--- Category E: Refunds / Disputes (701-703)
+-- ============================================================
+-- Fault Codes - Category E: Refunds / Disputes (701-703)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (701, 'Refunds / Disputes',
  'Customer is requesting a refund.',
  'Apply Refund De-escalation SOP - identify stage and escalate if needed.',
  '["Identify the stage: pre-impression, post-kit delivery, or post-veneer delivery","Apply Refund De-escalation SOP","Offer a concrete alternative: remake, Zoom session, free adhesive","If customer is post-delivery: request photos before any refund decision","Do NOT issue or promise any refund without Manager approval","Log full conversation and outcome in CRM"]',
  'conditional', 'Any refund commitment requires Manager approval before confirming.',
  (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx')),
-
 (702, 'Refunds / Disputes',
  'Chargeback resolved in company favor - customer is still interested.',
  'Re-engage professionally; rebuild trust and continue the order.',
  '["Review the chargeback outcome and all prior communication in CRM","Reach out with a friendly opener - do not mention the dispute","Focus on their original goal: getting veneers they love","Offer to pick up exactly where they left off","If payment plan adjustment is needed: involve Manager","Log re-engagement date and customer response in CRM"]',
  'none', NULL, NULL),
-
 (703, 'Refunds / Disputes',
  'Chargeback is filed and still unresolved.',
  'Flag immediately and hand off to Manager - do not contact customer directly.',
  '["Flag case in CRM as DISPUTE","Notify Manager within 15 minutes of becoming aware","Compile all evidence: tracking confirmation, communication history, payment receipts","Send evidence packet to Manager - they handle the Stripe/bank response","Do NOT contact the customer directly about the dispute until Manager clears it","Log flag time, Manager notified, and evidence submitted in CRM"]',
  'immediate', NULL,
- (SELECT id FROM public.fim_sops WHERE name = 'Chargeback Handling' AND section = 'cx')),
+ (SELECT id FROM public.fim_sops WHERE name = 'Chargeback Handling' AND section = 'cx'))
+ON CONFLICT (code) DO NOTHING;
 
--- Category F: Delivery (801-805)
+-- ============================================================
+-- Fault Codes - Category F: Delivery (801-805)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (801, 'Delivery',
  'Customer says item was not delivered but tracking shows delivered.',
  'Apply DNR Investigation SOP - investigate before any reship decision.',
  '["Pull tracking and screenshot the Delivered confirmation","Ask customer to check all delivery points (mailbox, porch, neighbor, building office)","Verify the delivery address on file matches the customer address","If confirmed: file a carrier investigation (USPS/FedEx/UPS)","Report investigation case number to Manager","Await Manager approval before reshipping","Log all steps and carrier case number in CRM"]',
  'conditional', 'Reship requires Manager approval.',
  (SELECT id FROM public.fim_sops WHERE name = 'DNR Investigation' AND section = 'cx')),
-
 (802, 'Delivery',
  'Package was stolen after confirmed delivery.',
  'Document the theft claim, file carrier investigation, escalate for reship decision.',
  '["Sympathize and let the customer know you will look into it for them","Confirm tracking shows Delivered and customer received a delivery notification","Advise customer to file a local police report if package had significant value","File a carrier theft/loss investigation on the carrier portal","Report to Manager with tracking evidence and police report reference if available","Await Manager decision on reship or partial resolution","Log all actions and case references in CRM"]',
  'conditional', 'Reship approval requires Manager sign-off.',
  (SELECT id FROM public.fim_sops WHERE name = 'DNR Investigation' AND section = 'cx')),
-
 (803, 'Delivery',
  'Wrong item or wrong address - delivery error.',
  'Identify who made the error and resolve accordingly.',
  '["Confirm: did the address error originate from the customer or the company system?","If company error: expedite a replacement and escalate to Manager","If customer error: explain the situation and offer a discounted reship","If item was wrong: confirm the correct product and process replacement order","Log error source, corrective action, and responsible party in CRM","Flag for Manager review to prevent future occurrences"]',
  'conditional', 'Company-caused address or item errors require Manager approval for resolution.',
  NULL),
-
 (804, 'Delivery',
  'Customer received an impression kit instead of the veneers they were expecting.',
  'Investigate fulfillment error and expedite the correct shipment.',
  '["Pull the order record - confirm what was shipped vs. what was ordered","Confirm whether the impression photos were received and approved for production","If veneers were not yet produced: explain the process timeline to the customer","If this was a fulfillment error (veneers were ready): flag immediately to Manager","Expedite the correct shipment with Manager approval","Apologize and provide a shipment tracking number promptly","Log error type and resolution in CRM"]',
  'immediate', NULL, NULL),
-
 (805, 'Delivery',
  'Customer believes the company is a fraud or scam after a delivery issue.',
  'Apply Fraud Concern Response SOP - stay calm and present proof.',
  '["Do not react defensively - acknowledge the concern fully","Apply Fraud Concern Response SOP","Share company legitimacy: verified reviews, real lab, money-back framing","Offer a Zoom to speak face-to-face and address every concern","If chargeback is already filed: escalate to Manager immediately","Log every statement and outcome verbatim in CRM"]',
  'conditional', 'If a chargeback has been filed - escalate to Manager immediately.',
- (SELECT id FROM public.fim_sops WHERE name = 'Fraud Concern Response' AND section = 'cx')),
+ (SELECT id FROM public.fim_sops WHERE name = 'Fraud Concern Response' AND section = 'cx'))
+ON CONFLICT (code) DO NOTHING;
 
--- Category G: Follow-Ups (901-905)
+-- ============================================================
+-- Fault Codes - Category G: Follow-Ups (901-905)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (901, 'Follow-Ups',
  'Standard follow-up required on an active case.',
  'Review case history and make contact per established protocol.',
  '["Review CX case history using Existing Case Review SOP before calling","Call with a purpose-driven opener tied to their specific status","Confirm their current situation: satisfied, still waiting, or has a concern","Address any outstanding issue or confirm next milestone","Send Post-Call Text Recap after the call","Log outcome and next follow-up date in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Existing Case Review' AND section = 'cx')),
-
 (902, 'Follow-Ups',
  'No follow-up was done on an active case.',
  'Initiate immediate outreach - treat as high priority.',
  '["Review when the last contact was made and what the last open action was","Call immediately - prioritize this case in today queue","Acknowledge to the customer that you are checking in without highlighting the gap","Resolve any outstanding concern or set next steps","Log reason for delayed follow-up internally and take corrective action","Flag in CRM if there is a pattern of missed follow-ups on this case"]',
  'none', NULL, NULL),
-
 (903, 'Follow-Ups',
  'Multiple outreach attempts made - customer is still not answering.',
  'Apply Marking a Case Unreachable SOP after minimum attempts threshold is met.',
  '["Confirm at least 3 logged outreach attempts on different days","Send one final warm SMS before marking","Apply Marking a Case Unreachable SOP - click Unreachable in the portal","Case moves to Unreachable queue and is removed from daily update counter","Set a 14-day re-engagement reminder","Log exact number of attempts, dates, and methods in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Marking a Case Unreachable' AND section = 'cx')),
-
 (904, 'Follow-Ups',
  'Customer has stopped paying but their plan is still active.',
  'Apply Stopped Paying Follow-Up SOP - focus on re-engaging, not threatening.',
  '["Check Stripe for exact payment failure date and amount","Apply Stopped Paying Follow-Up SOP","Offer flexibility: payment link, rescheduled date, or partial payment","If production is in progress: inform Manager whether to pause","Log payment status and customer stated reason in CRM","If 3 or more failed attempts: escalate to Manager"]',
  'conditional', '3 or more contact attempts fail - escalate to Manager.',
  (SELECT id FROM public.fim_sops WHERE name = 'Stopped Paying Follow-Up' AND section = 'cx')),
-
 (905, 'Follow-Ups',
  'Order was placed for a family member - main contact is not the patient.',
  'Confirm the patient details and adjust the CRM record accordingly.',
  '["Confirm who the ordering contact is vs. who the veneers are for","Update CRM with patient name, relationship, and relevant dental notes","Clarify communication preference: contact the buyer or the patient directly?","Ensure impression kit is addressed to the patient location","Note any dental condition specifics for the actual patient","Log all updates in CRM"]',
- 'none', NULL, NULL),
+ 'none', NULL, NULL)
+ON CONFLICT (code) DO NOTHING;
 
--- Category H: Dentistry Special (1001-1002)
+-- ============================================================
+-- Fault Codes - Category H: Dentistry Special (1001-1002)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (1001, 'Dentistry Special',
  'Customer is a candidate for the dentures program (no remaining natural teeth).',
  'Qualify and refer to the Dentures Program - notify Manager.',
  '["Confirm the customer has no top or bottom teeth remaining (full edentulous)","Explain the Dentures Program briefly: a tailored solution for customers without natural teeth","Do NOT proceed with a standard veneers kit order for this customer","Notify Manager - they handle all Dentures Program enrollment","Log the referral in CRM with notes on the customer dental situation","Advise customer that a Manager will reach out within 1 business day"]',
  'immediate', NULL, NULL),
-
 (1002, 'Dentistry Special',
  'Customer has no top teeth and needs dental adhesive guidance.',
  'Ship dental adhesive and provide usage instructions.',
  '["Confirm customer has no top teeth (fully edentulous top arch)","Advise that dental adhesive is needed to secure the veneer without natural tooth support","Ship complimentary dental adhesive if not already sent","Walk customer through adhesive application process","If customer expresses interest in the Dentures Program: apply code 1001 process","Log adhesive shipment and customer dental status in CRM"]',
- 'none', NULL, NULL),
+ 'none', NULL, NULL)
+ON CONFLICT (code) DO NOTHING;
 
--- Category I: New / Returning Customers (1101-1105)
+-- ============================================================
+-- Fault Codes - Category I: New / Returning Customers (1101-1105)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (1101, 'New / Returning',
  'Significant communication delay occurred on the company side.',
  'Acknowledge the delay, apologize, and re-engage with urgency.',
  '["Review the communication gap: when was the last contact and why was there a delay?","Open the call with a direct apology: I want to apologize for the delay - that is not the experience you should have","Offer a gesture of goodwill if appropriate (free adhesive, priority handling)","Address their current status and concern immediately","Log reason for delay and corrective action in CRM","Flag internally if the delay was a systemic or team issue"]',
  'conditional', 'Customer has become hostile or filed a dispute due to the delay.',
  (SELECT id FROM public.fim_sops WHERE name = 'Disconnected or Missed Call' AND section = 'cx')),
-
 (1102, 'New / Returning',
  'New customer placing their very first order.',
  'Apply New Customer Onboarding SOP - set a strong first impression.',
  '["Apply New Customer Onboarding SOP for full onboarding steps","Confirm order details, shipping address, and payment plan","Set expectations: kit timeline, impression process, production timeline","Answer all initial questions confidently and warmly","Send Post-Call Text Recap after the call","Log first contact date and conversation notes in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'New Customer Onboarding' AND section = 'cx')),
-
 (1103, 'New / Returning',
  'Returning customer placing a new order.',
  'Welcome them back, review history, and confirm new order details.',
  '["Pull up their prior case history using Existing Case Review SOP","Welcome them back warmly","Confirm: same shade as before or something different?","Verify shipping address and payment method","Confirm if prior impressions can be reused or if a new kit is needed","Log new order details and any preference changes in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Existing Case Review' AND section = 'cx')),
-
 (1104, 'New / Returning',
  'Returning customer and their impressions are already on file.',
  'Confirm impression reuse eligibility and proceed to production.',
  '["Locate the customer prior impressions in the lab records","Confirm with lab: are the impressions still viable? (generally valid for 6 months)","Confirm with customer: same specs or any changes to shade or size?","If impressions are viable: submit production order referencing existing impression ID","If impressions are expired: follow code 109 process for a new kit","Log production order reference and impression status in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Existing Case Review' AND section = 'cx')),
-
 (1105, 'New / Returning',
  'Unclosed sale - customer was interested but did not complete the purchase.',
  'Apply Unclosed Sale Recovery SOP to re-engage and close.',
  '["Apply Unclosed Sale Recovery SOP for full protocol","Review what the customer originally expressed interest in","Identify the sticking point: price, trust, dental concern, or timing","Address the sticking point directly and offer a relevant incentive if appropriate","Close with a clear next step: payment link, booking, or follow-up date","Log conversation outcome and next action in CRM"]',
  'none', NULL,
- (SELECT id FROM public.fim_sops WHERE name = 'Unclosed Sale Recovery' AND section = 'cx')),
+ (SELECT id FROM public.fim_sops WHERE name = 'Unclosed Sale Recovery' AND section = 'cx'))
+ON CONFLICT (code) DO NOTHING;
 
--- Category J: Happy Customers (1201-1203)
+-- ============================================================
+-- Fault Codes - Category J: Happy Customers (1201-1203)
+-- ============================================================
 
+INSERT INTO public.fim_fault_codes
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
+VALUES
 (1201, 'Happy Customers',
  'Customer is happy with their veneers and has no issues.',
  'Celebrate their experience and request a review and referral.',
  '["Congratulate the customer on their new smile","Ask if they would be open to leaving us a review","Send a Google Review or Trustpilot link via SMS","Ask if they know anyone who might also be interested in Pioneers Veneers","Log happiness status, review request sent, and any referral leads in CRM"]',
  'none', NULL, NULL),
-
 (1202, 'Happy Customers',
  'Customer is happy but veneers are slightly loose.',
  'Send dental adhesive and confirm satisfaction after a trial period.',
  '["Acknowledge the slight looseness: that is a normal adjustment for some customers","Ship dental adhesive immediately if they do not already have it","Walk customer through correct adhesive application","Schedule a 2-week follow-up to confirm fit improvement","If looseness persists after adhesive trial: assess for a remake (code 403)","Log adhesive shipment and follow-up date in CRM"]',
  'none', NULL,
- (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
-
+ (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit and Look Assessment' AND section = 'cx')),
 (1203, 'Happy Customers',
  'Order is completed - customer has stopped making payments on the plan.',
  'Apply Stopped Paying Follow-Up SOP to recover remaining balance.',
  '["Check Stripe: confirm remaining balance and payment plan status","Apply Stopped Paying Follow-Up SOP","Remind customer warmly: your veneers are fully delivered - we just want to wrap up the remaining balance together","Offer a final payment option: one lump sum or a rescheduled plan","If no response after 3 attempts: escalate to Manager for collections consideration","Log balance amount, payment status, and all contact attempts in CRM"]',
  'conditional', '3 or more contact attempts fail - escalate to Manager for collections.',
  (SELECT id FROM public.fim_sops WHERE name = 'Stopped Paying Follow-Up' AND section = 'cx'))
-
 ON CONFLICT (code) DO NOTHING;
