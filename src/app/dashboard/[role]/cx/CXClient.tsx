@@ -70,7 +70,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'agents'|'admin'|'no_update'>('agents');
+  const [section,     setSection]     = useState<'agents'|'admin'|'no_update'|'unreachable'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -95,15 +95,18 @@ export default function CXClient({
 
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));
   const todayUpdatedIds = new Set(updates.filter((u: any) => u.update_date === today).map((u: any) => u.case_id));
-  const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !todayUpdatedIds.has(c.id);
 
-  const escalatedCount = cases.filter(c => c.escalated).length;
-  const noUpdateCount  = cases.filter(c => c.no_update_needed && !c.escalated).length;
+  const escalatedCount   = cases.filter(c => c.escalated).length;
+  const noUpdateCount    = cases.filter(c => c.no_update_needed && !c.escalated).length;
+  const unreachableCount = cases.filter(c => c.unreachable && !c.escalated).length;
+
+  const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !c.unreachable && !todayUpdatedIds.has(c.id);
 
   const filtered = cases.filter(c => {
-    if (section === 'admin'     && !c.escalated)                      return false;
-    if (section === 'agents'    && (c.escalated || c.no_update_needed)) return false;
-    if (section === 'no_update' && (!c.no_update_needed || c.escalated)) return false;
+    if (section === 'admin'       && !c.escalated)                                    return false;
+    if (section === 'agents'      && (c.escalated || c.no_update_needed || c.unreachable)) return false;
+    if (section === 'no_update'   && (!c.no_update_needed || c.escalated))            return false;
+    if (section === 'unreachable' && (!c.unreachable || c.escalated))                 return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return c.customer_name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.issue?.toLowerCase().includes(q);
@@ -215,6 +218,14 @@ export default function CXClient({
     if (selectedCase?.id === c.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
   };
 
+  const handleToggleUnreachable = async (c: any) => {
+    const newVal = !c.unreachable;
+    const payload = { unreachable: newVal, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: c.id });
+    setCases(prev => prev.map(x => x.id === c.id ? { ...x, ...payload } : x));
+    if (selectedCase?.id === c.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
   const handleToggleHold = async (c: any, reason?: string) => {
     const newHold = !c.on_hold;
     const payload = { on_hold: newHold, hold_reason: newHold ? (reason ?? '') : null, updated_at: new Date().toISOString() };
@@ -285,9 +296,9 @@ export default function CXClient({
 
   /* ── Owner quick-look banner ────────────────────────────────── */
   const banner = (
-    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : 'AGENTS — ALL CUSTOMERS'}
+    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : 'var(--ink-4)', marginBottom: 6 }}>
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : 'AGENTS — ALL CUSTOMERS'}
       </div>
       {section === 'agents' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
@@ -305,6 +316,12 @@ export default function CXClient({
           {noUpdateCount === 0
             ? 'No cases marked as no update needed.'
             : <><strong style={{ color: 'oklch(0.36 0.15 145)' }}>{noUpdateCount} case{noUpdateCount !== 1 ? 's' : ''}</strong> marked as no update needed. These customers do not require daily update logs and are excluded from the update-due counter.</>}
+        </div>
+      ) : section === 'unreachable' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {unreachableCount === 0
+            ? 'No customers marked as unreachable.'
+            : <><strong style={{ color: 'oklch(0.40 0.18 290)' }}>{unreachableCount} customer{unreachableCount !== 1 ? 's' : ''}</strong> marked as unreachable. These cases are excluded from the update-due counter until contact is re-established.</>}
         </div>
       ) : (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
@@ -334,6 +351,10 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'no_update' ? 'oklch(0.93 0.05 145)' : 'transparent', color: section === 'no_update' ? 'oklch(0.36 0.15 145)' : 'var(--ink-4)', boxShadow: section === 'no_update' ? 'var(--sh-1)' : 'none' }}>
             ✓ No Update Needed · {noUpdateCount}
           </button>
+          <button onClick={() => setSection('unreachable')}
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'unreachable' ? 'oklch(0.92 0.06 290)' : 'transparent', color: section === 'unreachable' ? 'oklch(0.38 0.18 290)' : (unreachableCount > 0 ? 'oklch(0.45 0.15 290)' : 'var(--ink-4)'), boxShadow: section === 'unreachable' ? 'var(--sh-1)' : 'none' }}>
+            📵 Unreachable · {unreachableCount}
+          </button>
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
         {section === 'agents' && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
@@ -359,7 +380,7 @@ export default function CXClient({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : 'No customer cases found.'}
+          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
@@ -385,6 +406,7 @@ export default function CXClient({
                   {c.escalated && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.06 25)', color: 'oklch(0.40 0.20 25)' }}>⚠ ESCALATED</span>}
                   {c.on_hold && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0 0)', color: 'oklch(0.45 0 0)' }}>🔒 ON HOLD</span>}
                   {c.no_update_needed && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.05 145)', color: 'oklch(0.36 0.15 145)' }}>✓ NO UPDATE</span>}
+                  {c.unreachable && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.06 290)', color: 'oklch(0.38 0.18 290)' }}>📵 UNREACHABLE</span>}
                   {updateDue && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.94 0.06 80)', color: 'oklch(0.40 0.18 80)' }}>⚠ UPDATE DUE</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>{c.phone}</div>
@@ -412,6 +434,9 @@ export default function CXClient({
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'oklch(0.94 0.05 260)', color: 'oklch(0.38 0.15 260)', border: '1px solid oklch(0.88 0.06 260)' }}>
                       {nameMap[c.assigned_to] ?? 'Unknown'}
                     </span>
+                    {daysOpen(c.created_at) < 2 && (
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.08 145)', color: 'oklch(0.32 0.16 145)', letterSpacing: '0.04em' }}>NEW</span>
+                    )}
                     {isAdminOrOwner && (
                       <button onClick={e => { e.stopPropagation(); setReassigningCaseId(c.id); setReassignValue(c.assigned_to ?? ''); }}
                         style={{ fontSize: 10, background: 'none', border: '1px solid var(--line)', borderRadius: 6, padding: '2px 6px', cursor: 'pointer', color: 'var(--ink-4)' }}>
@@ -420,10 +445,15 @@ export default function CXClient({
                     )}
                   </div>
                 ) : (
-                  <button onClick={e => { e.stopPropagation(); handleClaimCase(c); }}
-                    style={{ marginTop: 6, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'oklch(0.96 0.04 260)', color: 'oklch(0.38 0.16 260)', border: '1.5px dashed oklch(0.75 0.10 260)', cursor: 'pointer' }}>
-                    + Claim Customer Case
-                  </button>
+                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={e => { e.stopPropagation(); handleClaimCase(c); }}
+                      style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: 'oklch(0.96 0.04 260)', color: 'oklch(0.38 0.16 260)', border: '1.5px dashed oklch(0.75 0.10 260)', cursor: 'pointer' }}>
+                      + Claim Customer Case
+                    </button>
+                    {daysOpen(c.created_at) < 2 && (
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.08 145)', color: 'oklch(0.32 0.16 145)', letterSpacing: '0.04em' }}>NEW</span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -733,6 +763,11 @@ export default function CXClient({
             style={selectedCase.no_update_needed ? { background: 'oklch(0.92 0.05 145)', color: 'oklch(0.36 0.15 145)', border: '1px solid oklch(0.82 0.08 145)' } : {}}
             onClick={() => handleToggleNoUpdate(selectedCase)}>
             {selectedCase.no_update_needed ? '↩ Reactivate updates' : '✓ No update needed'}
+          </button>
+          <button className="btn btn-sec btn-sm"
+            style={selectedCase.unreachable ? { background: 'oklch(0.92 0.06 290)', color: 'oklch(0.38 0.18 290)', border: '1px solid oklch(0.82 0.10 290)' } : {}}
+            onClick={() => handleToggleUnreachable(selectedCase)}>
+            {selectedCase.unreachable ? '↩ Mark reachable' : '📵 Unreachable'}
           </button>
           {showHoldInput && (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
