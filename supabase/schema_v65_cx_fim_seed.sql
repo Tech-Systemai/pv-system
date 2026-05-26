@@ -231,7 +231,7 @@ WHERE NOT EXISTS (
 --       are already covered by existing codes 101, 102, 103, 104. Not duplicated here.
 
 INSERT INTO public.fim_fault_codes
-  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id, section)
+  (code, category, condition_text, agent_action, agent_steps, escalation_type, escalation_condition, linked_sop_id)
 VALUES
 
 -- ── Category A: Impression Kit Issues ────────────────────────────────────────
