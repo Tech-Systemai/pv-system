@@ -1,4 +1,4 @@
--- v65: Seed CX FIM -- all fault codes (F-01 to F-44) and SOPs from the Pioneers Veneers Operations Manual.
+--- v65: Seed CX FIM -- all fault codes (F-01 to F-44) and SOPs from the Pioneers Veneers Operations Manual.
 -- F-06/07/08/09 are conceptually identical to existing codes 101/102/103/104 -- skipped to avoid duplicates.
 -- Each SOP uses INSERT ... SELECT WHERE NOT EXISTS for safe re-runs.
 -- Fault codes use ON CONFLICT (code) DO NOTHING.
