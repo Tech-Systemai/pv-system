@@ -1,5 +1,5 @@
---- v65: Seed CX FIM -- all fault codes (F-01 to F-44) and SOPs from the Pioneers Veneers Operations Manual.
--- F-06/07/08/09 are conceptually identical to existing codes 101/102/103/104 -- skipped to avoid duplicates.
+-- v65: Seed CX FIM - all fault codes (F-01 to F-44) and SOPs from the Pioneers Veneers Operations Manual.
+-- F-06/07/08/09 are conceptually identical to existing codes 101/102/103/104 - skipped to avoid duplicates.
 -- Each SOP uses INSERT ... SELECT WHERE NOT EXISTS for safe re-runs.
 -- Fault codes use ON CONFLICT (code) DO NOTHING.
 -- Run once in the Supabase SQL Editor.
@@ -11,35 +11,35 @@
 INSERT INTO public.fim_sops (name, category, when_to_use, body, section)
 SELECT 'New Customer Onboarding', 'General',
 'First contact with a brand-new customer who just placed their first order.',
-'WHEN: Customer has placed their first order -- no prior history in the system.
+'WHEN: Customer has placed their first order - no prior history in the system.
 
 STEPS:
-1. Greet warmly -- use first name, introduce yourself and Pioneers Veneers.
+1. Greet warmly - use first name, introduce yourself and Pioneers Veneers.
 2. Confirm order details (product, address, payment plan) in the system.
 3. Walk them through the full journey: kit delivery > impression > production > delivery.
-4. Set expectations on timelines -- be specific (e.g., kit arrives in 3-5 days).
+4. Set expectations on timelines - be specific (e.g., kit arrives in 3-5 days).
 5. Answer any initial questions about the process, putty, or the fit guarantee.
 6. Log first contact in CRM with date and key notes.
 7. Send the Post-Call Text Recap immediately after the call.
 
-WHY: A confident, informed new customer is far less likely to dispute, cancel, or ghost -- the first impression sets the tone for the entire relationship.',
+WHY: A confident, informed new customer is far less likely to dispute, cancel, or ghost - the first impression sets the tone for the entire relationship.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'New Customer Onboarding' AND section = 'cx');
 
 INSERT INTO public.fim_sops (name, category, when_to_use, body, section)
 SELECT 'Existing Case Review', 'General',
 'Before calling any returning or existing customer with prior history.',
-'WHEN: Any customer with prior history in the system -- before making contact.
+'WHEN: Any customer with prior history in the system - before making contact.
 
 STEPS:
-1. Open CX profile -- review all prior notes, lab submissions, and payment history.
+1. Open CX profile - review all prior notes, lab submissions, and payment history.
 2. Note current pipeline stage and the last action taken.
 3. Identify the core unresolved issue: impression, fit, payment, or satisfaction.
 4. Prepare 2-3 talking points tailored to their specific history.
 5. Check if they have open remakes, disputes, or outstanding balance.
 6. Set a clear call objective before dialing.
 
-WHY: Walking in informed prevents repeating what was already tried and builds customer trust -- customers feel heard when you know their history without asking.',
+WHY: Walking in informed prevents repeating what was already tried and builds customer trust - customers feel heard when you know their history without asking.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Existing Case Review' AND section = 'cx');
 
@@ -49,7 +49,7 @@ SELECT 'Disconnected or Missed Call', 'General',
 'WHEN: Call dropped unexpectedly or went unanswered.
 
 STEPS:
-1. Within 2 minutes of the disconnect, send: "Hi [Name], this is [Agent] from Pioneers Veneers -- looks like we got disconnected. I''ll try you again shortly!"
+1. Within 2 minutes of the disconnect, send: Hi [Name], this is [Agent] from Pioneers Veneers - looks like we got disconnected. I''ll try you again shortly!
 2. Wait 10 minutes, then attempt a second call.
 3. If no answer on the second attempt: leave a brief voicemail and log both attempts in CRM.
 4. Schedule a follow-up attempt for the next business day.
@@ -66,30 +66,30 @@ SELECT 'Stopped Paying Follow-Up', 'General',
 
 STEPS:
 1. Confirm the plan is still active in Stripe before calling.
-2. Open with empathy: "Hey [Name], just checking in -- noticed your plan renewal was pending and wanted to make sure everything is okay on your end."
-3. Avoid accusatory language -- frame the call as a check-in, not collections.
+2. Open with empathy: Hey [Name], just checking in - noticed your plan renewal was pending and wanted to make sure everything is okay on your end.
+3. Avoid accusatory language - frame the call as a check-in, not collections.
 4. Offer flexibility: a rescheduled date or a direct payment link.
 5. If no answer: send an SMS with a payment link and a friendly nudge.
 6. If 3+ failed attempts with no response: escalate to Manager.
 
-WHY: Payment issues are often temporary -- tone matters more than the ask. An aggressive collection approach reliably causes disputes.',
+WHY: Payment issues are often temporary - tone matters more than the ask. An aggressive collection approach reliably causes disputes.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Stopped Paying Follow-Up' AND section = 'cx');
 
 INSERT INTO public.fim_sops (name, category, when_to_use, body, section)
 SELECT 'Unclosed Sale Recovery', 'General',
 'Prospective customer expressed interest but never completed the purchase.',
-'WHEN: CRM shows "Interested CX" or "Unclosed Sale" status with no payment recorded.
+'WHEN: CRM shows Interested CX or Unclosed Sale status with no payment recorded.
 
 STEPS:
-1. Review conversation history -- understand what stopped them from buying.
-2. Open with low pressure: "Hey [Name], just following up -- I know you were looking into getting started with us."
+1. Review conversation history - understand what stopped them from buying.
+2. Open with low pressure: Hey [Name], just following up - I know you were looking into getting started with us.
 3. Address their hesitation directly (price, trust, dental concern, or timing).
 4. Offer a limited-time incentive if appropriate (free adhesive, priority slot).
 5. If no answer: send SMS with a short value reminder and a direct payment link.
 6. Log outcome and set a next follow-up date.
 
-WHY: Most unclosed sales are stalled by doubt, not disinterest -- one well-timed, empathetic follow-up converts more than three aggressive ones.',
+WHY: Most unclosed sales are stalled by doubt, not disinterest - one well-timed, empathetic follow-up converts more than three aggressive ones.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Unclosed Sale Recovery' AND section = 'cx');
 
@@ -100,15 +100,15 @@ SELECT 'Post-Call Text Recap', 'General',
 
 STEPS:
 1. Within 5 minutes of ending the call, send a personalized text:
-   "Hi [Name]! This is [Agent] from Pioneers Veneers. Quick recap from our call:
+   Hi [Name]! This is [Agent] from Pioneers Veneers. Quick recap from our call:
    - [Key point 1]
    - [Key point 2]
    Next step: [what happens next]
-   Feel free to reach out anytime -- we have got you!"
+   Feel free to reach out anytime - we have got you!
 2. Log the text as an action in CRM.
 3. If a next step has a specific date (appointment, shipment), add it to the shared calendar.
 
-WHY: A written recap reinforces trust, reduces "I did not know" disputes, and gives the customer a reference they can revisit.',
+WHY: A written recap reinforces trust, reduces disputes, and gives the customer a reference they can revisit.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Post-Call Text Recap' AND section = 'cx');
 
@@ -119,11 +119,11 @@ SELECT 'ZOOM Impression Protocol', 'Impression',
 
 STEPS:
 1. Schedule Zoom at customer''s earliest availability (same day if possible).
-2. Send calendar invite + Zoom link via both SMS and email.
+2. Send calendar invite and Zoom link via both SMS and email.
 3. Before the session: review customer''s dental notes and any prior rejections.
 4. On Zoom:
    a. Confirm good lighting and frontal camera angle.
-   b. Walk through putty mixing together -- time it out loud.
+   b. Walk through putty mixing together - time it out loud.
    c. Guide tray placement: upper lip pulled back, tray fully seated at gumline.
    d. Count down hold time (90 seconds) together.
    e. Have customer show impression on camera before ending session.
@@ -131,7 +131,7 @@ STEPS:
 6. If impression is poor: rebook immediately and document the reason.
 7. Send Post-Call Text Recap after the session.
 
-WHY: Live Zoom coaching dramatically reduces re-kit waste and builds customer confidence -- success rates are significantly higher than phone-only coaching.',
+WHY: Live Zoom coaching dramatically reduces re-kit waste and builds customer confidence - success rates are significantly higher than phone-only coaching.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'ZOOM Impression Protocol' AND section = 'cx');
 
@@ -141,18 +141,18 @@ SELECT 'Veneer Fit & Look Assessment', 'Veneers',
 'WHEN: Customer contacts us after receiving veneers with a fit or aesthetic complaint.
 
 STEPS:
-1. Acknowledge the concern with empathy: "I completely understand, let''s figure this out."
-2. Request photos: front smile, left side, right side -- all with veneers inserted.
+1. Acknowledge the concern with empathy: I completely understand, let''s figure this out.
+2. Request photos: front smile, left side, right side - all with veneers inserted.
 3. Once photos are received, compare against the original lab submission notes.
 4. Classify the issue:
-   - GAP: veneers not flush with gums -> likely needs new impression
-   - BULK: too thick -> may be correctable with a lab adjustment
-   - LENGTH: too short or long -> may need new impression
-   - COLOR: wrong shade -> submit a color correction request to the lab
+   - GAP: veneers not flush with gums - likely needs new impression
+   - BULK: too thick - may be correctable with a lab adjustment
+   - LENGTH: too short or long - may need new impression
+   - COLOR: wrong shade - submit a color correction request to the lab
 5. Based on the classification, advise the customer and submit the appropriate lab request.
-6. If customer demands refund: offer a remake first -- escalate to Manager only if refused.
+6. If customer demands refund: offer a remake first - escalate to Manager only if refused.
 
-WHY: Most fit/look complaints are addressable with targeted lab adjustments -- full refunds are avoidable in the majority of cases.',
+WHY: Most fit/look complaints are addressable with targeted lab adjustments - full refunds are avoidable in the majority of cases.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx');
 
@@ -162,40 +162,40 @@ SELECT 'Refund De-escalation', 'Sentiment',
 'WHEN: Customer is angry, demanding a refund, raising their voice, or threatening further action.
 
 STEPS:
-1. Do NOT become defensive -- let them speak first and fully exhaust their concern.
-2. Validate: "I hear you, and I completely understand your frustration. You deserve a great result."
-3. Before any refund discussion, ask: "Can you help me understand exactly what the issue is?"
-4. Offer a concrete next step -- something tangible (remake, Zoom session, dental adhesive).
-5. If they push back: "I want to make sure we fix this the right way for you before we go down any other path."
+1. Do NOT become defensive - let them speak first and fully exhaust their concern.
+2. Validate: I hear you, and I completely understand your frustration. You deserve a great result.
+3. Before any refund discussion, ask: Can you help me understand exactly what the issue is?
+4. Offer a concrete next step - something tangible (remake, Zoom session, dental adhesive).
+5. If they push back: I want to make sure we fix this the right way for you before we go down any other path.
 6. If they still insist on a refund: inform Manager before making any commitment.
 7. Log emotion level, exact words used, and outcome in CRM.
 
-WHY: Escalated customers need to feel heard before they can hear solutions -- leading with empathy converts the majority of refund demands into remake requests.',
+WHY: Escalated customers need to feel heard before they can hear solutions - leading with empathy converts the majority of refund demands into remake requests.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx');
 
 INSERT INTO public.fim_sops (name, category, when_to_use, body, section)
 SELECT 'Fraud Concern Response', 'Sentiment',
 'Customer accuses the company of being fraudulent or a scam.',
-'WHEN: Customer says "this is a scam," "you are fraudsters," or makes a similar accusation.
+'WHEN: Customer says this is a scam or you are fraudsters or makes a similar accusation.
 
 STEPS:
-1. Stay completely calm -- never argue or become defensive.
-2. Respond: "I completely understand why that concern would come up, and I really want to address it for you."
+1. Stay completely calm - never argue or become defensive.
+2. Respond: I completely understand why that concern would come up, and I really want to address it for you.
 3. Walk them through company legitimacy: real lab, verified reviews, before/after testimonials, Google rating.
 4. Offer to share a review link or a customer story immediately during the call.
 5. If they are willing to continue: book a Zoom to demonstrate face-to-face professionalism.
-6. If they have already filed a chargeback: escalate to Manager immediately -- do not engage further without approval.
+6. If they have already filed a chargeback: escalate to Manager immediately - do not engage further without approval.
 7. Log every accusation verbatim in CRM.
 
-WHY: Fraud accusations usually stem from delivery delays or unmet expectations -- a calm, factual response with social proof resolves most of these without escalation.',
+WHY: Fraud accusations usually stem from delivery delays or unmet expectations - a calm, factual response with social proof resolves most of these without escalation.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Fraud Concern Response' AND section = 'cx');
 
 INSERT INTO public.fim_sops (name, category, when_to_use, body, section)
 SELECT 'DNR Investigation', 'Delivery',
 'Customer reports package not received but tracking shows delivered.',
-'WHEN: Customer says they never received their package but the carrier tracking shows "Delivered."
+'WHEN: Customer says they never received their package but the carrier tracking shows Delivered.
 
 STEPS:
 1. Pull the tracking number and screenshot the delivery confirmation.
@@ -204,10 +204,10 @@ STEPS:
 4. If address was correct and customer confirms a thorough search:
    a. File a carrier investigation via the carrier''s official website (USPS, FedEx, or UPS).
    b. Record the investigation case number in CRM.
-5. Notify Manager -- they approve whether to reship.
+5. Notify Manager - they approve whether to reship.
 6. Do NOT promise a reship or refund without Manager approval.
 
-WHY: Most DNR cases resolve with a thorough porch check or a package held at the facility -- filing an investigation first prevents unnecessary reship costs.',
+WHY: Most DNR cases resolve with a thorough porch check or a package held at the facility - filing an investigation first prevents unnecessary reship costs.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'DNR Investigation' AND section = 'cx');
 
@@ -220,9 +220,9 @@ STEPS:
 1. Confirm all attempts are logged: dates, methods (call, voicemail, SMS), and any responses.
 2. Minimum requirement before marking: 3 attempts on at least 3 different days.
 3. Send a final SMS before marking:
-   "Hi [Name], we have tried reaching you a few times! We are still here whenever you are ready. Just reply or call us at your convenience."
-4. In the portal: click the "Unreachable" button on the case.
-5. Case moves to the Unreachable section -- excluded from the daily update counter.
+   Hi [Name], we have tried reaching you a few times! We are still here whenever you are ready. Just reply or call us at your convenience.
+4. In the portal: click the Unreachable button on the case.
+5. Case moves to the Unreachable section - excluded from the daily update counter.
 6. Set a re-engagement reminder for 14 days out.
 
 WHY: Marking unreachable keeps the active queue clean and prevents daily follow-up time being spent on dormant cases.',
@@ -237,12 +237,12 @@ SELECT 'Condition Approval Process', 'Operations',
 STEPS:
 1. Gather full dental history: ask about implants, bridges, dentures, crowns, partials, and recent procedures.
 2. Request 4-angle dental photos: front smile, left side, right side, upper arch.
-3. Submit photos + detailed notes to Manager for Condition Approval review.
+3. Submit photos and detailed notes to Manager for Condition Approval review.
 4. Do NOT ship an impression kit or proceed with any production until written approval is received.
 5. If approved: proceed normally and note the approval date and approver in CRM.
 6. If denied: inform the customer and offer either a full refund or a referral to the dentistry program.
 
-WHY: Proceeding without condition approval risks product failure, customer injury, and legal exposure -- this step is non-negotiable.',
+WHY: Proceeding without condition approval risks product failure, customer injury, and legal exposure - this step is non-negotiable.',
 'cx'
 WHERE NOT EXISTS (SELECT 1 FROM public.fim_sops WHERE name = 'Condition Approval Process' AND section = 'cx');
 
@@ -267,7 +267,7 @@ VALUES
 
 (106, 'Impression / Technical',
  'Customer is not answering at the impression kit stage.',
- 'Apply Disconnected/Missed Call SOP -- log all attempts and reattempt.',
+ 'Apply Disconnected/Missed Call SOP - log all attempts and reattempt.',
  '["Send SMS: Hi [Name] from Pioneers Veneers! Just tried calling to check in on your impression kit. Give us a ring when you get a chance!","Attempt a second call the next business day","If no response after 3 attempts consider marking Unreachable","Log all attempts with dates and method in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Disconnected or Missed Call' AND section = 'cx')),
@@ -276,7 +276,7 @@ VALUES
  'Customer wants to cancel their order after receiving the impression kit.',
  'De-escalate with empathy and offer alternatives before any cancellation.',
  '["Acknowledge their concern and ask what is worrying them","Identify the real concern: fear of process, shipping delay, financial issue, or doubt","Offer a Zoom coaching session to address fear of the impression process","If financial: offer a payment plan adjustment or pause","Do NOT process any cancellation without Manager approval","Log conversation outcome and next step in CRM"]',
- 'conditional', 'Customer insists on cancellation -- escalate to Manager before processing.',
+ 'conditional', 'Customer insists on cancellation - escalate to Manager before processing.',
  (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx')),
 
 (108, 'Impression / Technical',
@@ -296,17 +296,17 @@ VALUES
 -- Category B: Veneers Fit (401-404)
 
 (401, 'Veneers Fit',
- 'Veneers do not fit right -- general fit complaint.',
- 'Request photos and apply Veneer Fit & Look Assessment SOP.',
- '["Acknowledge the concern empathetically","Request 3 photos: front, left side, right side -- all with veneers in","Compare photos against original lab submission","Classify the issue: gap vs. bulk vs. length","Submit appropriate lab request based on classification","Confirm with customer within 24h of photo review"]',
+ 'Veneers do not fit right - general fit complaint.',
+ 'Request photos and apply Veneer Fit and Look Assessment SOP.',
+ '["Acknowledge the concern empathetically","Request 3 photos: front, left side, right side - all with veneers in","Compare photos against original lab submission","Classify the issue: gap vs. bulk vs. length","Submit appropriate lab request based on classification","Confirm with customer within 24h of photo review"]',
  'conditional', 'Customer threatens dispute or refund.',
  (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
 
 (402, 'Veneers Fit',
- 'Veneers are too big -- customer cannot fully close their mouth.',
+ 'Veneers are too big - customer cannot fully close their mouth.',
  'Collect photos, classify as bulk/fit issue, submit lab adjustment request.',
  '["Request 3-angle photos and a short video of the customer attempting to close their mouth","Confirm: is it upper veneers extending too far or overall bulk?","If bulk: submit lab adjustment request for reduced thickness","If new impression is required: follow new kit process (code 109)","Provide ETA to customer and log in CRM"]',
- 'conditional', 'Customer refuses remake and demands refund -- escalate to Manager.',
+ 'conditional', 'Customer refuses remake and demands refund - escalate to Manager.',
  (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
 
 (403, 'Veneers Fit',
@@ -317,9 +317,9 @@ VALUES
  (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
 
 (404, 'Veneers Fit',
- 'Bottom teeth are hitting top veneers -- customer cannot close their mouth.',
+ 'Bottom teeth are hitting top veneers - customer cannot close their mouth.',
  'Request photos/video, assess for bulk reduction or new impression.',
- '["Request 3-angle photos plus a video of bite attempt","Assess: are veneers extending past the natural bite plane?","If yes: submit lab adjustment for height reduction","If new impression would resolve: approve new kit (code 109)","Advise customer not to force-bite -- could crack veneers","Log findings and lab request reference in CRM"]',
+ '["Request 3-angle photos plus a video of bite attempt","Assess: are veneers extending past the natural bite plane?","If yes: submit lab adjustment for height reduction","If new impression would resolve: approve new kit (code 109)","Advise customer not to force-bite - could crack veneers","Log findings and lab request reference in CRM"]',
  'conditional', 'Customer is in physical discomfort or demands refund.',
  (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
 
@@ -334,9 +334,9 @@ VALUES
 
 (502, 'Veneers Look / Color',
  'Customer is disappointed with the overall appearance of the veneers.',
- 'Request photos and apply Veneer Fit & Look Assessment SOP.',
+ 'Request photos and apply Veneer Fit and Look Assessment SOP.',
  '["Ask open-ended question: Can you describe what specifically does not look right?","Request 3 photos in natural daylight (front, left, right)","Identify specific issue: too white, wrong shape, gap, or length","Submit targeted lab correction request based on classification","If issue is subjective taste (not a defect): offer a Zoom consultation with Manager","Log all findings and outcome in CRM"]',
- 'conditional', 'Customer insists on full refund citing appearance only -- escalate to Manager.',
+ 'conditional', 'Customer insists on full refund citing appearance only - escalate to Manager.',
  (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
 
 (503, 'Veneers Look / Color',
@@ -363,14 +363,14 @@ VALUES
 
 (602, 'Remakes',
  'Second remake was delivered and the customer is still unhappy.',
- 'Escalate to Manager -- do not attempt a third remake without approval.',
- '["Acknowledge the customer ongoing frustration with genuine empathy","Request updated photos: front, left, right -- in natural light","Do NOT promise another remake or refund without Manager involvement","Compile full case file: all remake notes, lab submissions, photos","Present to Manager for a formal resolution decision","Communicate outcome to the customer within 24h of Manager decision","Log all details in CRM"]',
+ 'Escalate to Manager - do not attempt a third remake without approval.',
+ '["Acknowledge the customer ongoing frustration with genuine empathy","Request updated photos: front, left, right - in natural light","Do NOT promise another remake or refund without Manager involvement","Compile full case file: all remake notes, lab submissions, photos","Present to Manager for a formal resolution decision","Communicate outcome to the customer within 24h of Manager decision","Log all details in CRM"]',
  'immediate', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx')),
 
 (603, 'Remakes',
  'Customer paid for a remake but has not sent impression photos.',
- 'Follow up for photos -- no production begins without them.',
+ 'Follow up for photos - no production begins without them.',
  '["Send a polite reminder SMS: Hi [Name] we have your remake order ready to go! We just need photos of your current veneers to get started. Can you send front, left, and right side shots?","Wait 48h and send a second reminder if no response","If no response after 3 attempts: consider marking Unreachable","Do NOT contact the lab or start production without receiving photos","Log all follow-up attempts in CRM"]',
  'none', NULL, NULL),
 
@@ -385,21 +385,21 @@ VALUES
 
 (701, 'Refunds / Disputes',
  'Customer is requesting a refund.',
- 'Apply Refund De-escalation SOP -- identify stage and escalate if needed.',
- '["Identify the stage: pre-impression, post-kit delivery, or post-veneer delivery","Apply Refund De-escalation SOP","Offer a concrete alternative: remake, Zoom session, free adhesive","If customer is post-delivery: request photos before any refund decision","Do NOT issue or promise any refund without Manager approval","Log full conversation and customer exact words and outcome in CRM"]',
+ 'Apply Refund De-escalation SOP - identify stage and escalate if needed.',
+ '["Identify the stage: pre-impression, post-kit delivery, or post-veneer delivery","Apply Refund De-escalation SOP","Offer a concrete alternative: remake, Zoom session, free adhesive","If customer is post-delivery: request photos before any refund decision","Do NOT issue or promise any refund without Manager approval","Log full conversation and outcome in CRM"]',
  'conditional', 'Any refund commitment requires Manager approval before confirming.',
  (SELECT id FROM public.fim_sops WHERE name = 'Refund De-escalation' AND section = 'cx')),
 
 (702, 'Refunds / Disputes',
- 'Chargeback resolved in company favor -- customer is still interested.',
+ 'Chargeback resolved in company favor - customer is still interested.',
  'Re-engage professionally; rebuild trust and continue the order.',
- '["Review the chargeback outcome and all prior communication in CRM","Reach out with a friendly opener -- do not mention the dispute","Focus on their original goal: getting veneers they love","Offer to pick up exactly where they left off","If payment plan adjustment is needed: involve Manager","Log re-engagement date and customer response in CRM"]',
+ '["Review the chargeback outcome and all prior communication in CRM","Reach out with a friendly opener - do not mention the dispute","Focus on their original goal: getting veneers they love","Offer to pick up exactly where they left off","If payment plan adjustment is needed: involve Manager","Log re-engagement date and customer response in CRM"]',
  'none', NULL, NULL),
 
 (703, 'Refunds / Disputes',
  'Chargeback is filed and still unresolved.',
- 'Flag immediately and hand off to Manager -- do not contact customer directly.',
- '["Flag case in CRM as DISPUTE","Notify Manager within 15 minutes of becoming aware","Compile all evidence: tracking confirmation, communication history, payment receipts","Send evidence packet to Manager -- they handle the Stripe/bank response","Do NOT contact the customer directly about the dispute until Manager clears it","Log flag time, Manager notified, and evidence submitted in CRM"]',
+ 'Flag immediately and hand off to Manager - do not contact customer directly.',
+ '["Flag case in CRM as DISPUTE","Notify Manager within 15 minutes of becoming aware","Compile all evidence: tracking confirmation, communication history, payment receipts","Send evidence packet to Manager - they handle the Stripe/bank response","Do NOT contact the customer directly about the dispute until Manager clears it","Log flag time, Manager notified, and evidence submitted in CRM"]',
  'immediate', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Chargeback Handling' AND section = 'cx')),
 
@@ -407,7 +407,7 @@ VALUES
 
 (801, 'Delivery',
  'Customer says item was not delivered but tracking shows delivered.',
- 'Apply DNR Investigation SOP -- investigate before any reship decision.',
+ 'Apply DNR Investigation SOP - investigate before any reship decision.',
  '["Pull tracking and screenshot the Delivered confirmation","Ask customer to check all delivery points (mailbox, porch, neighbor, building office)","Verify the delivery address on file matches the customer address","If confirmed: file a carrier investigation (USPS/FedEx/UPS)","Report investigation case number to Manager","Await Manager approval before reshipping","Log all steps and carrier case number in CRM"]',
  'conditional', 'Reship requires Manager approval.',
  (SELECT id FROM public.fim_sops WHERE name = 'DNR Investigation' AND section = 'cx')),
@@ -420,7 +420,7 @@ VALUES
  (SELECT id FROM public.fim_sops WHERE name = 'DNR Investigation' AND section = 'cx')),
 
 (803, 'Delivery',
- 'Wrong item or wrong address -- delivery error.',
+ 'Wrong item or wrong address - delivery error.',
  'Identify who made the error and resolve accordingly.',
  '["Confirm: did the address error originate from the customer or the company system?","If company error: expedite a replacement and escalate to Manager","If customer error: explain the situation and offer a discounted reship","If item was wrong: confirm the correct product and process replacement order","Log error source, corrective action, and responsible party in CRM","Flag for Manager review to prevent future occurrences"]',
  'conditional', 'Company-caused address or item errors require Manager approval for resolution.',
@@ -429,14 +429,14 @@ VALUES
 (804, 'Delivery',
  'Customer received an impression kit instead of the veneers they were expecting.',
  'Investigate fulfillment error and expedite the correct shipment.',
- '["Pull the order record -- confirm what was shipped vs. what was ordered","Confirm whether the impression photos were received and approved for production","If veneers were not yet produced: explain the process timeline to the customer","If this was a fulfillment error (veneers were ready): flag immediately to Manager","Expedite the correct shipment with Manager approval","Apologize and provide a shipment tracking number promptly","Log error type and resolution in CRM"]',
+ '["Pull the order record - confirm what was shipped vs. what was ordered","Confirm whether the impression photos were received and approved for production","If veneers were not yet produced: explain the process timeline to the customer","If this was a fulfillment error (veneers were ready): flag immediately to Manager","Expedite the correct shipment with Manager approval","Apologize and provide a shipment tracking number promptly","Log error type and resolution in CRM"]',
  'immediate', NULL, NULL),
 
 (805, 'Delivery',
  'Customer believes the company is a fraud or scam after a delivery issue.',
- 'Apply Fraud Concern Response SOP -- stay calm and present proof.',
- '["Do not react defensively -- acknowledge the concern fully","Apply Fraud Concern Response SOP","Share company legitimacy: verified reviews, real lab, money-back framing","Offer a Zoom to speak face-to-face and address every concern","If chargeback is already filed: escalate to Manager immediately","Log every statement and outcome verbatim in CRM"]',
- 'conditional', 'If a chargeback has been filed -- escalate to Manager immediately.',
+ 'Apply Fraud Concern Response SOP - stay calm and present proof.',
+ '["Do not react defensively - acknowledge the concern fully","Apply Fraud Concern Response SOP","Share company legitimacy: verified reviews, real lab, money-back framing","Offer a Zoom to speak face-to-face and address every concern","If chargeback is already filed: escalate to Manager immediately","Log every statement and outcome verbatim in CRM"]',
+ 'conditional', 'If a chargeback has been filed - escalate to Manager immediately.',
  (SELECT id FROM public.fim_sops WHERE name = 'Fraud Concern Response' AND section = 'cx')),
 
 -- Category G: Follow-Ups (901-905)
@@ -450,26 +450,26 @@ VALUES
 
 (902, 'Follow-Ups',
  'No follow-up was done on an active case.',
- 'Initiate immediate outreach -- treat as high priority.',
- '["Review when the last contact was made and what the last open action was","Call immediately -- prioritize this case in today queue","Acknowledge to the customer that you are checking in without highlighting the gap","Resolve any outstanding concern or set next steps","Log reason for delayed follow-up internally and take corrective action","Flag in CRM if there is a pattern of missed follow-ups on this case"]',
+ 'Initiate immediate outreach - treat as high priority.',
+ '["Review when the last contact was made and what the last open action was","Call immediately - prioritize this case in today queue","Acknowledge to the customer that you are checking in without highlighting the gap","Resolve any outstanding concern or set next steps","Log reason for delayed follow-up internally and take corrective action","Flag in CRM if there is a pattern of missed follow-ups on this case"]',
  'none', NULL, NULL),
 
 (903, 'Follow-Ups',
- 'Multiple outreach attempts made -- customer is still not answering.',
+ 'Multiple outreach attempts made - customer is still not answering.',
  'Apply Marking a Case Unreachable SOP after minimum attempts threshold is met.',
- '["Confirm at least 3 logged outreach attempts on different days","Send one final warm SMS before marking","Apply Marking a Case Unreachable SOP -- click Unreachable in the portal","Case moves to Unreachable queue and is removed from daily update counter","Set a 14-day re-engagement reminder","Log exact number of attempts, dates, and methods in CRM"]',
+ '["Confirm at least 3 logged outreach attempts on different days","Send one final warm SMS before marking","Apply Marking a Case Unreachable SOP - click Unreachable in the portal","Case moves to Unreachable queue and is removed from daily update counter","Set a 14-day re-engagement reminder","Log exact number of attempts, dates, and methods in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'Marking a Case Unreachable' AND section = 'cx')),
 
 (904, 'Follow-Ups',
  'Customer has stopped paying but their plan is still active.',
- 'Apply Stopped Paying Follow-Up SOP -- focus on re-engaging, not threatening.',
- '["Check Stripe for exact payment failure date and amount","Apply Stopped Paying Follow-Up SOP","Offer flexibility: payment link, rescheduled date, or partial payment","If production is in progress: inform Manager whether to pause","Log payment status and customer stated reason in CRM","If 3+ failed attempts: escalate to Manager"]',
- 'conditional', '3 or more contact attempts fail -- escalate to Manager.',
+ 'Apply Stopped Paying Follow-Up SOP - focus on re-engaging, not threatening.',
+ '["Check Stripe for exact payment failure date and amount","Apply Stopped Paying Follow-Up SOP","Offer flexibility: payment link, rescheduled date, or partial payment","If production is in progress: inform Manager whether to pause","Log payment status and customer stated reason in CRM","If 3 or more failed attempts: escalate to Manager"]',
+ 'conditional', '3 or more contact attempts fail - escalate to Manager.',
  (SELECT id FROM public.fim_sops WHERE name = 'Stopped Paying Follow-Up' AND section = 'cx')),
 
 (905, 'Follow-Ups',
- 'Order was placed for a family member -- main contact is not the patient.',
+ 'Order was placed for a family member - main contact is not the patient.',
  'Confirm the patient details and adjust the CRM record accordingly.',
  '["Confirm who the ordering contact is vs. who the veneers are for","Update CRM with patient name, relationship, and relevant dental notes","Clarify communication preference: contact the buyer or the patient directly?","Ensure impression kit is addressed to the patient location","Note any dental condition specifics for the actual patient","Log all updates in CRM"]',
  'none', NULL, NULL),
@@ -478,8 +478,8 @@ VALUES
 
 (1001, 'Dentistry Special',
  'Customer is a candidate for the dentures program (no remaining natural teeth).',
- 'Qualify and refer to the Dentures Program -- notify Manager.',
- '["Confirm the customer has no top or bottom teeth remaining (full edentulous)","Explain the Dentures Program briefly: a tailored solution for customers without natural teeth","Do NOT proceed with a standard veneers kit order for this customer","Notify Manager -- they handle all Dentures Program enrollment","Log the referral in CRM with notes on the customer dental situation","Advise customer that a Manager will reach out within 1 business day"]',
+ 'Qualify and refer to the Dentures Program - notify Manager.',
+ '["Confirm the customer has no top or bottom teeth remaining (full edentulous)","Explain the Dentures Program briefly: a tailored solution for customers without natural teeth","Do NOT proceed with a standard veneers kit order for this customer","Notify Manager - they handle all Dentures Program enrollment","Log the referral in CRM with notes on the customer dental situation","Advise customer that a Manager will reach out within 1 business day"]',
  'immediate', NULL, NULL),
 
 (1002, 'Dentistry Special',
@@ -493,13 +493,13 @@ VALUES
 (1101, 'New / Returning',
  'Significant communication delay occurred on the company side.',
  'Acknowledge the delay, apologize, and re-engage with urgency.',
- '["Review the communication gap: when was the last contact and why was there a delay?","Open the call with a direct apology: I want to apologize for the delay -- that is not the experience you should have","Offer a gesture of goodwill if appropriate (free adhesive, priority handling)","Address their current status and concern immediately","Log reason for delay and corrective action in CRM","Flag internally if the delay was a systemic or team issue"]',
+ '["Review the communication gap: when was the last contact and why was there a delay?","Open the call with a direct apology: I want to apologize for the delay - that is not the experience you should have","Offer a gesture of goodwill if appropriate (free adhesive, priority handling)","Address their current status and concern immediately","Log reason for delay and corrective action in CRM","Flag internally if the delay was a systemic or team issue"]',
  'conditional', 'Customer has become hostile or filed a dispute due to the delay.',
  (SELECT id FROM public.fim_sops WHERE name = 'Disconnected or Missed Call' AND section = 'cx')),
 
 (1102, 'New / Returning',
  'New customer placing their very first order.',
- 'Apply New Customer Onboarding SOP -- set a strong first impression.',
+ 'Apply New Customer Onboarding SOP - set a strong first impression.',
  '["Apply New Customer Onboarding SOP for full onboarding steps","Confirm order details, shipping address, and payment plan","Set expectations: kit timeline, impression process, production timeline","Answer all initial questions confidently and warmly","Send Post-Call Text Recap after the call","Log first contact date and conversation notes in CRM"]',
  'none', NULL,
  (SELECT id FROM public.fim_sops WHERE name = 'New Customer Onboarding' AND section = 'cx')),
@@ -519,7 +519,7 @@ VALUES
  (SELECT id FROM public.fim_sops WHERE name = 'Existing Case Review' AND section = 'cx')),
 
 (1105, 'New / Returning',
- 'Unclosed sale -- customer was interested but did not complete the purchase.',
+ 'Unclosed sale - customer was interested but did not complete the purchase.',
  'Apply Unclosed Sale Recovery SOP to re-engage and close.',
  '["Apply Unclosed Sale Recovery SOP for full protocol","Review what the customer originally expressed interest in","Identify the sticking point: price, trust, dental concern, or timing","Address the sticking point directly and offer a relevant incentive if appropriate","Close with a clear next step: payment link, booking, or follow-up date","Log conversation outcome and next action in CRM"]',
  'none', NULL,
@@ -541,10 +541,10 @@ VALUES
  (SELECT id FROM public.fim_sops WHERE name = 'Veneer Fit & Look Assessment' AND section = 'cx')),
 
 (1203, 'Happy Customers',
- 'Order is completed -- customer has stopped making payments on the plan.',
+ 'Order is completed - customer has stopped making payments on the plan.',
  'Apply Stopped Paying Follow-Up SOP to recover remaining balance.',
- '["Check Stripe: confirm remaining balance and payment plan status","Apply Stopped Paying Follow-Up SOP","Remind customer warmly: your veneers are fully delivered -- we just want to wrap up the remaining balance together","Offer a final payment option: one lump sum or a rescheduled plan","If no response after 3 attempts: escalate to Manager for collections consideration","Log balance amount, payment status, and all contact attempts in CRM"]',
- 'conditional', '3 or more contact attempts fail -- escalate to Manager for collections.',
+ '["Check Stripe: confirm remaining balance and payment plan status","Apply Stopped Paying Follow-Up SOP","Remind customer warmly: your veneers are fully delivered - we just want to wrap up the remaining balance together","Offer a final payment option: one lump sum or a rescheduled plan","If no response after 3 attempts: escalate to Manager for collections consideration","Log balance amount, payment status, and all contact attempts in CRM"]',
+ 'conditional', '3 or more contact attempts fail - escalate to Manager for collections.',
  (SELECT id FROM public.fim_sops WHERE name = 'Stopped Paying Follow-Up' AND section = 'cx'))
 
 ON CONFLICT (code) DO NOTHING;
