@@ -2,6 +2,9 @@
 
 import { useState, useMemo } from 'react';
 import { dbOp } from '@/utils/db';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /* ── Types ───────────────────────────────────────────────────────────── */
 
@@ -158,6 +161,119 @@ export default function FIMClient({
   const [catErr, setCatErr]       = useState('');
 
   const [categories, setCategories] = useState<Category[]>(savedCategories ?? DEFAULT_CATEGORIES);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  /* ── Export helpers ── */
+  function exportToExcel() {
+    setShowExportMenu(false);
+    const wb = XLSX.utils.book_new();
+
+    const codeRows = codes.map(fc => ({
+      'Code': fc.code,
+      'Category': fc.category,
+      'Condition': fc.condition_text,
+      'Agent Action': fc.agent_action,
+      'Agent Steps': (fc.agent_steps ?? []).join('\n'),
+      'Escalation': fc.escalation_type,
+      'Escalation Condition': fc.escalation_condition ?? '',
+      'Linked SOP': fc.linked_sop_id && sopById[fc.linked_sop_id] ? sopById[fc.linked_sop_id].name : '',
+    }));
+    const codesSheet = XLSX.utils.json_to_sheet(codeRows);
+    codesSheet['!cols'] = [{ wch: 8 }, { wch: 28 }, { wch: 40 }, { wch: 40 }, { wch: 50 }, { wch: 14 }, { wch: 30 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, codesSheet, 'Fault Codes');
+
+    const sopRows = sops.map(s => ({
+      'Name': s.name,
+      'Category': s.category,
+      'When to Use': s.when_to_use ?? '',
+      'Body': s.body,
+    }));
+    const sopsSheet = XLSX.utils.json_to_sheet(sopRows);
+    sopsSheet['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 40 }, { wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, sopsSheet, 'SOPs');
+
+    XLSX.writeFile(wb, `FIM-Export-${section.toUpperCase()}.xlsx`);
+  }
+
+  function exportToPDF() {
+    setShowExportMenu(false);
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const title = `FIM · Fault Identification Manual — ${section.toUpperCase()} Section`;
+
+    doc.setFontSize(14);
+    doc.setTextColor(40, 40, 80);
+    doc.text(title, 14, 16);
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 140);
+    doc.text(`Exported ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}  ·  ${codes.length} fault codes  ·  ${sops.length} SOPs`, 14, 22);
+
+    doc.setFontSize(11);
+    doc.setTextColor(40, 40, 80);
+    doc.text('Fault Codes', 14, 30);
+
+    autoTable(doc, {
+      startY: 33,
+      head: [['Code', 'Category', 'Condition', 'Agent Action', 'Agent Steps', 'Escalation', 'Escalation Condition', 'Linked SOP']],
+      body: codes.map(fc => [
+        String(fc.code),
+        fc.category,
+        fc.condition_text,
+        fc.agent_action,
+        (fc.agent_steps ?? []).map((s, i) => `${i + 1}. ${s}`).join('\n'),
+        fc.escalation_type,
+        fc.escalation_condition ?? '—',
+        fc.linked_sop_id && sopById[fc.linked_sop_id] ? sopById[fc.linked_sop_id].name : '—',
+      ]),
+      styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak', minCellHeight: 6 },
+      headStyles: { fillColor: [80, 80, 200], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 12 },
+        1: { cellWidth: 34 },
+        2: { cellWidth: 44 },
+        3: { cellWidth: 44 },
+        4: { cellWidth: 50 },
+        5: { cellWidth: 22 },
+        6: { cellWidth: 34 },
+        7: { cellWidth: 26 },
+      },
+      didDrawPage: (_data) => {
+        doc.setFontSize(7);
+        doc.setTextColor(160, 160, 160);
+        doc.text(`Page ${(doc as any).internal.getNumberOfPages()}`, doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 6, { align: 'right' });
+      },
+    });
+
+    doc.addPage();
+    doc.setFontSize(11);
+    doc.setTextColor(40, 40, 80);
+    doc.text('Standard Operating Procedures (SOPs)', 14, 16);
+
+    autoTable(doc, {
+      startY: 20,
+      head: [['Name', 'Category', 'When to Use', 'Body']],
+      body: sops.map(s => [
+        s.name,
+        s.category,
+        s.when_to_use ?? '—',
+        s.body,
+      ]),
+      styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak', minCellHeight: 6 },
+      headStyles: { fillColor: [80, 80, 200], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 36 },
+        1: { cellWidth: 24 },
+        2: { cellWidth: 54 },
+        3: { cellWidth: 152 },
+      },
+      didDrawPage: (_data) => {
+        doc.setFontSize(7);
+        doc.setTextColor(160, 160, 160);
+        doc.text(`Page ${(doc as any).internal.getNumberOfPages()}`, doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 6, { align: 'right' });
+      },
+    });
+
+    doc.save(`FIM-Export-${section.toUpperCase()}.pdf`);
+  }
 
   /* ── Derived ── */
   const filteredCodes = useMemo(() => {
@@ -386,6 +502,32 @@ export default function FIMClient({
               + Add SOP
             </button>
           )}
+          {/* Export dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowExportMenu(v => !v)}
+              style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', color: 'oklch(0.45 0.18 145)', border: '1px solid oklch(0.80 0.10 145)', cursor: 'pointer', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+              ↓ Export
+            </button>
+            {showExportMenu && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowExportMenu(false)} />
+                <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: '#fff', borderRadius: 10, boxShadow: '0 8px 32px oklch(0 0 0 / 0.15)', border: '1px solid oklch(0.90 0.01 260)', zIndex: 50, minWidth: 170, overflow: 'hidden' }}>
+                  <button onClick={exportToPDF}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, color: 'oklch(0.30 0.02 260)', fontWeight: 500 }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.96 0.01 260)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    Export as PDF
+                  </button>
+                  <button onClick={exportToExcel}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, color: 'oklch(0.30 0.02 260)', fontWeight: 500, borderTop: '1px solid oklch(0.93 0.01 260)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'oklch(0.96 0.01 260)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    Export as Excel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button onClick={() => setTab(tab === 'codes' ? 'sops' : 'codes')}
             style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', color: 'oklch(0.45 0.02 260)', border: '1px solid oklch(0.88 0.01 260)', cursor: 'pointer', fontWeight: 500, fontSize: 13 }}>
             {tab === 'codes' ? `Browse SOPs (${sops.length}) →` : `Browse fault codes (${codes.length}) →`}
