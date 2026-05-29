@@ -12,8 +12,13 @@ const DEFAULT_CHANNELS = [
   { id: 'announcements', label: '# Announcements', roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'], archived: false },
 ];
 
-const ALL_ROLES = ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'];
-const DM_ROLES  = ['owner', 'admin', 'supervisor', 'accountant'];
+const ALL_ROLES = ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant', 'dentist'];
+
+// sales/cx can only DM non-sales/cx roles; everyone else can DM anyone
+const getDMableRoles = (role: string): string[] =>
+  role === 'sales' || role === 'cx'
+    ? ['owner', 'admin', 'supervisor', 'accountant', 'dentist']
+    : ALL_ROLES;
 const BUCKET    = 'chat-files';
 
 const dmId = (uid1: string, uid2: string) => `dm-${[uid1, uid2].sort().join('|')}`;
@@ -85,7 +90,7 @@ export default function ChatClient({
 
   const archivedChannels = isOwner ? channelList.filter(c => c.archived) : [];
 
-  const dmableUsers  = allUsers.filter(u => DM_ROLES.includes(u.role) && u.id !== currentUserId);
+  const dmableUsers  = allUsers.filter(u => getDMableRoles(currentUserRole).includes(u.role) && u.id !== currentUserId);
   const activeDMUsers = allUsers.filter(u =>
     u.id !== currentUserId && messages.some(m => m.channel === dmId(currentUserId, u.id)),
   );
