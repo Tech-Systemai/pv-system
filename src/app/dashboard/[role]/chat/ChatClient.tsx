@@ -19,6 +19,9 @@ const getDMableRoles = (role: string): string[] =>
   role === 'sales' || role === 'cx'
     ? ['owner', 'admin', 'supervisor', 'accountant', 'dentist']
     : ALL_ROLES;
+
+const ALWAYS_ACTIVE_ROLES = ['owner', 'admin', 'accountant', 'dentist'];
+const isClockedIn = (u: any) => ALWAYS_ACTIVE_ROLES.includes(u?.role) || !!u?.clocked_in;
 const BUCKET    = 'chat-files';
 
 const dmId = (uid1: string, uid2: string) => `dm-${[uid1, uid2].sort().join('|')}`;
@@ -334,7 +337,7 @@ export default function ChatClient({
           const unread = dmUnreads[dmCh] || 0;
           return (
             <button key={u.id} onClick={() => openDM(dmCh)} style={{ display: 'flex', alignItems: 'center', gap: '7px', width: '100%', textAlign: 'left', padding: '7px 14px', border: 'none', cursor: 'pointer', background: channel === dmCh ? '#2d3748' : 'transparent', color: channel === dmCh ? '#fff' : '#94a3b8', fontSize: '12px' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#4a5568', flexShrink: 0 }} />
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: isClockedIn(u) ? '#10b981' : '#4a5568', flexShrink: 0 }} />
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</span>
               {unread > 0 && <span style={{ background: '#ef4444', color: '#fff', borderRadius: '8px', fontSize: '9px', fontWeight: 700, padding: '1px 5px', flexShrink: 0 }}>{unread}</span>}
             </button>
@@ -360,7 +363,7 @@ export default function ChatClient({
             )}
           </div>
           <span style={{ fontSize: '11px', color: '#6b7689' }}>
-            {isDM ? (dmRecipient?.clocked_in ? '🟢 Clocked in' : '⚫ Clocked out') : `${channelMembers.length} members`}
+            {isDM ? (isClockedIn(dmRecipient) ? '🟢 Clocked in' : '⚫ Clocked out') : `${channelMembers.length} members`}
           </span>
         </div>
 
@@ -448,9 +451,9 @@ export default function ChatClient({
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: '#1a1f2e', textAlign: 'center', padding: '0 12px' }}>{dmRecipient.name}</div>
                 <div style={{ fontSize: '11px', color: ROLE_COLOR[dmRecipient.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{dmRecipient.role}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: dmRecipient.clocked_in ? '#10b981' : '#9ca3af', marginTop: '4px' }}>
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dmRecipient.clocked_in ? '#10b981' : '#d1d5db' }} />
-                  {dmRecipient.clocked_in ? 'Clocked In' : 'Clocked Out'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: isClockedIn(dmRecipient) ? '#10b981' : '#9ca3af', marginTop: '4px' }}>
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: isClockedIn(dmRecipient) ? '#10b981' : '#d1d5db' }} />
+                  {isClockedIn(dmRecipient) ? 'Clocked In' : 'Clocked Out'}
                 </div>
                 <div style={{ fontSize: '10px', color: '#9ca3af', marginTop: '8px', padding: '0 16px', textAlign: 'center' }}>Private conversation</div>
               </>
@@ -464,7 +467,7 @@ export default function ChatClient({
             <div style={{ flex: 1, overflowY: 'auto' }}>
               {channelMembers.map(u => (
                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 14px' }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#d1d5db', flexShrink: 0 }} />
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isClockedIn(u) ? '#10b981' : '#d1d5db', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#1a1f2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
                     <div style={{ fontSize: '10px', color: ROLE_COLOR[u.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{u.role}</div>
@@ -546,9 +549,9 @@ export default function ChatClient({
                       <div style={{ fontSize: '13px', fontWeight: 600, color: '#1a1f2e' }}>{u.name}</div>
                       <div style={{ fontSize: '11px', color: ROLE_COLOR[u.role] || '#6b7689', fontWeight: 600, textTransform: 'capitalize' }}>{u.role}</div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: u.clocked_in ? '#10b981' : '#9ca3af', flexShrink: 0 }}>
-                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: u.clocked_in ? '#10b981' : '#d1d5db' }} />
-                      {u.clocked_in ? 'In' : 'Out'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: isClockedIn(u) ? '#10b981' : '#9ca3af', flexShrink: 0 }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: isClockedIn(u) ? '#10b981' : '#d1d5db' }} />
+                      {isClockedIn(u) ? 'In' : 'Out'}
                     </div>
                     {hasHistory && <div style={{ fontSize: '10px', color: '#6b7689', flexShrink: 0 }}>existing</div>}
                   </button>
