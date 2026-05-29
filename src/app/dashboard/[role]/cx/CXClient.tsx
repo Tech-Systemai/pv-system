@@ -36,6 +36,39 @@ const PAY_META: Record<string, { bg: string; color: string }> = {
   'Defaulted': { bg: 'oklch(0.92 0.06 25)',  color: 'oklch(0.40 0.20 25)'  },
 };
 
+const PIPELINE_STAGES = [
+  { key: 'new_order',                    label: 'New order' },
+  { key: 'imp_kit_sent',                 label: 'Impressions kit sent' },
+  { key: 'imp_kit_delivered',            label: 'Impressions kit delivered' },
+  { key: 'imp_appointment_done',         label: 'Impression appointment done' },
+  { key: 'collect_payment',              label: 'Collect partial / full payment' },
+  { key: 'waiting_sendback_tracking',    label: 'Awaiting send-back tracking #' },
+  { key: 'imp_kit_on_way_to_lab',        label: 'IMP kit on the way to lab' },
+  { key: 'received_imp_kit_at_lab',      label: 'Received IMP kit at lab' },
+  { key: 'in_production',               label: 'In production' },
+  { key: 'quality_check',               label: 'Quality check' },
+  { key: 'collect_full_payment_veneers', label: 'Collect full payment for veneers' },
+  { key: 'veneers_shipped',             label: 'Veneers shipped' },
+  { key: 'veneers_delivered',           label: 'Veneers delivered' },
+  { key: 'completed_no_issues',         label: 'Completed — no issues' },
+  { key: 'referral_upsell',             label: 'Referral / upsell' },
+];
+const STAGE_GROUPS = [
+  { label: 'IMPRESSIONS',      keys: ['new_order', 'imp_kit_sent', 'imp_kit_delivered', 'imp_appointment_done'] },
+  { label: 'PAYMENT & RETURN', keys: ['collect_payment', 'waiting_sendback_tracking', 'imp_kit_on_way_to_lab', 'received_imp_kit_at_lab'] },
+  { label: 'PRODUCTION',       keys: ['in_production', 'quality_check', 'collect_full_payment_veneers'] },
+  { label: 'DELIVERY & AFTER', keys: ['veneers_shipped', 'veneers_delivered', 'completed_no_issues', 'referral_upsell'] },
+];
+const EXCEPTION_FLAGS = [
+  { key: 'needs_new_imp_kit',               label: 'Needs new impression kit',          hue: 45,  chroma: 0.08 },
+  { key: 'veneers_on_hold_failed_payment',  label: 'Veneers on hold — failed payment',  hue: 15,  chroma: 0.08 },
+  { key: 'remake_issue',                    label: 'Remake / issue',                    hue: 45,  chroma: 0.08 },
+  { key: 'disputed',                        label: 'Disputed',                          hue: 15,  chroma: 0.08 },
+  { key: 'needs_refund',                    label: 'Needs refund',                      hue: 260, chroma: 0.02 },
+  { key: 'veneers_received_failed_payment', label: 'Veneers received — failed payment', hue: 15,  chroma: 0.08 },
+  { key: 'unsatisfied_defaulted',           label: 'Unsatisfied / defaulted',           hue: 15,  chroma: 0.08 },
+];
+
 function sColor(status: string) {
   const h = STATUS_HUE[status] ?? 200;
   return `oklch(0.50 0.20 ${h})`;
@@ -252,6 +285,34 @@ export default function CXClient({
     setStages(newStages);
     await dbOp('global_settings', 'upsert', { key: 'cx_pipeline_stages', value: newStages });
     setShowAddCol(false);
+  };
+
+  const handleToggleStage = async (stageKey: string) => {
+    if (!selectedCase) return;
+    const done: string[] = selectedCase.stages_done ?? [];
+    const idx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
+    const isDone = done.includes(stageKey);
+    let newDone: string[];
+    if (isDone) {
+      const keep = new Set(PIPELINE_STAGES.slice(0, idx).map(s => s.key));
+      newDone = done.filter(k => keep.has(k));
+    } else {
+      newDone = PIPELINE_STAGES.slice(0, idx + 1).map(s => s.key);
+    }
+    const payload = { stages_done: newDone, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: selectedCase.id });
+    setCases(prev => prev.map(c => c.id === selectedCase.id ? { ...c, ...payload } : c));
+    setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
+  const handleToggleException = async (flagKey: string) => {
+    if (!selectedCase) return;
+    const flags: string[] = selectedCase.exception_flags ?? [];
+    const newFlags = flags.includes(flagKey) ? flags.filter(k => k !== flagKey) : [...flags, flagKey];
+    const payload = { exception_flags: newFlags, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: selectedCase.id });
+    setCases(prev => prev.map(c => c.id === selectedCase.id ? { ...c, ...payload } : c));
+    setSelectedCase((p: any) => ({ ...p, ...payload }));
   };
 
   const exportCSV = () => {
@@ -587,6 +648,9 @@ export default function CXClient({
   );
 
   /* ── Case detail modal ──────────────────────────────────────── */
+  const stagesDone: string[]     = selectedCase?.stages_done     ?? [];
+  const exceptionFlags: string[] = selectedCase?.exception_flags ?? [];
+
   const detailModal = selectedCase && (
     <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); } }}>
       <div className="md" style={{ width: 820, maxHeight: '95vh', overflowY: 'auto', padding: 0 }}>
@@ -678,6 +742,87 @@ export default function CXClient({
             <button onClick={() => handleToggleHold(selectedCase)} style={{ marginLeft: 'auto', fontSize: 12, background: 'none', border: '1px solid var(--line)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', color: 'var(--ink-4)' }}>Remove hold</button>
           </div>
         )}
+
+        {/* Pipeline tracker */}
+        <div style={{ padding: '18px 24px 16px', borderBottom: '1px solid var(--line)' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)' }}>
+              WHERE THEY STAND · {stagesDone.length} OF {PIPELINE_STAGES.length} STAGES DONE
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span style={{ fontSize: 26, fontWeight: 900, color: 'oklch(0.38 0.18 260)', lineHeight: 1 }}>
+                {Math.round(stagesDone.length / PIPELINE_STAGES.length * 100)}%
+              </span>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)' }}>THROUGH PIPELINE</span>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div style={{ height: 5, borderRadius: 999, background: 'oklch(0.93 0.01 260)', marginBottom: 16, overflow: 'hidden' }}>
+            <div style={{ height: '100%', borderRadius: 999, background: 'oklch(0.50 0.18 260)', width: `${stagesDone.length / PIPELINE_STAGES.length * 100}%`, transition: 'width 0.25s ease' }} />
+          </div>
+          {/* Stage groups */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18, marginBottom: 14 }}>
+            {STAGE_GROUPS.map(group => {
+              const groupDone = group.keys.filter(k => stagesDone.includes(k)).length;
+              return (
+                <div key={group.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7, paddingBottom: 5, borderBottom: '1px solid var(--line)' }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--ink-4)' }}>{group.label}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: groupDone === group.keys.length ? 'oklch(0.36 0.15 145)' : 'var(--ink-5)' }}>{groupDone}/{group.keys.length}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {group.keys.map(key => {
+                      const stage = PIPELINE_STAGES.find(s => s.key === key)!;
+                      const isDone = stagesDone.includes(key);
+                      const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === key);
+                      const isCurrent = !isDone && stageIdx === stagesDone.length;
+                      return (
+                        <div key={key} onClick={() => handleToggleStage(key)}
+                          style={{ display: 'flex', alignItems: 'flex-start', gap: 7, cursor: 'pointer', padding: '3px 5px', borderRadius: 6,
+                            background: isCurrent ? 'oklch(0.95 0.03 260)' : 'transparent',
+                            border: `1px solid ${isCurrent ? 'oklch(0.88 0.06 260)' : 'transparent'}` }}>
+                          <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                            background: isDone ? 'oklch(0.50 0.18 260)' : 'transparent',
+                            border: isDone ? 'none' : `2px solid ${isCurrent ? 'oklch(0.50 0.18 260)' : 'oklch(0.78 0.02 260)'}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {isDone && <span style={{ color: 'white', fontSize: 8, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                            {isCurrent && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.50 0.18 260)' }} />}
+                          </div>
+                          <span style={{ fontSize: 11.5, lineHeight: 1.35,
+                            color: isDone ? 'var(--ink)' : isCurrent ? 'oklch(0.35 0.18 260)' : 'var(--ink-4)',
+                            fontWeight: isCurrent ? 700 : isDone ? 500 : 400 }}>
+                            {stage.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Exceptions */}
+          <div style={{ borderTop: '1px dashed var(--line)', paddingTop: 11 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--ink-4)', marginBottom: 8 }}>EXCEPTIONS — TAP TO FLAG THIS CASE</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+              {EXCEPTION_FLAGS.map(flag => {
+                const isActive = exceptionFlags.includes(flag.key);
+                return (
+                  <button key={flag.key} onClick={() => handleToggleException(flag.key)}
+                    style={{ padding: '4px 13px', borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+                      background: isActive ? `oklch(0.93 ${flag.chroma} ${flag.hue})` : 'white',
+                      color: isActive ? `oklch(0.35 ${flag.chroma * 2.2} ${flag.hue})` : 'var(--ink-4)',
+                      border: `1.5px solid ${isActive ? `oklch(0.80 ${flag.chroma * 1.5} ${flag.hue})` : 'var(--line)'}`,
+                      transition: 'all 0.12s' }}>
+                    {isActive && <span style={{ marginRight: 4, fontSize: 8 }}>●</span>}
+                    {flag.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
         {/* Body: two columns */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
