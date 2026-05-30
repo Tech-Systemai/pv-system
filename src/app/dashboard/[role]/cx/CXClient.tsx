@@ -114,6 +114,7 @@ export default function CXClient({
   const [holdInputText, setHoldInputText] = useState('');
   const [reassigningCaseId, setReassigningCaseId] = useState<number | null>(null);
   const [reassignValue, setReassignValue] = useState('');
+  const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({});
 
   const [form,      setForm]      = useState({ ...EMPTY_FORM });
   const [updateText, setUpdateText] = useState('');
@@ -315,6 +316,11 @@ export default function CXClient({
     setSelectedCase((p: any) => ({ ...p, ...payload }));
   };
 
+  const markCaseRead = (caseId: number) => {
+    localStorage.setItem(`cx-last-read-${currentUserId}-${caseId}`, new Date().toISOString());
+    setUnreadCounts(prev => { const next = { ...prev }; delete next[caseId]; return next; });
+  };
+
   const exportCSV = () => {
     const rows = [
       ['Name','Phone','Stage','Status','Priority','Issue','Payment Left','Pay Status'],
@@ -335,6 +341,16 @@ export default function CXClient({
     document.addEventListener('keydown', h);
     return () => document.removeEventListener('keydown', h);
   }, [handleLogUpdate]);
+
+  useEffect(() => {
+    const counts: Record<number, number> = {};
+    cases.forEach(c => {
+      const lastRead = localStorage.getItem(`cx-last-read-${currentUserId}-${c.id}`) ?? new Date(0).toISOString();
+      const count = updates.filter(u => u.case_id === c.id && u.created_at > lastRead).length;
+      if (count > 0) counts[c.id] = count;
+    });
+    setUnreadCounts(counts);
+  }, []);
 
   /* ── Status stat strip ─────────────────────────────────────── */
   const statStrip = (
@@ -452,7 +468,7 @@ export default function CXClient({
         const border = c.on_hold ? 'oklch(0.60 0 0)' : sColor(c.status);
         const updateDue = needsUpdate(c);
         return (
-          <div key={c.id} onClick={() => setSelectedCase(c)}
+          <div key={c.id} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}
             style={{ background: 'white', border: '1px solid var(--line)', borderLeft: `4px solid ${border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow .12s, transform .12s', outline: updateDue ? '1.5px solid oklch(0.80 0.12 80)' : 'none' }}
             onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = ''; }}>
@@ -547,7 +563,13 @@ export default function CXClient({
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: (PAY_META[c.pay_status] ?? {}).bg ?? 'var(--surface-2)', color: (PAY_META[c.pay_status] ?? {}).color ?? 'var(--ink-4)' }}>{c.pay_status.toUpperCase()}</span>
               )}
               {c.payment_left != null && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>${Number(c.payment_left).toLocaleString('en-US',{minimumFractionDigits:2})} left</span>}
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-5)' }}>{caseUpdates(c.id).length} update{caseUpdates(c.id).length !== 1 ? 's' : ''}</span>
+              {unreadCounts[c.id] > 0 ? (
+                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, padding: '3px 11px', borderRadius: 999, background: 'oklch(0.91 0.09 145)', color: 'oklch(0.28 0.16 145)', border: '1.5px solid oklch(0.78 0.13 145)' }}>
+                  {unreadCounts[c.id] === 1 ? '1 new update' : `${unreadCounts[c.id]} new updates`}
+                </span>
+              ) : (
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-5)' }}>{caseUpdates(c.id).length} update{caseUpdates(c.id).length !== 1 ? 's' : ''}</span>
+              )}
             </div>
           </div>
         );
@@ -572,17 +594,22 @@ export default function CXClient({
             <div style={{ border: '1px solid var(--line)', borderRadius: '0 0 10px 10px', overflow: 'hidden', background: 'var(--surface)' }}>
               {cols.length === 0 && <div style={{ padding: '18px 14px', textAlign: 'center', color: 'var(--ink-5)', fontSize: 12 }}>—</div>}
               {cols.map((c, i) => (
-                <div key={c.id} onClick={() => setSelectedCase(c)}
+                <div key={c.id} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}
                   style={{ padding: '12px 14px', borderBottom: i < cols.length - 1 ? '1px solid var(--line-2)' : 'none', cursor: 'pointer', borderLeft: `3px solid ${c.on_hold ? 'oklch(0.60 0 0)' : sColor(c.status)}`, background: 'white', transition: 'background .1s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-2)'}
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'white'}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>{c.customer_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-5)', marginBottom: 6 }}>{c.phone}</div>
                   {c.issue && <div style={{ fontSize: 12, color: 'var(--ink-4)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.45 }}>{c.issue}</div>}
-                  <div style={{ marginTop: 8, display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <div style={{ marginTop: 8, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: (PRIORITY_META[c.priority]??PRIORITY_META.MEDIUM).bg, color: (PRIORITY_META[c.priority]??PRIORITY_META.MEDIUM).color }}>{c.priority}</span>
                     {c.on_hold && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'oklch(0.92 0 0)', color: 'oklch(0.45 0 0)' }}>ON HOLD</span>}
                     {needsUpdate(c) && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'oklch(0.94 0.06 80)', color: 'oklch(0.40 0.18 80)' }}>⚠</span>}
+                    {unreadCounts[c.id] > 0 && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: 'oklch(0.91 0.09 145)', color: 'oklch(0.28 0.16 145)', border: '1px solid oklch(0.78 0.13 145)' }}>
+                        {unreadCounts[c.id] === 1 ? '1 new update' : `${unreadCounts[c.id]} new updates`}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -611,13 +638,18 @@ export default function CXClient({
               const pm = PRIORITY_META[c.priority] ?? PRIORITY_META.MEDIUM;
               const paym = PAY_META[c.pay_status] ?? {};
               return (
-                <tr key={c.id} onClick={() => setSelectedCase(c)}
+                <tr key={c.id} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}
                   style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--line-2)' : 'none', cursor: 'pointer', borderLeft: `3px solid ${c.on_hold ? 'oklch(0.60 0 0)' : sColor(c.status)}` }}
                   onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-2)'}
                   onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = ''}>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
                     {c.customer_name}
                     {needsUpdate(c) && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 8, background: 'oklch(0.94 0.06 80)', color: 'oklch(0.40 0.18 80)' }}>⚠</span>}
+                    {unreadCounts[c.id] > 0 && (
+                      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'oklch(0.91 0.09 145)', color: 'oklch(0.28 0.16 145)', border: '1px solid oklch(0.78 0.13 145)' }}>
+                        {unreadCounts[c.id] === 1 ? '1 new update' : `${unreadCounts[c.id]} new updates`}
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '10px 14px', color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>{c.phone}</td>
                   <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
