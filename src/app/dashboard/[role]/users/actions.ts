@@ -23,28 +23,60 @@ export async function createEmployeeAccount(formData: FormData) {
     user_metadata: { name, role },
   });
 
+  let userId: string;
+
   if (authError) {
-    return { error: authError.message };
+    // If the auth user still exists from a partial delete (profile gone, auth record orphaned),
+    // find them by email, reset their credentials, and reuse their ID.
+    const isAlreadyExists =
+      authError.message.toLowerCase().includes('already registered') ||
+      authError.message.toLowerCase().includes('already exists') ||
+      (authError as any).code === 'email_exists';
+
+    if (!isAlreadyExists) {
+      return { error: authError.message };
+    }
+
+    let foundUser = null;
+    let page = 1;
+    while (!foundUser) {
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 50 });
+      if (!listData?.users.length) break;
+      foundUser = listData.users.find(u => u.email === email) ?? null;
+      if (listData.users.length < 50) break;
+      page++;
+    }
+
+    if (!foundUser) return { error: authError.message };
+
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(foundUser.id, {
+      password,
+      email_confirm: true,
+      user_metadata: { name, role },
+    });
+    if (updateError) return { error: updateError.message };
+
+    userId = foundUser.id;
+  } else {
+    userId = authData.user.id;
   }
 
-  if (authData.user) {
-    // Upsert (not update) so it works whether the trigger created the row or not
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .upsert({
-        id: authData.user.id,
-        email,
-        name,
-        username,
-        role,
-        department: role === 'sales' ? 'Sales' : role === 'cx' ? 'CX' : 'Management',
-        salary,
-        status: 'Active',
-      });
+  // Upsert (not update) so it works whether the trigger created the row or not
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .upsert({
+      id: userId,
+      email,
+      name,
+      username,
+      role,
+      department: role === 'sales' ? 'Sales' : role === 'cx' ? 'CX' : 'Management',
+      salary,
+      status: 'Active',
+    });
 
-    if (profileError) {
-      return { error: profileError.message };
-    }
+  if (profileError) {
+    return { error: profileError.message };
   }
 
   return { success: true };
