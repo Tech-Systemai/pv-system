@@ -26,23 +26,16 @@ export async function createEmployeeAccount(formData: FormData) {
   let userId: string;
 
   if (authError) {
-    // If the auth user still exists from a partial delete (profile gone, auth record orphaned),
-    // find them by email, reset their credentials, and reuse their ID.
-    const isAlreadyExists =
-      authError.message.toLowerCase().includes('already registered') ||
-      authError.message.toLowerCase().includes('already exists') ||
-      (authError as any).code === 'email_exists';
-
-    if (!isAlreadyExists) {
-      return { error: authError.message };
-    }
-
+    // Auth creation failed — check if an orphaned auth user exists with this email
+    // (happens when profile deletion succeeded but auth.users deletion failed).
+    // Any auth error triggers the lookup; if no orphan is found we return the original error.
     let foundUser = null;
     let page = 1;
+    const needle = email.toLowerCase();
     while (!foundUser) {
       const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 50 });
-      if (!listData?.users.length) break;
-      foundUser = listData.users.find(u => u.email === email) ?? null;
+      if (!listData?.users?.length) break;
+      foundUser = listData.users.find(u => u.email?.toLowerCase() === needle) ?? null;
       if (listData.users.length < 50) break;
       page++;
     }
