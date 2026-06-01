@@ -10,7 +10,7 @@ export default async function UsersPage() {
   const admin = createAdminClient();
   const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
   const isMgmt = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
-  const canAdd = ['owner', 'admin'].includes(profile?.role ?? '');
+  const canAdd = ['owner', 'admin', 'dentist'].includes(profile?.role ?? '');
 
   const { data: employees } = await admin.from('profiles').select('*').order('name');
 
