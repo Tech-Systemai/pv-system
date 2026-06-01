@@ -469,7 +469,7 @@ export default function RemakeRequestsClient({
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input type="text" placeholder="Search patient, case ID…" value={search}
               onChange={e => setSearch(e.target.value)} className="fld-input" style={{ width: 200, fontSize: 12 }} />
-            {!isOwner && <button className="btn btn-acc btn-sm" onClick={() => setShowNew(true)}>+ New remake request</button>}
+            <button className="btn btn-acc btn-sm" onClick={() => setShowNew(true)}>+ New remake request</button>
           </div>
         </div>
 
