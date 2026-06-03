@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, type ChangeEvent, type Dispatch, type SetStateAction } from 'react';
+import { useState, useRef, type RefObject, type ChangeEvent, type Dispatch, type SetStateAction } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { dbOp } from '@/utils/db';
 
@@ -181,6 +181,12 @@ export default function RemakeRequestsClient({
   const [kitTracking, setKitTracking] = useState('');
   const [kitSaving, setKitSaving] = useState(false);
 
+  // Lab reference photo uploads (owner)
+  const [labFiles, setLabFiles] = useState<File[]>([]);
+  const [labLabels, setLabLabels] = useState<string[]>([]);
+  const [uploadingLab, setUploadingLab] = useState(false);
+  const labFileRef = useRef<HTMLInputElement>(null);
+
   // ─── Derived ───────────────────────────────────────────────────────────────
 
   const display = isOwner ? requests : requests.filter(r => r.submitted_by === currentUserId);
@@ -215,7 +221,19 @@ export default function RemakeRequestsClient({
     setNewPhotoTypes(prev => prev.filter((_, j) => j !== i));
   };
 
-  const uploadPhotos = async (requestId: number, files: File[], types: string[]) => {
+  const addLabFiles = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setLabFiles(prev => [...prev, ...files]);
+    setLabLabels(prev => [...prev, ...files.map(() => '')]);
+    if (labFileRef.current) labFileRef.current.value = '';
+  };
+
+  const removeLabFile = (i: number) => {
+    setLabFiles(prev => prev.filter((_, j) => j !== i));
+    setLabLabels(prev => prev.filter((_, j) => j !== i));
+  };
+
+  const uploadPhotos = async (requestId: number, files: File[], types: string[], labels?: string[]) => {
     const added: RemakePhoto[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -229,6 +247,7 @@ export default function RemakeRequestsClient({
         photo_type: types[i] ?? PHOTO_TYPES[i] ?? 'PHOTO',
         photo_url: publicUrl,
         uploaded_by: currentUserId,
+        ...(labels?.[i] ? { photo_label: labels[i] } : {}),
       });
       if (data?.[0]) added.push(data[0] as RemakePhoto);
     }
@@ -284,8 +303,24 @@ export default function RemakeRequestsClient({
       const updated = { ...selected, ...patch };
       setRequests(prev => prev.map(r => r.id === selected.id ? updated : r));
       setSelected(updated);
+      if (labFiles.length > 0) {
+        const added = await uploadPhotos(selected.id, labFiles, labFiles.map(() => 'LAB_REF'), labLabels);
+        setPhotos(prev => [...prev, ...added]);
+        setLabFiles([]);
+        setLabLabels([]);
+      }
     }
     setBusy(false);
+  };
+
+  const uploadLabPhotosDirect = async () => {
+    if (!selected || labFiles.length === 0) return;
+    setUploadingLab(true);
+    const added = await uploadPhotos(selected.id, labFiles, labFiles.map(() => 'LAB_REF'), labLabels);
+    setPhotos(prev => [...prev, ...added]);
+    setLabFiles([]);
+    setLabLabels([]);
+    setUploadingLab(false);
   };
 
   const decline = async () => {
@@ -379,6 +414,14 @@ export default function RemakeRequestsClient({
           onAdvanceStage={advanceStage}
           onDelete={deleteRequest}
           onBack={() => setSelected(null)}
+          labFiles={labFiles}
+          labLabels={labLabels}
+          labFileRef={labFileRef}
+          uploadingLab={uploadingLab}
+          onAddLabFiles={addLabFiles}
+          onRemoveLabFile={removeLabFile}
+          onUpdateLabLabel={(i, v) => setLabLabels(prev => prev.map((l, j) => j === i ? v : l))}
+          onUploadLabPhotos={uploadLabPhotosDirect}
         />
       </div>
     );
@@ -625,6 +668,60 @@ export default function RemakeRequestsClient({
   );
 }
 
+// ─── Lab Upload Panel ─────────────────────────────────────────────────────────
+
+function LabUploadPanel({ labFiles, labLabels, labFileRef, uploadingLab, isPending, onAddLabFiles, onRemoveLabFile, onUpdateLabLabel, onUploadLabPhotos }: {
+  labFiles: File[];
+  labLabels: string[];
+  labFileRef: RefObject<HTMLInputElement | null>;
+  uploadingLab: boolean;
+  isPending: boolean;
+  onAddLabFiles: (e: ChangeEvent<HTMLInputElement>) => void;
+  onRemoveLabFile: (i: number) => void;
+  onUpdateLabLabel: (i: number, v: string) => void;
+  onUploadLabPhotos: () => void;
+}) {
+  return (
+    <div style={{ marginTop: 14, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ink-4)', marginBottom: 10 }}>
+        LAB REFERENCE IMAGES · {labFiles.length} QUEUED
+      </div>
+      {labFiles.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8, marginBottom: 10 }}>
+          {labFiles.map((f, i) => (
+            <div key={i} style={{ border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+              <div style={{ aspectRatio: '4/3', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🔬</div>
+              <div style={{ padding: '4px 6px' }}>
+                <input type="text" placeholder="Label (optional)" value={labLabels[i] ?? ''}
+                  onChange={e => onUpdateLabLabel(i, e.target.value)}
+                  style={{ width: '100%', fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)' }} />
+              </div>
+              <div style={{ padding: '0 6px 5px', fontSize: 9, color: 'var(--ink-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+              <button onClick={() => onRemoveLabFile(i)}
+                style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div onClick={() => labFileRef.current?.click()}
+          style={{ flex: 1, border: '2px dashed var(--line)', borderRadius: 8, padding: '10px 14px', textAlign: 'center', cursor: 'pointer', fontSize: 12, color: 'var(--ink-4)' }}>
+          + Add lab reference images
+        </div>
+        <input ref={labFileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onAddLabFiles} />
+        {labFiles.length > 0 && !isPending && (
+          <button className="btn btn-sm" style={{ background: 'oklch(0.45 0.15 265)', color: '#fff', border: 'none', whiteSpace: 'nowrap' }}
+            disabled={uploadingLab} onClick={onUploadLabPhotos}>
+            {uploadingLab ? '…' : `↑ Upload ${labFiles.length}`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Detail View ──────────────────────────────────────────────────────────────
 
 function DetailView({
@@ -634,6 +731,8 @@ function DetailView({
   declineReason, setDeclineReason,
   kitTracking, setKitTracking, kitSaving, onSaveKitTracking,
   busy, onApprove, onDecline, onAdvanceStage, onDelete, onBack,
+  labFiles, labLabels, labFileRef, uploadingLab,
+  onAddLabFiles, onRemoveLabFile, onUpdateLabLabel, onUploadLabPhotos,
 }: {
   request: RemakeRequest;
   photos: RemakePhoto[];
@@ -654,12 +753,25 @@ function DetailView({
   onAdvanceStage: (key: string) => void;
   onDelete: () => void;
   onBack: () => void;
+  labFiles: File[];
+  labLabels: string[];
+  labFileRef: RefObject<HTMLInputElement | null>;
+  uploadingLab: boolean;
+  onAddLabFiles: (e: ChangeEvent<HTMLInputElement>) => void;
+  onRemoveLabFile: (i: number) => void;
+  onUpdateLabLabel: (i: number, v: string) => void;
+  onUploadLabPhotos: () => void;
 }) {
   const stage = getStage(request);
   const isPending    = request.status === 'pending_review';
   const isProduction = request.status === 'in_production';
   const isApproved   = isProduction || request.status === 'delivered';
   const rh = reasonHue(request.reason_category);
+
+  const customerPhotos = photos.filter(p => p.photo_type !== 'LAB_REF');
+  const labPhotos      = photos.filter(p => p.photo_type === 'LAB_REF');
+
+  const labPanelProps = { labFiles, labLabels, labFileRef, uploadingLab, isPending, onAddLabFiles, onRemoveLabFile, onUpdateLabLabel, onUploadLabPhotos };
 
   const nextStage = STAGES[stage];
   const canAdvance = stage < 6 && nextStage && (
@@ -828,14 +940,14 @@ function DetailView({
           </div>
         </div>
 
-        {/* Photos */}
-        {photos.length > 0 && (
+        {/* Customer photos */}
+        {customerPhotos.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ink-4)', marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
-              <span>PHOTOS FROM CUSTOMER</span><span>{photos.length} ATTACHED</span>
+              <span>PHOTOS FROM CUSTOMER</span><span>{customerPhotos.length} ATTACHED</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
-              {photos.map(p => (
+              {customerPhotos.map(p => (
                 <div key={p.id} style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
                   <a href={p.photo_url} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
                     <div style={{ position: 'relative', aspectRatio: '4/3', background: 'var(--surface-2)' }}>
@@ -852,6 +964,36 @@ function DetailView({
                     </div>
                   </a>
                   {p.photo_label && <div style={{ padding: '5px 8px', fontSize: 10.5, color: 'var(--ink-3)' }}>{p.photo_label}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Lab reference photos */}
+        {labPhotos.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'oklch(0.40 0.14 265)', marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
+              <span>LAB REFERENCE IMAGES</span><span>{labPhotos.length} ATTACHED</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
+              {labPhotos.map(p => (
+                <div key={p.id} style={{ border: '1px solid oklch(0.82 0.12 265)', borderRadius: 10, overflow: 'hidden', background: 'oklch(0.97 0.02 265)' }}>
+                  <a href={p.photo_url} target="_blank" rel="noreferrer" style={{ display: 'block' }}>
+                    <div style={{ position: 'relative', aspectRatio: '4/3', background: 'oklch(0.94 0.04 265)' }}>
+                      <span style={{ position: 'absolute', top: 7, left: 7, zIndex: 1, background: 'oklch(0.40 0.16 265)', color: '#fff', fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', padding: '2px 7px', borderRadius: 4 }}>
+                        LAB REF
+                      </span>
+                      <img src={p.photo_url} alt="lab reference"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        onError={e => {
+                          const el = e.currentTarget as HTMLImageElement;
+                          el.style.display = 'none';
+                          if (el.parentElement) el.parentElement.style.background = 'repeating-linear-gradient(45deg,oklch(0.94 0.04 265),oklch(0.94 0.04 265) 8px,oklch(0.88 0.08 265) 8px,oklch(0.88 0.08 265) 16px)';
+                        }} />
+                    </div>
+                  </a>
+                  {p.photo_label && <div style={{ padding: '5px 8px', fontSize: 10.5, color: 'oklch(0.40 0.14 265)', fontWeight: 500 }}>{p.photo_label}</div>}
                 </div>
               ))}
             </div>
@@ -922,7 +1064,8 @@ function DetailView({
                 placeholder="e.g. Replace #10 only. Verify occlusal contact ≤ 0.3mm."
                 value={approveForm.owner_notes} onChange={e => setApproveForm(f => ({ ...f, owner_notes: e.target.value }))} />
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
+            <LabUploadPanel {...labPanelProps} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
               <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.88 0.06 25)' }} onClick={() => setShowDecline(true)}>
                 ✕ Decline request
               </button>
@@ -934,6 +1077,15 @@ function DetailView({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Standalone lab reference upload for non-pending cases */}
+        {isOwner && !isPending && request.status !== 'rejected' && (
+          <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 18, marginTop: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ink-4)', marginBottom: 4 }}>LAB REFERENCE IMAGES</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 2 }}>Attach annotated photos or diagrams to guide the lab on the exact fault.</div>
+            <LabUploadPanel {...labPanelProps} />
           </div>
         )}
 
