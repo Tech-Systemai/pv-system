@@ -44,3 +44,31 @@ export function fmtDateShort(d: Date | string | null | undefined): string {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
+
+/**
+ * Returns the current 14-day bi-weekly period boundaries for an employee.
+ * Anchored on firstPayDate; falls back to last 14 days ending today if not set.
+ */
+export function getCurrentBiweeklyPeriod(firstPayDate: string | null | undefined): {
+  start: Date; end: Date; startStr: string; endStr: string; label: string;
+} {
+  let start: Date;
+  if (firstPayDate) {
+    const anchor = new Date(firstPayDate);
+    anchor.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((today.getTime() - anchor.getTime()) / 86400000);
+    const periodIdx = Math.max(0, Math.floor(diffDays / 14));
+    start = new Date(anchor);
+    start.setDate(anchor.getDate() + periodIdx * 14);
+  } else {
+    start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 13);
+  }
+  const end = new Date(start);
+  end.setDate(start.getDate() + 13);
+  const label = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  return { start, end, startStr: start.toISOString().slice(0, 10), endStr: end.toISOString().slice(0, 10), label };
+}
