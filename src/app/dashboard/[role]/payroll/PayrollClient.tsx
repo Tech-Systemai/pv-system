@@ -4,19 +4,42 @@ import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 
 const PERIOD = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+const NORMAL_MINS_PER_DAY = 480; // 8 hours
+
+type CustomItem = { id: string; description: string; amount: number; type: 'addition' | 'deduction' };
+type EditCustomItem = { id: string; description: string; amount: string; type: 'addition' | 'deduction' };
+
+function fmtH(mins: number) {
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+function getCustomItemsNet(items: CustomItem[]): number {
+  return items.reduce((s, ci) => s + (ci.type === 'addition' ? ci.amount : -ci.amount), 0);
+}
 
 function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
   const date = new Date().toLocaleDateString();
+  const att = item.att ?? { normalMins: 0, overtimeMins: 0, totalMins: 0, daysPresent: 0, daysLate: 0 };
+  const customItems: CustomItem[] = item.slip?.custom_items ?? [];
+
   const vRows = empViolations.map(v => `
     <tr>
       <td style="padding:7px 10px;font-weight:500;font-size:12px">${v.rule_name ?? ''}</td>
       <td style="padding:7px 10px;color:#64748b;font-size:12px">${v.explanation ?? ''}</td>
-      <td style="padding:7px 10px;color:#94a3b8;font-size:12px;white-space:nowrap">${new Date(v.triggered_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+      <td style="padding:7px 10px;color:#94a3b8;font-size:12px;white-space:nowrap">${new Date(v.triggered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
       <td style="padding:7px 10px;text-align:right;color:#ef4444;font-size:12px">−${v.points_deducted ?? 0}</td>
       <td style="padding:7px 10px;text-align:right;color:#ef4444;font-weight:600;font-size:12px">−$${(v.salary_deducted ?? 0).toFixed(2)}</td>
     </tr>`).join('');
+
   const bonusRow = (item.bonuses ?? 0) > 0
     ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Bonus</span><span style="font-weight:600;color:#10b981">+$${item.bonuses}</span></div>` : '';
+
+  const customItemRows = customItems.map(ci =>
+    `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
+      <span style="color:#475569">${ci.description || 'Custom item'}</span>
+      <span style="font-weight:600;color:${ci.type === 'addition' ? '#10b981' : '#ef4444'}">${ci.type === 'addition' ? '+' : '−'}$${ci.amount.toFixed(2)}</span>
+    </div>`).join('');
+
   const deductTable = empViolations.length > 0 ? `
     <div style="margin-bottom:24px">
       <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:10px">Deduction Detail</div>
@@ -36,6 +59,7 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
       </table>
       ${item.slip?.deduction_notes ? `<div style="margin-top:8px;font-size:12px;color:#64748b;padding:6px 10px;background:#fffbeb;border-radius:6px;border-left:3px solid #f59e0b">Note: ${item.slip.deduction_notes}</div>` : ''}
     </div>` : '';
+
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Payslip — ${PERIOD}</title>
 <style>body{font-family:Inter,Arial,sans-serif;max-width:800px;margin:40px auto;padding:0 40px;color:#1a1f2e;line-height:1.6}table{width:100%;border-collapse:collapse}@media print{body{margin:0}}</style>
 </head><body>
@@ -51,12 +75,17 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
     <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:8px">Employee</div>
     <div style="font-size:18px;font-weight:700;color:#0f172a">${emp.name}</div>
     <div style="font-size:13px;color:#475569">${emp.role}${emp.department ? ' · ' + emp.department : ''}</div>
-    <div style="font-size:12px;color:#475569;margin-top:8px;line-height:1.6">Days present: ${item.att?.daysPresent ?? '—'}<br>Days late: ${item.att?.daysLate ?? '—'}<br>Tracked hours: ${Math.floor((item.att?.totalMins ?? 0)/60)}h ${(item.att?.totalMins ?? 0)%60}m</div>
+    <div style="font-size:12px;color:#475569;margin-top:8px;line-height:1.8">
+      Days present: ${att.daysPresent}<br>Days late: ${att.daysLate}<br>
+      Normal time: ${fmtH(att.normalMins)}<br>Overtime: ${fmtH(att.overtimeMins)}<br>
+      Total tracked: ${fmtH(att.totalMins)}
+    </div>
   </div>
   <div style="background:#f8fafc;padding:20px;border-radius:12px">
     <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:10px">Payment Summary</div>
     <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Base Salary</span><span style="font-weight:600">$${item.base.toLocaleString()}</span></div>
     ${bonusRow}
+    ${customItemRows}
     <div style="display:flex;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px;font-size:13px"><span style="color:#ef4444">Total Deductions</span><span style="color:#ef4444;font-weight:600">−$${item.deductions.toLocaleString()}</span></div>
     <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;font-weight:700">Net Pay</span><span style="font-size:24px;font-weight:800;color:#10b981">$${item.net.toLocaleString()}</span></div>
   </div>
@@ -93,20 +122,25 @@ export default function PayrollClient({
   const [editBonus, setEditBonus] = useState('');
   const [editAdj, setEditAdj] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const [editCustomItems, setEditCustomItems] = useState<EditCustomItem[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
-  const attendanceByUser: Record<string, { totalMins: number; daysPresent: number; daysLate: number }> = {};
+  const attendanceByUser: Record<string, { totalMins: number; normalMins: number; overtimeMins: number; daysPresent: number; daysLate: number }> = {};
   for (const log of attendanceLogs) {
-    if (!attendanceByUser[log.user_id]) attendanceByUser[log.user_id] = { totalMins: 0, daysPresent: 0, daysLate: 0 };
-    attendanceByUser[log.user_id].totalMins += log.productive_time_minutes ?? 0;
+    if (!attendanceByUser[log.user_id]) {
+      attendanceByUser[log.user_id] = { totalMins: 0, normalMins: 0, overtimeMins: 0, daysPresent: 0, daysLate: 0 };
+    }
+    const mins = log.productive_time_minutes ?? 0;
+    attendanceByUser[log.user_id].totalMins += mins;
+    attendanceByUser[log.user_id].normalMins += Math.min(mins, NORMAL_MINS_PER_DAY);
+    attendanceByUser[log.user_id].overtimeMins += Math.max(0, mins - NORMAL_MINS_PER_DAY);
     if (log.clock_in_time) attendanceByUser[log.user_id].daysPresent++;
     if (log.status === 'late') attendanceByUser[log.user_id].daysLate++;
   }
 
-  // Violations indexed by user for quick lookup
   const violationsByUser: Record<string, any[]> = {};
   for (const v of violations) {
     if (!violationsByUser[v.user_id]) violationsByUser[v.user_id] = [];
@@ -124,7 +158,7 @@ export default function PayrollClient({
       const deductions = getAutoDeductions(e.id);
       const base_salary = e.salary || 2500;
       const net_pay = parseFloat((base_salary - deductions).toFixed(2));
-      return { user_id: e.id, period: PERIOD, base_salary, deductions, bonuses: 0, manual_adj: 0, net_pay, status: 'Approved' };
+      return { user_id: e.id, period: PERIOD, base_salary, deductions, bonuses: 0, manual_adj: 0, net_pay, status: 'Approved', custom_items: [] };
     });
     const { data, error } = await dbOp('payrolls', 'insert', newPayrolls);
     if (error) { showToast(`Error: ${error}`); }
@@ -138,6 +172,20 @@ export default function PayrollClient({
     setEditBonus(String(item.slip?.bonuses ?? 0));
     setEditAdj(String(item.slip?.manual_adj ?? 0));
     setEditNotes(item.slip?.deduction_notes ?? '');
+    const raw: CustomItem[] = item.slip?.custom_items ?? [];
+    setEditCustomItems(raw.map(ci => ({ ...ci, amount: String(ci.amount) })));
+  };
+
+  const addCustomItem = () => {
+    setEditCustomItems(prev => [...prev, { id: crypto.randomUUID(), description: '', amount: '0', type: 'addition' }]);
+  };
+
+  const updateCustomItem = (idx: number, patch: Partial<EditCustomItem>) => {
+    setEditCustomItems(prev => prev.map((ci, i) => i === idx ? { ...ci, ...patch } : ci));
+  };
+
+  const removeCustomItem = (idx: number) => {
+    setEditCustomItems(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleEditSave = async () => {
@@ -147,13 +195,21 @@ export default function PayrollClient({
     const bonus = parseFloat(editBonus) || 0;
     const adj = parseFloat(editAdj) || 0;
     const autoDeductions = getAutoDeductions(editItem.emp.id);
-    const totalDeductions = parseFloat((autoDeductions - adj).toFixed(2)); // adj = positive means reduce deduction
-    const net = parseFloat((base + bonus - Math.max(0, totalDeductions)).toFixed(2));
+    const totalDeductions = parseFloat((autoDeductions - adj).toFixed(2));
+    const savedCustomItems: CustomItem[] = editCustomItems.map(ci => ({
+      id: ci.id,
+      description: ci.description,
+      amount: parseFloat(ci.amount) || 0,
+      type: ci.type,
+    }));
+    const customNet = getCustomItemsNet(savedCustomItems);
+    const net = parseFloat((base + bonus - Math.max(0, totalDeductions) + customNet).toFixed(2));
 
     const patch = {
       base_salary: base, bonuses: bonus, manual_adj: adj,
       deductions: Math.max(0, totalDeductions), net_pay: net,
       deduction_notes: editNotes, status: 'Approved',
+      custom_items: savedCustomItems,
     };
 
     if (editItem.slip) {
@@ -197,14 +253,14 @@ export default function PayrollClient({
   const currentPeriodList = employees.map(e => {
     const slip = payrolls.find(p => p.user_id === e.id && p.period === PERIOD);
     const autoDeductions = getAutoDeductions(e.id);
-    const manualAdj = slip?.manual_adj ?? 0;
     const deductions = slip ? slip.deductions : autoDeductions;
     const base = slip ? slip.base_salary : (e.salary || 2500);
     const bonuses = slip?.bonuses ?? 0;
-    const net = slip ? slip.net_pay : parseFloat((base - deductions).toFixed(2));
+    const customItems: CustomItem[] = slip?.custom_items ?? [];
+    const net = slip ? slip.net_pay : parseFloat((base - deductions + getCustomItemsNet(customItems)).toFixed(2));
     const isApproved = slip?.status === 'Approved';
-    const att = attendanceByUser[e.id] ?? { totalMins: 0, daysPresent: 0, daysLate: 0 };
-    return { emp: e, base, deductions, net, bonuses, manualAdj, isApproved, slip, att };
+    const att = attendanceByUser[e.id] ?? { totalMins: 0, normalMins: 0, overtimeMins: 0, daysPresent: 0, daysLate: 0 };
+    return { emp: e, base, deductions, net, bonuses, customItems, isApproved, slip, att };
   });
 
   const totalPayroll = currentPeriodList.reduce((s, i) => s + i.net, 0);
@@ -255,7 +311,7 @@ export default function PayrollClient({
           <div className="card-hdr">
             <div>
               <div className="card-title">Payroll · {PERIOD}</div>
-              <div className="card-sub">Deductions pulled from policy violations · click Edit to add adjustments or bonuses</div>
+              <div className="card-sub">Deductions pulled from policy violations · click Edit to add adjustments, bonuses, or custom line items</div>
             </div>
             <button className="btn btn-acc btn-sm" onClick={handleProcessAll} disabled={isProcessing}>
               {isProcessing ? 'Processing…' : '⚡ Process & Approve All'}
@@ -267,11 +323,11 @@ export default function PayrollClient({
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Attendance</th>
+                  <th>Hours Worked</th>
                   <th>Base Salary</th>
                   <th>Violations</th>
                   <th>Deductions</th>
-                  <th>Bonus</th>
+                  <th>Bonus / Other</th>
                   <th>Net Pay</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -281,6 +337,8 @@ export default function PayrollClient({
                 {currentPeriodList.map(item => {
                   const hue = ((item.emp.name || 'U').charCodeAt(0) * 13) % 360;
                   const empViolations = violationsByUser[item.emp.id] ?? [];
+                  const customAdditions = item.customItems.filter(ci => ci.type === 'addition');
+                  const customDeductions = item.customItems.filter(ci => ci.type === 'deduction');
                   return (
                     <tr key={item.emp.id}>
                       <td>
@@ -294,8 +352,12 @@ export default function PayrollClient({
                           </div>
                         </div>
                       </td>
-                      <td style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--mono)' }}>
-                        {item.att.daysPresent}d · {item.att.daysLate}L · {Math.floor(item.att.totalMins / 60)}h
+                      <td style={{ fontSize: 11, fontFamily: 'var(--mono)' }}>
+                        <div style={{ color: 'var(--ink-2)' }}>{Math.floor(item.att.normalMins / 60)}h norm</div>
+                        {item.att.overtimeMins > 0 && (
+                          <div style={{ color: 'var(--acc)' }}>{Math.floor(item.att.overtimeMins / 60)}h OT</div>
+                        )}
+                        <div style={{ color: 'var(--ink-4)', fontSize: 10 }}>{item.att.daysPresent}d · {item.att.daysLate}L</div>
                       </td>
                       <td style={{ fontWeight: 600 }}>${item.base.toLocaleString()}</td>
                       <td style={{ fontSize: 11 }}>
@@ -319,8 +381,19 @@ export default function PayrollClient({
                           <span style={{ color: 'var(--ink-4)' }}>—</span>
                         )}
                       </td>
-                      <td style={{ color: item.bonuses > 0 ? 'var(--ok)' : 'var(--ink-4)', fontFamily: 'var(--mono)' }}>
-                        {item.bonuses > 0 ? `+$${item.bonuses}` : '—'}
+                      <td style={{ fontSize: 11 }}>
+                        {item.bonuses > 0 && (
+                          <div style={{ color: 'var(--ok)', fontFamily: 'var(--mono)' }}>+${item.bonuses} bonus</div>
+                        )}
+                        {customAdditions.map((ci, i) => (
+                          <div key={i} style={{ color: 'var(--ok)', whiteSpace: 'nowrap' }}>+${ci.amount.toFixed(2)} {ci.description?.slice(0, 18)}</div>
+                        ))}
+                        {customDeductions.map((ci, i) => (
+                          <div key={i} style={{ color: 'var(--err)', whiteSpace: 'nowrap' }}>−${ci.amount.toFixed(2)} {ci.description?.slice(0, 18)}</div>
+                        ))}
+                        {item.bonuses === 0 && item.customItems.length === 0 && (
+                          <span style={{ color: 'var(--ink-4)' }}>—</span>
+                        )}
                       </td>
                       <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--ok)' }}>${item.net.toLocaleString()}</td>
                       <td>
@@ -361,11 +434,37 @@ export default function PayrollClient({
         const adjVal = parseFloat(editAdj) || 0;
         const bonusVal = parseFloat(editBonus) || 0;
         const baseVal = parseFloat(editBase) || editItem.base;
-        const previewNet = parseFloat((baseVal + bonusVal - Math.max(0, autoDeductions - adjVal)).toFixed(2));
+        const savedCustomItems = editCustomItems.map(ci => ({ ...ci, amount: parseFloat(ci.amount) || 0, type: ci.type }));
+        const customNet = getCustomItemsNet(savedCustomItems as CustomItem[]);
+        const previewNet = parseFloat((baseVal + bonusVal - Math.max(0, autoDeductions - adjVal) + customNet).toFixed(2));
+        const att = editItem.att ?? { normalMins: 0, overtimeMins: 0, totalMins: 0 };
         return (
           <div className="mb" onClick={e => { if (e.target === e.currentTarget) setEditItem(null); }}>
-            <div className="md" style={{ width: 560, maxHeight: '88vh', overflowY: 'auto' }}>
+            <div className="md" style={{ width: 600, maxHeight: '88vh', overflowY: 'auto' }}>
               <div className="md-t">Edit Payslip — {editItem.emp.name}</div>
+
+              {/* Hours worked (read-only) */}
+              {att.totalMins > 0 && (
+                <div style={{ background: 'var(--surface-2)', borderRadius: 9, padding: '12px 14px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 10 }}>HOURS WORKED THIS PERIOD</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 2 }}>Normal Time</div>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtH(att.normalMins)}</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '8px 0', borderLeft: '1px solid var(--line-2)', borderRight: '1px solid var(--line-2)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 2 }}>Overtime</div>
+                      <div style={{ fontWeight: 700, fontSize: 16, color: att.overtimeMins > 0 ? 'var(--acc)' : 'var(--ink-3)' }}>
+                        {fmtH(att.overtimeMins)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                      <div style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 2 }}>Total</div>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtH(att.totalMins)}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Violation breakdown */}
               {empViolations.length > 0 && (
@@ -411,14 +510,55 @@ export default function PayrollClient({
                   placeholder="e.g. Deduction waived for approved leave" style={{ resize: 'vertical' }} />
               </div>
 
+              {/* Custom line items */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Custom Line Items <span style={{ color: 'var(--ink-4)', fontWeight: 400, fontSize: 12 }}>— allowances, advances, deductions, etc.</span></div>
+                  <button className="btn btn-sec btn-sm" onClick={addCustomItem}>+ Add Item</button>
+                </div>
+                {editCustomItems.length === 0 && (
+                  <div style={{ color: 'var(--ink-4)', fontSize: 12, padding: '6px 0' }}>No custom items added.</div>
+                )}
+                {editCustomItems.map((ci, idx) => (
+                  <div key={ci.id} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 120px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <input
+                      className="fld-input"
+                      placeholder="Description (e.g. Travel allowance)"
+                      value={ci.description}
+                      onChange={e => updateCustomItem(idx, { description: e.target.value })}
+                    />
+                    <input
+                      className="fld-input mono"
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={ci.amount}
+                      onChange={e => updateCustomItem(idx, { amount: e.target.value })}
+                    />
+                    <select
+                      className="fld-input"
+                      value={ci.type}
+                      onChange={e => updateCustomItem(idx, { type: e.target.value as 'addition' | 'deduction' })}
+                    >
+                      <option value="addition">+ Addition</option>
+                      <option value="deduction">− Deduction</option>
+                    </select>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--err)', padding: '0 8px' }}
+                      onClick={() => removeCustomItem(idx)}
+                      title="Remove"
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Net pay preview */}
               <div style={{ background: 'var(--surface-2)', padding: '12px 14px', borderRadius: 9, marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 10 }}>NET PAY PREVIEW</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
                   <span style={{ color: 'var(--ink-3)' }}>Base salary</span>
                   <span>${baseVal.toLocaleString()}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--ink-3)' }}>Deductions (after adj.)</span>
-                  <span style={{ color: 'var(--err)' }}>−${Math.max(0, autoDeductions - adjVal).toFixed(2)}</span>
                 </div>
                 {bonusVal > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
@@ -426,6 +566,21 @@ export default function PayrollClient({
                     <span style={{ color: 'var(--ok)' }}>+${bonusVal}</span>
                   </div>
                 )}
+                {savedCustomItems.map((ci, idx) => {
+                  const amt = (ci as any).amount ?? 0;
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                      <span style={{ color: 'var(--ink-3)' }}>{(ci as any).description || 'Custom item'}</span>
+                      <span style={{ color: (ci as any).type === 'addition' ? 'var(--ok)' : 'var(--err)' }}>
+                        {(ci as any).type === 'addition' ? '+' : '−'}${amt.toFixed(2)}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--ink-3)' }}>Deductions (after adj.)</span>
+                  <span style={{ color: 'var(--err)' }}>−${Math.max(0, autoDeductions - adjVal).toFixed(2)}</span>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, paddingTop: 8, borderTop: '1px solid var(--line-2)' }}>
                   <span>Net Pay</span>
                   <span style={{ color: 'var(--ok)' }}>${previewNet.toLocaleString()}</span>
@@ -446,6 +601,8 @@ export default function PayrollClient({
       {/* Print / PDF payslip */}
       {printSlip && (() => {
         const empViolations = violationsByUser[printSlip.emp.id] ?? [];
+        const att = printSlip.att ?? { normalMins: 0, overtimeMins: 0, totalMins: 0, daysPresent: 0, daysLate: 0 };
+        const customItems: CustomItem[] = printSlip.slip?.custom_items ?? [];
         return (
           <div className="print-container" style={{ background: '#fff', padding: '40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
             <div style={{ borderBottom: '2px solid oklch(0.52 0.20 268)', paddingBottom: '20px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -467,10 +624,12 @@ export default function PayrollClient({
                 <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px' }}>Employee</div>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{printSlip.emp.name}</div>
                 <div style={{ fontSize: '13px', color: '#475569' }}>{printSlip.emp.role} · {printSlip.emp.department}</div>
-                <div style={{ fontSize: '12px', color: '#475569', marginTop: '8px', lineHeight: 1.6 }}>
-                  Days present: {printSlip.att.daysPresent}<br />
-                  Days late: {printSlip.att.daysLate}<br />
-                  Tracked hours: {Math.floor(printSlip.att.totalMins / 60)}h {printSlip.att.totalMins % 60}m
+                <div style={{ fontSize: '12px', color: '#475569', marginTop: '8px', lineHeight: 1.8 }}>
+                  Days present: {att.daysPresent}<br />
+                  Days late: {att.daysLate}<br />
+                  Normal time: {fmtH(att.normalMins)}<br />
+                  Overtime: {fmtH(att.overtimeMins)}<br />
+                  Total tracked: {fmtH(att.totalMins)}
                 </div>
               </div>
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px' }}>
@@ -485,6 +644,14 @@ export default function PayrollClient({
                     <span style={{ fontWeight: 600, color: '#10b981' }}>+${printSlip.bonuses}</span>
                   </div>
                 )}
+                {customItems.map((ci, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
+                    <span style={{ color: '#475569' }}>{ci.description || 'Custom item'}</span>
+                    <span style={{ fontWeight: 600, color: ci.type === 'addition' ? '#10b981' : '#ef4444' }}>
+                      {ci.type === 'addition' ? '+' : '−'}${ci.amount.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', fontSize: '13px' }}>
                   <span style={{ color: '#ef4444' }}>Total Deductions</span>
                   <span style={{ color: '#ef4444', fontWeight: 600 }}>−${printSlip.deductions.toLocaleString()}</span>
