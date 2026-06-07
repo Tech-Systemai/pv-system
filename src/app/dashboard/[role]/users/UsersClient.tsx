@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { dbOp } from '@/utils/db';
 import { createClient } from '@/utils/supabase/client';
 import { createEmployeeAccount, deleteEmployee, resetUserPassword } from './actions';
 import { useRouter } from 'next/navigation';
+import { CURRENCIES, fmt, getPayDates, fmtDate, fmtDateShort, type CurrencyCode } from '@/utils/currency';
 
 const BUCKET = 'employee-docs';
 const HUES = [268, 75, 155, 25, 290, 200, 50, 320];
@@ -23,15 +24,15 @@ function StatCard({ ico, tone, label, value, foot }: { ico: string; tone: string
   const toneMap: Record<string, string> = { ind: 'stat-ico ind', ok: 'stat-ico ok', wn: 'stat-ico wn', er: 'stat-ico er' };
   return (
     <div className="stat-card" style={{ cursor: 'default' }}>
-      <div className="stat-h">
-        <div className={toneMap[tone] ?? 'stat-ico ind'}>{ico}</div>
-      </div>
+      <div className="stat-h"><div className={toneMap[tone] ?? 'stat-ico ind'}>{ico}</div></div>
       <div className="stat-l">{label}</div>
       <div className="stat-v">{value}</div>
       <div className="stat-foot">{foot}</div>
     </div>
   );
 }
+
+const CURRENCY_OPTIONS = Object.entries(CURRENCIES).map(([code, c]) => ({ code, label: `${c.symbol} ${c.name} (${code})` }));
 
 export default function UsersClient({
   initialUsers, isMgmt, canAdd = false,
@@ -95,7 +96,7 @@ export default function UsersClient({
     u.department?.toLowerCase().includes(filter.toLowerCase())
   );
 
-  const handleAddSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleAddSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
@@ -110,7 +111,7 @@ export default function UsersClient({
     setIsSubmitting(false);
   };
 
-  const handleEditSave = async (e: FormEvent<HTMLFormElement>) => {
+  const handleEditSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setEditSaving(true);
     const fd = new FormData(e.currentTarget);
@@ -122,6 +123,10 @@ export default function UsersClient({
       salary: Number(fd.get('salary')),
       points: Number(fd.get('points')),
       status: fd.get('status') as string,
+      currency: fd.get('currency') as string,
+      start_date: (fd.get('start_date') as string) || null,
+      training_end_date: (fd.get('training_end_date') as string) || null,
+      first_pay_date: (fd.get('first_pay_date') as string) || null,
     };
     const { error } = await dbOp('profiles', 'update', updates, { id: editUser.id });
     if (!error) {
@@ -160,19 +165,16 @@ export default function UsersClient({
   };
 
   const activeCount = users.filter(u => u.clocked_in).length;
-  const avgTenure = '2.8y';
 
   return (
     <div className="page-fade">
-      {/* Stat cards row */}
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         <StatCard ico="👥" tone="ind" label="HEADCOUNT" value={users.length} foot={`+${Math.max(0, users.length - 4)} this quarter`} />
         <StatCard ico="●" tone="ok" label="ACTIVE NOW" value={activeCount} foot={`${users.length > 0 ? Math.round((activeCount / users.length) * 100) : 0}% on shift`} />
         <StatCard ico="📅" tone="wn" label="ANNIVERSARIES" value="3" foot="this week" />
-        <StatCard ico="🎯" tone="ind" label="AVG TENURE" value={avgTenure} foot="median: 2.4y" />
+        <StatCard ico="🎯" tone="ind" label="AVG TENURE" value="2.8y" foot="median: 2.4y" />
       </div>
 
-      {/* Directory card */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="card-hdr" style={{ padding: '14px 18px' }}>
           <div>
@@ -189,26 +191,17 @@ export default function UsersClient({
               style={{ width: 200, fontSize: 12 }}
             />
             <div className="tabs" style={{ background: 'var(--surface-2)', padding: 3, borderRadius: 8 }}>
-              <button className={`tab${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')} style={{ fontSize: 12, padding: '4px 12px' }}>
-                ⊞ Grid
-              </button>
-              <button className={`tab${viewMode === 'table' ? ' active' : ''}`} onClick={() => setViewMode('table')} style={{ fontSize: 12, padding: '4px 12px' }}>
-                ☰ Table
-              </button>
+              <button className={`tab${viewMode === 'grid' ? ' active' : ''}`} onClick={() => setViewMode('grid')} style={{ fontSize: 12, padding: '4px 12px' }}>⊞ Grid</button>
+              <button className={`tab${viewMode === 'table' ? ' active' : ''}`} onClick={() => setViewMode('table')} style={{ fontSize: 12, padding: '4px 12px' }}>☰ Table</button>
             </div>
-            {canAdd && (
-              <button className="btn btn-acc btn-sm" onClick={() => setIsModalOpen(true)}>+ Invite</button>
-            )}
+            {canAdd && <button className="btn btn-acc btn-sm" onClick={() => setIsModalOpen(true)}>+ Invite</button>}
           </div>
         </div>
 
         {filteredUsers.length === 0 && (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-            No employees found.
-          </div>
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>No employees found.</div>
         )}
 
-        {/* Grid view */}
         {viewMode === 'grid' && filteredUsers.length > 0 && (
           <div style={{ padding: '16px 18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
             {filteredUsers.map(emp => {
@@ -228,18 +221,14 @@ export default function UsersClient({
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className={`bdg ${isMgmtRole ? 'bdg-acc' : 'bdg-gy'}`}>{emp.role}</span>
-                    {emp.status === 'Terminated'
-                      ? <span className="bdg bdg-err">Terminated</span>
-                      : emp.status === 'Inactive'
-                      ? <span className="bdg bdg-gy">Inactive</span>
-                      : emp.status === 'On Leave'
-                      ? <span className="bdg bdg-warn">On Leave</span>
-                      : emp.clocked_in
-                      ? <span className="bdg bdg-ok">● Active</span>
+                    {emp.status === 'Terminated' ? <span className="bdg bdg-err">Terminated</span>
+                      : emp.status === 'Inactive' ? <span className="bdg bdg-gy">Inactive</span>
+                      : emp.status === 'On Leave' ? <span className="bdg bdg-warn">On Leave</span>
+                      : emp.clocked_in ? <span className="bdg bdg-ok">● Active</span>
                       : <span className="bdg bdg-gy">Offline</span>}
                   </div>
                   <div style={{ marginTop: 10, fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--mono)' }}>
-                    Since {emp.created_at ? new Date(emp.created_at).getFullYear() : '—'}
+                    {emp.start_date ? `Started ${fmtDateShort(emp.start_date)}` : `Since ${emp.created_at ? new Date(emp.created_at).getFullYear() : '—'}`}
                   </div>
                 </div>
               );
@@ -247,7 +236,6 @@ export default function UsersClient({
           </div>
         )}
 
-        {/* Table view */}
         {viewMode === 'table' && filteredUsers.length > 0 && (
           <div style={{ overflowX: 'auto' }}>
             <table className="tbl">
@@ -257,7 +245,7 @@ export default function UsersClient({
                   <th>Role</th>
                   <th>Department</th>
                   <th>Email</th>
-                  <th>Joined</th>
+                  <th>Start Date</th>
                   <th>Status</th>
                   {isMgmt && <th>Salary</th>}
                 </tr>
@@ -277,22 +265,16 @@ export default function UsersClient({
                       <td style={{ color: 'var(--ink-3)' }}>{emp.department || '—'}</td>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--ink-3)' }}>{emp.email || '—'}</td>
                       <td style={{ fontFamily: 'var(--mono)', fontSize: 11.5 }}>
-                        {emp.created_at ? new Date(emp.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' }) : '—'}
+                        {emp.start_date ? fmtDate(emp.start_date) : emp.created_at ? new Date(emp.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' }) : '—'}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          {emp.status === 'Terminated'
-                            ? <span className="bdg bdg-err">Terminated</span>
-                            : emp.status === 'Inactive'
-                            ? <span className="bdg bdg-gy">Inactive</span>
-                            : emp.status === 'On Leave'
-                            ? <span className="bdg bdg-warn">On Leave</span>
-                            : emp.clocked_in
-                            ? <span className="bdg bdg-ok">● Active</span>
-                            : <span className="bdg bdg-gy">Offline</span>}
-                        </div>
+                        {emp.status === 'Terminated' ? <span className="bdg bdg-err">Terminated</span>
+                          : emp.status === 'Inactive' ? <span className="bdg bdg-gy">Inactive</span>
+                          : emp.status === 'On Leave' ? <span className="bdg bdg-warn">On Leave</span>
+                          : emp.clocked_in ? <span className="bdg bdg-ok">● Active</span>
+                          : <span className="bdg bdg-gy">Offline</span>}
                       </td>
-                      {isMgmt && <td style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>${(emp.salary || 0).toLocaleString()}</td>}
+                      {isMgmt && <td style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{fmt(emp.salary || 0, emp.currency)}</td>}
                     </tr>
                   );
                 })}
@@ -305,7 +287,7 @@ export default function UsersClient({
       {/* Add Employee Modal */}
       {isModalOpen && (
         <div className="mb">
-          <div className="md" style={{ width: 440 }}>
+          <div className="md" style={{ width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="md-t">Add New Employee</div>
             <form onSubmit={handleAddSubmit}>
               <div className="pv-fld"><label>Full Name</label><input type="text" name="name" required /></div>
@@ -323,7 +305,36 @@ export default function UsersClient({
                 </select>
               </div>
               <div className="pv-fld"><label>Department</label><input type="text" name="department" placeholder="e.g. Sales Team A" /></div>
-              <div className="pv-fld"><label>Base Salary ($)</label><input type="number" name="salary" defaultValue={2500} required /></div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="pv-fld">
+                  <label>Base Salary</label>
+                  <input type="number" name="salary" defaultValue={2500} required />
+                </div>
+                <div className="pv-fld">
+                  <label>Currency</label>
+                  <select name="currency" defaultValue="USD">
+                    {CURRENCY_OPTIONS.map(o => <option key={o.code} value={o.code}>{o.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 8px' }}>Schedule</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="pv-fld">
+                  <label>Start Date</label>
+                  <input type="date" name="start_date" />
+                </div>
+                <div className="pv-fld">
+                  <label>Training End Date</label>
+                  <input type="date" name="training_end_date" />
+                </div>
+              </div>
+              <div className="pv-fld">
+                <label>First Pay Date <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(anchors the bi-weekly schedule)</span></label>
+                <input type="date" name="first_pay_date" />
+              </div>
+
               <div style={{ background: 'var(--surface-2)', padding: '10px 12px', borderRadius: 7, fontSize: 11, color: 'var(--ink-3)', marginBottom: 16 }}>
                 Default password: <strong>pioneers2026!</strong> — employee should change on first login.
               </div>
@@ -337,114 +348,149 @@ export default function UsersClient({
       )}
 
       {/* View Employee Modal */}
-      {viewUser && !editUser && (
-        <div className="mb">
-          <div className="md" style={{ width: 500, maxHeight: '90vh', overflow: 'auto', padding: 0 }}>
-            <div style={{ padding: '24px 24px 0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-                <Avatar name={viewUser.name ?? 'U'} size={52} />
-                <div>
-                  <div style={{ fontSize: 17, fontWeight: 700 }}>{viewUser.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{viewUser.email || '—'}</div>
+      {viewUser && !editUser && (() => {
+        const cur = viewUser.currency || 'USD';
+        const payDates = getPayDates(viewUser.first_pay_date, 3);
+        const isInTraining = viewUser.start_date && viewUser.training_end_date
+          && new Date() >= new Date(viewUser.start_date)
+          && new Date() <= new Date(viewUser.training_end_date);
+        return (
+          <div className="mb">
+            <div className="md" style={{ width: 520, maxHeight: '90vh', overflow: 'auto', padding: 0 }}>
+              <div style={{ padding: '24px 24px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                  <Avatar name={viewUser.name ?? 'U'} size={52} />
+                  <div>
+                    <div style={{ fontSize: 17, fontWeight: 700 }}>{viewUser.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{viewUser.email || '—'}</div>
+                  </div>
+                  <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    {viewUser.status === 'Terminated' ? <span className="bdg bdg-err">Terminated</span>
+                      : viewUser.status === 'Inactive' ? <span className="bdg bdg-gy">Inactive</span>
+                      : viewUser.status === 'On Leave' ? <span className="bdg bdg-warn">On Leave</span>
+                      : <span className="bdg bdg-ok">Employed</span>}
+                    {isInTraining && <span className="bdg bdg-warn" style={{ fontSize: 10 }}>In Training</span>}
+                    {(!viewUser.status || viewUser.status === 'Active') && (
+                      <span className={`bdg ${viewUser.clocked_in ? 'bdg-ok' : 'bdg-gy'}`} style={{ fontSize: 10 }}>
+                        {viewUser.clocked_in ? '● On shift' : '○ Off shift'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                  {viewUser.status === 'Terminated'
-                    ? <span className="bdg bdg-err">Terminated</span>
-                    : viewUser.status === 'Inactive'
-                    ? <span className="bdg bdg-gy">Inactive</span>
-                    : viewUser.status === 'On Leave'
-                    ? <span className="bdg bdg-warn">On Leave</span>
-                    : <span className="bdg bdg-ok">Employed</span>}
-                  {(!viewUser.status || viewUser.status === 'Active') && (
-                    <span className={`bdg ${viewUser.clocked_in ? 'bdg-ok' : 'bdg-gy'}`} style={{ fontSize: 10 }}>
-                      {viewUser.clocked_in ? '● On shift' : '○ Off shift'}
-                    </span>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7, marginBottom: 14 }}>
+                  {([
+                    ['ID', viewUser.id.substring(0, 8)],
+                    ['Username', viewUser.username ? `@${viewUser.username}` : '—'],
+                    ['Role', viewUser.role],
+                    ['Department', viewUser.department || '—'],
+                    ['Employment', viewUser.status || 'Active'],
+                    ['Location', viewUser.location || 'Remote'],
+                    ['Salary', fmt(viewUser.salary || 0, cur)],
+                    ['Currency', `${CURRENCIES[cur as CurrencyCode]?.symbol ?? ''} ${cur}`],
+                    ['Points', `${viewUser.points ?? 7}/7`],
+                    ['Hours Worked', viewHours === null ? '…' : `${viewHours} hrs`],
+                  ] as [string, string][]).map(([k, v]) => (
+                    <div key={k} style={{ background: 'var(--surface-2)', padding: '9px 11px', borderRadius: 7 }}>
+                      <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 1 }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pay Schedule */}
+                <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Pay Schedule</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 10 }}>
+                    {[
+                      ['Start Date', fmtDate(viewUser.start_date)],
+                      ['Training Until', fmtDate(viewUser.training_end_date)],
+                      ['First Pay Date', fmtDate(viewUser.first_pay_date)],
+                      ['Frequency', viewUser.first_pay_date ? 'Bi-weekly' : '—'],
+                    ].map(([k, v]) => (
+                      <div key={k}>
+                        <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginTop: 1 }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {payDates.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Upcoming Pay Dates</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {payDates.map((d, i) => {
+                          const isNext = i === 0;
+                          return (
+                            <div key={i} style={{
+                              padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: isNext ? 700 : 400,
+                              background: isNext ? 'var(--acc)' : 'var(--surface)',
+                              color: isNext ? '#fff' : 'var(--ink-2)',
+                              border: `1px solid ${isNext ? 'transparent' : 'var(--line)'}`,
+                            }}>
+                              {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {isNext && <span style={{ fontSize: 10, marginLeft: 5, opacity: 0.8 }}>next</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 7, marginBottom: 16 }}>
-                {([
-                  ['ID', viewUser.id.substring(0, 8)],
-                  ['Username', viewUser.username ? `@${viewUser.username}` : '—'],
-                  ['Role', viewUser.role],
-                  ['Department', viewUser.department || '—'],
-                  ['Employment', viewUser.status || 'Active'],
-                  ['Location', viewUser.location || 'Remote'],
-                  ['Salary', `$${(viewUser.salary || 0).toLocaleString()}`],
-                  ['Points', `${viewUser.points ?? 7}/7`],
-                  ['Hours Worked', viewHours === null ? '…' : `${viewHours} hrs`],
-                ] as [string, string][]).map(([k, v]) => (
-                  <div key={k} style={{ background: 'var(--surface-2)', padding: '9px 11px', borderRadius: 7 }}>
-                    <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{k}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginTop: 1 }}>{v}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {isMgmt && (
-              <div style={{ padding: '0 24px' }}>
-                <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 10, marginBottom: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>📄 Signed Contract</div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {viewUser.contract_url ? (
-                      <a href={viewUser.contract_url} target="_blank" rel="noreferrer" className="btn btn-sec btn-sm" style={{ textDecoration: 'none', fontSize: 12 }}>View Contract</a>
-                    ) : (
-                      <span style={{ fontSize: 12, color: 'var(--ink-4)', flex: 1 }}>No contract on file</span>
-                    )}
-                    <input ref={contractRef} type="file" accept=".pdf,.doc,.docx,image/*" style={{ display: 'none' }}
-                      onChange={e => { if (e.target.files?.[0]) uploadEmployeeDoc(e.target.files[0], viewUser.id, 'contract'); e.target.value = ''; }} />
-                    <button onClick={() => contractRef.current?.click()} className="btn btn-sec btn-sm" disabled={!!viewUploading}>
-                      {viewUploading === 'contract' ? 'Uploading…' : viewUser.contract_url ? 'Replace' : 'Upload Contract'}
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 10, marginBottom: 20 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>🪪 ID Document</div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {viewUser.id_document_url ? (
-                      <a href={viewUser.id_document_url} target="_blank" rel="noreferrer" className="btn btn-sec btn-sm" style={{ textDecoration: 'none', fontSize: 12 }}>View ID</a>
-                    ) : (
-                      <span style={{ fontSize: 12, color: 'var(--ink-4)', flex: 1 }}>No ID on file</span>
-                    )}
-                    <input ref={idRef} type="file" accept=".pdf,image/*" style={{ display: 'none' }}
-                      onChange={e => { if (e.target.files?.[0]) uploadEmployeeDoc(e.target.files[0], viewUser.id, 'id'); e.target.value = ''; }} />
-                    <button onClick={() => idRef.current?.click()} className="btn btn-sec btn-sm" disabled={!!viewUploading}>
-                      {viewUploading === 'id' ? 'Uploading…' : viewUser.id_document_url ? 'Replace' : 'Upload ID'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div style={{ padding: '0 24px 24px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {isMgmt && (
-                <button className="btn btn-pri btn-sm" onClick={() => setEditUser(viewUser)}>Edit Details</button>
+                <div style={{ padding: '0 24px' }}>
+                  <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 10, marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>📄 Signed Contract</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {viewUser.contract_url ? (
+                        <a href={viewUser.contract_url} target="_blank" rel="noreferrer" className="btn btn-sec btn-sm" style={{ textDecoration: 'none', fontSize: 12 }}>View Contract</a>
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--ink-4)', flex: 1 }}>No contract on file</span>
+                      )}
+                      <input ref={contractRef} type="file" accept=".pdf,.doc,.docx,image/*" style={{ display: 'none' }}
+                        onChange={e => { if (e.target.files?.[0]) uploadEmployeeDoc(e.target.files[0], viewUser.id, 'contract'); e.target.value = ''; }} />
+                      <button onClick={() => contractRef.current?.click()} className="btn btn-sec btn-sm" disabled={!!viewUploading}>
+                        {viewUploading === 'contract' ? 'Uploading…' : viewUser.contract_url ? 'Replace' : 'Upload Contract'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 10, marginBottom: 20 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>🪪 ID Document</div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {viewUser.id_document_url ? (
+                        <a href={viewUser.id_document_url} target="_blank" rel="noreferrer" className="btn btn-sec btn-sm" style={{ textDecoration: 'none', fontSize: 12 }}>View ID</a>
+                      ) : (
+                        <span style={{ fontSize: 12, color: 'var(--ink-4)', flex: 1 }}>No ID on file</span>
+                      )}
+                      <input ref={idRef} type="file" accept=".pdf,image/*" style={{ display: 'none' }}
+                        onChange={e => { if (e.target.files?.[0]) uploadEmployeeDoc(e.target.files[0], viewUser.id, 'id'); e.target.value = ''; }} />
+                      <button onClick={() => idRef.current?.click()} className="btn btn-sec btn-sm" disabled={!!viewUploading}>
+                        {viewUploading === 'id' ? 'Uploading…' : viewUser.id_document_url ? 'Replace' : 'Upload ID'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
-              {canAdd && (
-                <>
-                  <button
-                    className="btn btn-sec btn-sm"
-                    onClick={() => { setResetTarget(viewUser); setResetPw(''); setResetMsg(null); }}
-                  >
-                    Reset Password
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    style={{ background: 'oklch(0.97 0.01 25)', color: 'oklch(0.50 0.18 25)', border: '1px solid oklch(0.88 0.06 25)' }}
-                    onClick={handleDelete}
-                    disabled={deleting}
-                  >
-                    {deleting ? 'Deleting…' : 'Delete Employee'}
-                  </button>
-                </>
-              )}
-              <button className="btn btn-sec btn-sm" onClick={() => setViewUser(null)}>Close</button>
+
+              <div style={{ padding: '0 24px 24px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {isMgmt && <button className="btn btn-pri btn-sm" onClick={() => setEditUser(viewUser)}>Edit Details</button>}
+                {canAdd && (
+                  <>
+                    <button className="btn btn-sec btn-sm" onClick={() => { setResetTarget(viewUser); setResetPw(''); setResetMsg(null); }}>Reset Password</button>
+                    <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.01 25)', color: 'oklch(0.50 0.18 25)', border: '1px solid oklch(0.88 0.06 25)' }}
+                      onClick={handleDelete} disabled={deleting}>
+                      {deleting ? 'Deleting…' : 'Delete Employee'}
+                    </button>
+                  </>
+                )}
+                <button className="btn btn-sec btn-sm" onClick={() => setViewUser(null)}>Close</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Reset Password Modal */}
       {resetTarget && (
@@ -466,20 +512,10 @@ export default function UsersClient({
             )}
             <div className="pv-fld">
               <label>New Password</label>
-              <input
-                type="text"
-                value={resetPw}
-                onChange={e => setResetPw(e.target.value)}
-                placeholder="Min. 6 characters"
-                autoFocus
-              />
+              <input type="text" value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="Min. 6 characters" autoFocus />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-acc"
-                disabled={resetSaving || resetPw.length < 6}
-                onClick={handleResetPassword}
-              >
+              <button className="btn btn-acc" disabled={resetSaving || resetPw.length < 6} onClick={handleResetPassword}>
                 {resetSaving ? 'Saving…' : 'Set Password'}
               </button>
               <button className="btn btn-sec" onClick={() => { setResetTarget(null); setResetMsg(null); }}>Cancel</button>
@@ -491,7 +527,7 @@ export default function UsersClient({
       {/* Edit Employee Modal */}
       {editUser && (
         <div className="mb">
-          <div className="md" style={{ width: 440 }}>
+          <div className="md" style={{ width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="md-t">Edit — {editUser.name}</div>
             <form onSubmit={handleEditSave}>
               <div className="pv-fld"><label>Full Name</label><input type="text" name="name" defaultValue={editUser.name} required /></div>
@@ -509,7 +545,20 @@ export default function UsersClient({
                 </select>
               </div>
               <div className="pv-fld"><label>Department</label><input type="text" name="department" defaultValue={editUser.department ?? ''} /></div>
-              <div className="pv-fld"><label>Base Salary ($)</label><input type="number" name="salary" defaultValue={editUser.salary ?? 2500} required /></div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="pv-fld">
+                  <label>Base Salary</label>
+                  <input type="number" name="salary" defaultValue={editUser.salary ?? 2500} required />
+                </div>
+                <div className="pv-fld">
+                  <label>Currency</label>
+                  <select name="currency" defaultValue={editUser.currency ?? 'USD'}>
+                    {CURRENCY_OPTIONS.map(o => <option key={o.code} value={o.code}>{o.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
               <div className="pv-fld">
                 <label>Reliability Points (0–7)</label>
                 <input type="number" name="points" defaultValue={editUser.points ?? 7} min={0} max={7} required />
@@ -523,6 +572,23 @@ export default function UsersClient({
                   <option value="Terminated">Terminated</option>
                 </select>
               </div>
+
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '14px 0 8px' }}>Schedule</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="pv-fld">
+                  <label>Start Date</label>
+                  <input type="date" name="start_date" defaultValue={editUser.start_date ?? ''} />
+                </div>
+                <div className="pv-fld">
+                  <label>Training End Date</label>
+                  <input type="date" name="training_end_date" defaultValue={editUser.training_end_date ?? ''} />
+                </div>
+              </div>
+              <div className="pv-fld">
+                <label>First Pay Date <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>(anchors the bi-weekly schedule)</span></label>
+                <input type="date" name="first_pay_date" defaultValue={editUser.first_pay_date ?? ''} />
+              </div>
+
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" className="btn btn-acc" disabled={editSaving}>{editSaving ? 'Saving…' : 'Save Changes'}</button>
                 <button type="button" className="btn btn-sec" onClick={() => setEditUser(null)}>Cancel</button>

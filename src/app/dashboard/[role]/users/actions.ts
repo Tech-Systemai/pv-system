@@ -14,6 +14,10 @@ export async function createEmployeeAccount(formData: FormData) {
   const role = formData.get('role') as string;
   const salary = Number(formData.get('salary'));
   const username = (formData.get('username') as string) || email.split('@')[0];
+  const currency = (formData.get('currency') as string) || 'USD';
+  const start_date = (formData.get('start_date') as string) || null;
+  const training_end_date = (formData.get('training_end_date') as string) || null;
+  const first_pay_date = (formData.get('first_pay_date') as string) || null;
 
   // Pass metadata so the trigger can populate the profile immediately
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -66,6 +70,10 @@ export async function createEmployeeAccount(formData: FormData) {
       department: role === 'sales' ? 'Sales' : role === 'cx' ? 'CX' : 'Management',
       salary,
       status: 'Active',
+      currency,
+      start_date,
+      training_end_date,
+      first_pay_date,
     });
 
   if (profileError) {

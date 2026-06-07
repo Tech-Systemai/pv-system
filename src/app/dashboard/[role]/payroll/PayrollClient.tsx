@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { dbOp } from '@/utils/db';
+import { fmt, getPayDates, fmtDate, CURRENCIES, type CurrencyCode } from '@/utils/currency';
 
 const PERIOD = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 const NORMAL_MINS_PER_DAY = 480; // 8 hours
@@ -17,10 +18,37 @@ function getCustomItemsNet(items: CustomItem[]): number {
   return items.reduce((s, ci) => s + (ci.type === 'addition' ? ci.amount : -ci.amount), 0);
 }
 
+/** Render the bi-weekly schedule bar for the payslip HTML */
+function payScheduleHtml(emp: any): string {
+  const payDates = getPayDates(emp.first_pay_date, 4);
+  if (!payDates.length && !emp.start_date) return '';
+  const cur = emp.currency || 'USD';
+  const curSymbol = CURRENCIES[cur as CurrencyCode]?.symbol ?? '$';
+
+  const dateItems = payDates.map((d, i) => {
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `<div style="padding:4px 10px;border-radius:5px;font-size:11px;background:${i === 0 ? '#4f46e5' : '#f1f5f9'};color:${i === 0 ? '#fff' : '#475569'};font-weight:${i === 0 ? 700 : 400}">${label}${i === 0 ? ' ← next' : ''}</div>`;
+  }).join('');
+
+  return `
+    <div style="margin-bottom:24px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden">
+      <div style="background:#f8fafc;padding:10px 14px;font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em">Pay Schedule · Bi-weekly · ${curSymbol} ${cur}</div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:20px;font-size:12px;color:#475569">
+          ${emp.start_date ? `<span><strong>Start:</strong> ${new Date(emp.start_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>` : ''}
+          ${emp.training_end_date ? `<span><strong>Training until:</strong> ${new Date(emp.training_end_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>` : ''}
+          ${emp.first_pay_date ? `<span><strong>First pay:</strong> ${new Date(emp.first_pay_date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>` : ''}
+        </div>
+        ${payDates.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${dateItems}</div>` : ''}
+      </div>
+    </div>`;
+}
+
 function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
   const date = new Date().toLocaleDateString();
   const att = item.att ?? { normalMins: 0, overtimeMins: 0, totalMins: 0, daysPresent: 0, daysLate: 0 };
   const customItems: CustomItem[] = item.slip?.custom_items ?? [];
+  const cur = emp.currency || 'USD';
 
   const vRows = empViolations.map(v => `
     <tr>
@@ -28,16 +56,16 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
       <td style="padding:7px 10px;color:#64748b;font-size:12px">${v.explanation ?? ''}</td>
       <td style="padding:7px 10px;color:#94a3b8;font-size:12px;white-space:nowrap">${new Date(v.triggered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
       <td style="padding:7px 10px;text-align:right;color:#ef4444;font-size:12px">−${v.points_deducted ?? 0}</td>
-      <td style="padding:7px 10px;text-align:right;color:#ef4444;font-weight:600;font-size:12px">−$${(v.salary_deducted ?? 0).toFixed(2)}</td>
+      <td style="padding:7px 10px;text-align:right;color:#ef4444;font-weight:600;font-size:12px">−${fmt(v.salary_deducted ?? 0, cur)}</td>
     </tr>`).join('');
 
   const bonusRow = (item.bonuses ?? 0) > 0
-    ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Bonus</span><span style="font-weight:600;color:#10b981">+$${item.bonuses}</span></div>` : '';
+    ? `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Bonus</span><span style="font-weight:600;color:#10b981">+${fmt(item.bonuses, cur)}</span></div>` : '';
 
   const customItemRows = customItems.map(ci =>
     `<div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
       <span style="color:#475569">${ci.description || 'Custom item'}</span>
-      <span style="font-weight:600;color:${ci.type === 'addition' ? '#10b981' : '#ef4444'}">${ci.type === 'addition' ? '+' : '−'}$${ci.amount.toFixed(2)}</span>
+      <span style="font-weight:600;color:${ci.type === 'addition' ? '#10b981' : '#ef4444'}">${ci.type === 'addition' ? '+' : '−'}${fmt(ci.amount, cur)}</span>
     </div>`).join('');
 
   const deductTable = empViolations.length > 0 ? `
@@ -54,7 +82,7 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
         <tbody>${vRows}</tbody>
         <tfoot><tr style="background:#fff7f7">
           <td colspan="4" style="padding:8px 10px;font-weight:700;font-size:13px">Total Deductions</td>
-          <td style="padding:8px 10px;text-align:right;font-weight:700;color:#ef4444;font-size:13px">−$${item.deductions.toLocaleString()}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700;color:#ef4444;font-size:13px">−${fmt(item.deductions, cur)}</td>
         </tr></tfoot>
       </table>
       ${item.slip?.deduction_notes ? `<div style="margin-top:8px;font-size:12px;color:#64748b;padding:6px 10px;background:#fffbeb;border-radius:6px;border-left:3px solid #f59e0b">Note: ${item.slip.deduction_notes}</div>` : ''}
@@ -70,6 +98,7 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
   </div>
   <div style="text-align:right"><div style="font-size:14px;font-weight:600">Period: ${PERIOD}</div><div style="font-size:12px;color:#64748b">Generated: ${date}</div></div>
 </div>
+${payScheduleHtml(emp)}
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-bottom:30px">
   <div>
     <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:8px">Employee</div>
@@ -82,12 +111,12 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
     </div>
   </div>
   <div style="background:#f8fafc;padding:20px;border-radius:12px">
-    <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:10px">Payment Summary</div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Base Salary</span><span style="font-weight:600">$${item.base.toLocaleString()}</span></div>
+    <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;margin-bottom:10px">Payment Summary (${cur})</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px"><span style="color:#475569">Base Salary</span><span style="font-weight:600">${fmt(item.base, cur)}</span></div>
     ${bonusRow}
     ${customItemRows}
-    <div style="display:flex;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px;font-size:13px"><span style="color:#ef4444">Total Deductions</span><span style="color:#ef4444;font-weight:600">−$${item.deductions.toLocaleString()}</span></div>
-    <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;font-weight:700">Net Pay</span><span style="font-size:24px;font-weight:800;color:#10b981">$${item.net.toLocaleString()}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid #e2e8f0;padding-bottom:12px;font-size:13px"><span style="color:#ef4444">Total Deductions</span><span style="color:#ef4444;font-weight:600">−${fmt(item.deductions, cur)}</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:15px;font-weight:700">Net Pay</span><span style="font-size:24px;font-weight:800;color:#10b981">${fmt(item.net, cur)}</span></div>
   </div>
 </div>
 ${deductTable}
@@ -234,7 +263,7 @@ export default function PayrollClient({
     const { error } = await dbOp('inbox_documents', 'insert', {
       user_id: emp.id,
       title: subject, subject,
-      content: `Your payslip for ${PERIOD} is ready. Net pay: $${item.net.toLocaleString()}. Please review and sign below.`,
+      content: `Your payslip for ${PERIOD} is ready. Net pay: ${fmt(item.net, emp.currency)}. Please review and sign below.`,
       type: 'Payslip',
       sender: 'Finance / Management',
       sender_id: currentUserId,
@@ -260,7 +289,11 @@ export default function PayrollClient({
     const net = slip ? slip.net_pay : parseFloat((base - deductions + getCustomItemsNet(customItems)).toFixed(2));
     const isApproved = slip?.status === 'Approved';
     const att = attendanceByUser[e.id] ?? { totalMins: 0, normalMins: 0, overtimeMins: 0, daysPresent: 0, daysLate: 0 };
-    return { emp: e, base, deductions, net, bonuses, customItems, isApproved, slip, att };
+    const payDates = getPayDates(e.first_pay_date, 2);
+    const isInTraining = e.start_date && e.training_end_date
+      && new Date() >= new Date(e.start_date)
+      && new Date() <= new Date(e.training_end_date);
+    return { emp: e, base, deductions, net, bonuses, customItems, isApproved, slip, att, payDates, isInTraining };
   });
 
   const totalPayroll = currentPeriodList.reduce((s, i) => s + i.net, 0);
@@ -279,18 +312,17 @@ export default function PayrollClient({
       ` }} />
 
       <div className="page-fade no-print">
-        {/* Stat cards */}
         <div className="stat-grid" style={{ marginBottom: 20 }}>
           <div className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className="stat-ico ok">$</div></div>
             <div className="stat-l">TOTAL PAYROLL</div>
-            <div className="stat-v">${totalPayroll.toLocaleString()}</div>
+            <div className="stat-v">{totalPayroll.toLocaleString()}</div>
             <div className="stat-foot">{PERIOD}</div>
           </div>
           <div className="stat-card" style={{ cursor: 'default' }}>
             <div className="stat-h"><div className="stat-ico er">↓</div></div>
             <div className="stat-l">TOTAL DEDUCTIONS</div>
-            <div className="stat-v" style={{ color: 'var(--err)' }}>${totalDeductions.toLocaleString()}</div>
+            <div className="stat-v" style={{ color: 'var(--err)' }}>{totalDeductions.toLocaleString()}</div>
             <div className="stat-foot">From policy violations</div>
           </div>
           <div className="stat-card" style={{ cursor: 'default' }}>
@@ -311,7 +343,7 @@ export default function PayrollClient({
           <div className="card-hdr">
             <div>
               <div className="card-title">Payroll · {PERIOD}</div>
-              <div className="card-sub">Deductions pulled from policy violations · click Edit to add adjustments, bonuses, or custom line items</div>
+              <div className="card-sub">Deductions from violations · click Edit to add adjustments, bonuses, or custom line items</div>
             </div>
             <button className="btn btn-acc btn-sm" onClick={handleProcessAll} disabled={isProcessing}>
               {isProcessing ? 'Processing…' : '⚡ Process & Approve All'}
@@ -323,6 +355,7 @@ export default function PayrollClient({
               <thead>
                 <tr>
                   <th>Employee</th>
+                  <th>Pay Schedule</th>
                   <th>Hours Worked</th>
                   <th>Base Salary</th>
                   <th>Violations</th>
@@ -339,6 +372,7 @@ export default function PayrollClient({
                   const empViolations = violationsByUser[item.emp.id] ?? [];
                   const customAdditions = item.customItems.filter(ci => ci.type === 'addition');
                   const customDeductions = item.customItems.filter(ci => ci.type === 'deduction');
+                  const cur = item.emp.currency || 'USD';
                   return (
                     <tr key={item.emp.id}>
                       <td>
@@ -348,9 +382,35 @@ export default function PayrollClient({
                           </div>
                           <div>
                             <div style={{ fontWeight: 600 }}>{item.emp.name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{item.emp.role}</div>
+                            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                              {item.emp.role}
+                              {item.isInTraining && <span className="bdg bdg-warn" style={{ fontSize: 9, marginLeft: 5 }}>Training</span>}
+                            </div>
                           </div>
                         </div>
+                      </td>
+                      <td style={{ fontSize: 11 }}>
+                        {item.emp.start_date && (
+                          <div style={{ color: 'var(--ink-3)' }}>Start: {fmtDate(item.emp.start_date)}</div>
+                        )}
+                        {item.emp.training_end_date && (
+                          <div style={{ color: 'var(--ink-4)' }}>Training until: {fmtDate(item.emp.training_end_date)}</div>
+                        )}
+                        {item.payDates.length > 0 ? (
+                          <div style={{ marginTop: 3 }}>
+                            <div style={{ color: 'var(--acc)', fontWeight: 600 }}>
+                              Next pay: {item.payDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </div>
+                            {item.payDates[1] && (
+                              <div style={{ color: 'var(--ink-4)' }}>
+                                Then: {item.payDates[1].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ color: 'var(--ink-4)' }}>No schedule set</div>
+                        )}
+                        <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2, fontFamily: 'var(--mono)' }}>{cur}</div>
                       </td>
                       <td style={{ fontSize: 11, fontFamily: 'var(--mono)' }}>
                         <div style={{ color: 'var(--ink-2)' }}>{Math.floor(item.att.normalMins / 60)}h norm</div>
@@ -359,43 +419,35 @@ export default function PayrollClient({
                         )}
                         <div style={{ color: 'var(--ink-4)', fontSize: 10 }}>{item.att.daysPresent}d · {item.att.daysLate}L</div>
                       </td>
-                      <td style={{ fontWeight: 600 }}>${item.base.toLocaleString()}</td>
+                      <td style={{ fontWeight: 600 }}>{fmt(item.base, cur)}</td>
                       <td style={{ fontSize: 11 }}>
                         {empViolations.length > 0 ? (
                           <div>
                             {empViolations.slice(0, 2).map((v: any, i: number) => (
                               <div key={i} style={{ color: 'var(--err)', whiteSpace: 'nowrap' }}>
-                                {v.rule_name?.slice(0, 22)} −${(v.salary_deducted ?? 0).toFixed(2)}
+                                {v.rule_name?.slice(0, 20)} −{fmt(v.salary_deducted ?? 0, cur)}
                               </div>
                             ))}
-                            {empViolations.length > 2 && (
-                              <div style={{ color: 'var(--ink-4)' }}>+{empViolations.length - 2} more</div>
-                            )}
+                            {empViolations.length > 2 && <div style={{ color: 'var(--ink-4)' }}>+{empViolations.length - 2} more</div>}
                           </div>
                         ) : <span style={{ color: 'var(--ink-4)' }}>—</span>}
                       </td>
                       <td>
-                        {item.deductions > 0 ? (
-                          <span style={{ color: 'var(--err)', fontWeight: 600 }}>−${item.deductions.toLocaleString()}</span>
-                        ) : (
-                          <span style={{ color: 'var(--ink-4)' }}>—</span>
-                        )}
+                        {item.deductions > 0
+                          ? <span style={{ color: 'var(--err)', fontWeight: 600 }}>−{fmt(item.deductions, cur)}</span>
+                          : <span style={{ color: 'var(--ink-4)' }}>—</span>}
                       </td>
                       <td style={{ fontSize: 11 }}>
-                        {item.bonuses > 0 && (
-                          <div style={{ color: 'var(--ok)', fontFamily: 'var(--mono)' }}>+${item.bonuses} bonus</div>
-                        )}
+                        {item.bonuses > 0 && <div style={{ color: 'var(--ok)', fontFamily: 'var(--mono)' }}>+{fmt(item.bonuses, cur)} bonus</div>}
                         {customAdditions.map((ci, i) => (
-                          <div key={i} style={{ color: 'var(--ok)', whiteSpace: 'nowrap' }}>+${ci.amount.toFixed(2)} {ci.description?.slice(0, 18)}</div>
+                          <div key={i} style={{ color: 'var(--ok)', whiteSpace: 'nowrap' }}>+{fmt(ci.amount, cur)} {ci.description?.slice(0, 14)}</div>
                         ))}
                         {customDeductions.map((ci, i) => (
-                          <div key={i} style={{ color: 'var(--err)', whiteSpace: 'nowrap' }}>−${ci.amount.toFixed(2)} {ci.description?.slice(0, 18)}</div>
+                          <div key={i} style={{ color: 'var(--err)', whiteSpace: 'nowrap' }}>−{fmt(ci.amount, cur)} {ci.description?.slice(0, 14)}</div>
                         ))}
-                        {item.bonuses === 0 && item.customItems.length === 0 && (
-                          <span style={{ color: 'var(--ink-4)' }}>—</span>
-                        )}
+                        {item.bonuses === 0 && item.customItems.length === 0 && <span style={{ color: 'var(--ink-4)' }}>—</span>}
                       </td>
-                      <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--ok)' }}>${item.net.toLocaleString()}</td>
+                      <td style={{ fontWeight: 700, fontSize: 14, color: 'var(--ok)' }}>{fmt(item.net, cur)}</td>
                       <td>
                         {item.isApproved
                           ? <span className="bdg bdg-ok">Approved</span>
@@ -434,16 +486,54 @@ export default function PayrollClient({
         const adjVal = parseFloat(editAdj) || 0;
         const bonusVal = parseFloat(editBonus) || 0;
         const baseVal = parseFloat(editBase) || editItem.base;
-        const savedCustomItems = editCustomItems.map(ci => ({ ...ci, amount: parseFloat(ci.amount) || 0, type: ci.type }));
+        const savedCustomItems = editCustomItems.map(ci => ({ ...ci, amount: parseFloat(ci.amount) || 0 }));
         const customNet = getCustomItemsNet(savedCustomItems as CustomItem[]);
         const previewNet = parseFloat((baseVal + bonusVal - Math.max(0, autoDeductions - adjVal) + customNet).toFixed(2));
         const att = editItem.att ?? { normalMins: 0, overtimeMins: 0, totalMins: 0 };
+        const cur = editItem.emp.currency || 'USD';
+        const curName = CURRENCIES[cur as CurrencyCode]?.name ?? cur;
+        const payDates = getPayDates(editItem.emp.first_pay_date, 4);
         return (
           <div className="mb" onClick={e => { if (e.target === e.currentTarget) setEditItem(null); }}>
-            <div className="md" style={{ width: 600, maxHeight: '88vh', overflowY: 'auto' }}>
+            <div className="md" style={{ width: 620, maxHeight: '88vh', overflowY: 'auto' }}>
               <div className="md-t">Edit Payslip — {editItem.emp.name}</div>
 
-              {/* Hours worked (read-only) */}
+              {/* Pay Schedule */}
+              <div style={{ background: 'var(--surface-2)', borderRadius: 9, padding: '12px 14px', marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 8 }}>PAY SCHEDULE · {cur} ({curName})</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: payDates.length ? 10 : 0 }}>
+                  {[
+                    ['Start Date', fmtDate(editItem.emp.start_date)],
+                    ['Training Until', fmtDate(editItem.emp.training_end_date)],
+                    ['First Pay Date', fmtDate(editItem.emp.first_pay_date)],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase' }}>{k}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, marginTop: 1 }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                {payDates.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>Upcoming Bi-weekly Pay Dates</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {payDates.map((d, i) => (
+                        <div key={i} style={{
+                          padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: i === 0 ? 700 : 400,
+                          background: i === 0 ? 'var(--acc)' : 'var(--surface)',
+                          color: i === 0 ? '#fff' : 'var(--ink-3)',
+                          border: `1px solid ${i === 0 ? 'transparent' : 'var(--line)'}`,
+                        }}>
+                          {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {i === 0 && <span style={{ fontSize: 9, marginLeft: 4, opacity: 0.8 }}>next</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Hours worked */}
               {att.totalMins > 0 && (
                 <div style={{ background: 'var(--surface-2)', borderRadius: 9, padding: '12px 14px', marginBottom: 16 }}>
                   <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 10 }}>HOURS WORKED THIS PERIOD</div>
@@ -478,29 +568,29 @@ export default function PayrollClient({
                           {new Date(v.triggered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
-                      <span style={{ color: 'var(--err)', fontFamily: 'var(--mono)' }}>−${(v.salary_deducted ?? 0).toFixed(2)}</span>
+                      <span style={{ color: 'var(--err)', fontFamily: 'var(--mono)' }}>−{fmt(v.salary_deducted ?? 0, cur)}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, paddingTop: 8 }}>
                     <span>Total auto deductions</span>
-                    <span style={{ color: 'var(--err)' }}>−${autoDeductions.toFixed(2)}</span>
+                    <span style={{ color: 'var(--err)' }}>−{fmt(autoDeductions, cur)}</span>
                   </div>
                 </div>
               )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div className="pv-fld">
-                  <label>Base Salary ($)</label>
+                  <label>Base Salary ({cur})</label>
                   <input className="fld-input mono" type="number" min="0" value={editBase} onChange={e => setEditBase(e.target.value)} />
                 </div>
                 <div className="pv-fld">
-                  <label>Bonus ($)</label>
+                  <label>Bonus ({cur})</label>
                   <input className="fld-input mono" type="number" min="0" value={editBonus} onChange={e => setEditBonus(e.target.value)} placeholder="0" />
                 </div>
               </div>
 
               <div className="pv-fld">
-                <label>Manual deduction adjustment ($) <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>— positive = reduce deductions (e.g. correction)</span></label>
+                <label>Manual deduction adjustment ({cur}) <span style={{ color: 'var(--ink-4)', fontWeight: 400 }}>— positive = reduce deductions</span></label>
                 <input className="fld-input mono" type="number" value={editAdj} onChange={e => setEditAdj(e.target.value)} placeholder="0" />
               </div>
 
@@ -513,57 +603,32 @@ export default function PayrollClient({
               {/* Custom line items */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>Custom Line Items <span style={{ color: 'var(--ink-4)', fontWeight: 400, fontSize: 12 }}>— allowances, advances, deductions, etc.</span></div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>Custom Line Items <span style={{ color: 'var(--ink-4)', fontWeight: 400, fontSize: 12 }}>— allowances, advances, other</span></div>
                   <button className="btn btn-sec btn-sm" onClick={addCustomItem}>+ Add Item</button>
                 </div>
-                {editCustomItems.length === 0 && (
-                  <div style={{ color: 'var(--ink-4)', fontSize: 12, padding: '6px 0' }}>No custom items added.</div>
-                )}
+                {editCustomItems.length === 0 && <div style={{ color: 'var(--ink-4)', fontSize: 12, padding: '4px 0' }}>No custom items.</div>}
                 {editCustomItems.map((ci, idx) => (
                   <div key={ci.id} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 120px 32px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                    <input
-                      className="fld-input"
-                      placeholder="Description (e.g. Travel allowance)"
-                      value={ci.description}
-                      onChange={e => updateCustomItem(idx, { description: e.target.value })}
-                    />
-                    <input
-                      className="fld-input mono"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={ci.amount}
-                      onChange={e => updateCustomItem(idx, { amount: e.target.value })}
-                    />
-                    <select
-                      className="fld-input"
-                      value={ci.type}
-                      onChange={e => updateCustomItem(idx, { type: e.target.value as 'addition' | 'deduction' })}
-                    >
+                    <input className="fld-input" placeholder="Description" value={ci.description} onChange={e => updateCustomItem(idx, { description: e.target.value })} />
+                    <input className="fld-input mono" type="number" min="0" placeholder="0" value={ci.amount} onChange={e => updateCustomItem(idx, { amount: e.target.value })} />
+                    <select className="fld-input" value={ci.type} onChange={e => updateCustomItem(idx, { type: e.target.value as 'addition' | 'deduction' })}>
                       <option value="addition">+ Addition</option>
                       <option value="deduction">− Deduction</option>
                     </select>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ color: 'var(--err)', padding: '0 8px' }}
-                      onClick={() => removeCustomItem(idx)}
-                      title="Remove"
-                    >✕</button>
+                    <button className="btn btn-ghost btn-sm" style={{ color: 'var(--err)', padding: '0 8px' }} onClick={() => removeCustomItem(idx)}>✕</button>
                   </div>
                 ))}
               </div>
 
               {/* Net pay preview */}
               <div style={{ background: 'var(--surface-2)', padding: '12px 14px', borderRadius: 9, marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 10 }}>NET PAY PREVIEW</div>
+                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--ink-3)', marginBottom: 10 }}>NET PAY PREVIEW ({cur})</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--ink-3)' }}>Base salary</span>
-                  <span>${baseVal.toLocaleString()}</span>
+                  <span style={{ color: 'var(--ink-3)' }}>Base salary</span><span>{fmt(baseVal, cur)}</span>
                 </div>
                 {bonusVal > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                    <span style={{ color: 'var(--ink-3)' }}>Bonus</span>
-                    <span style={{ color: 'var(--ok)' }}>+${bonusVal}</span>
+                    <span style={{ color: 'var(--ink-3)' }}>Bonus</span><span style={{ color: 'var(--ok)' }}>+{fmt(bonusVal, cur)}</span>
                   </div>
                 )}
                 {savedCustomItems.map((ci, idx) => {
@@ -572,18 +637,17 @@ export default function PayrollClient({
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
                       <span style={{ color: 'var(--ink-3)' }}>{(ci as any).description || 'Custom item'}</span>
                       <span style={{ color: (ci as any).type === 'addition' ? 'var(--ok)' : 'var(--err)' }}>
-                        {(ci as any).type === 'addition' ? '+' : '−'}${amt.toFixed(2)}
+                        {(ci as any).type === 'addition' ? '+' : '−'}{fmt(amt, cur)}
                       </span>
                     </div>
                   );
                 })}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--ink-3)' }}>Deductions (after adj.)</span>
-                  <span style={{ color: 'var(--err)' }}>−${Math.max(0, autoDeductions - adjVal).toFixed(2)}</span>
+                  <span style={{ color: 'var(--ink-3)' }}>Deductions</span>
+                  <span style={{ color: 'var(--err)' }}>−{fmt(Math.max(0, autoDeductions - adjVal), cur)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, paddingTop: 8, borderTop: '1px solid var(--line-2)' }}>
-                  <span>Net Pay</span>
-                  <span style={{ color: 'var(--ok)' }}>${previewNet.toLocaleString()}</span>
+                  <span>Net Pay</span><span style={{ color: 'var(--ok)' }}>{fmt(previewNet, cur)}</span>
                 </div>
               </div>
 
@@ -603,9 +667,11 @@ export default function PayrollClient({
         const empViolations = violationsByUser[printSlip.emp.id] ?? [];
         const att = printSlip.att ?? { normalMins: 0, overtimeMins: 0, totalMins: 0, daysPresent: 0, daysLate: 0 };
         const customItems: CustomItem[] = printSlip.slip?.custom_items ?? [];
+        const cur = printSlip.emp.currency || 'USD';
+        const payDates = getPayDates(printSlip.emp.first_pay_date, 4);
         return (
           <div className="print-container" style={{ background: '#fff', padding: '40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
-            <div style={{ borderBottom: '2px solid oklch(0.52 0.20 268)', paddingBottom: '20px', marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ borderBottom: '2px solid oklch(0.52 0.20 268)', paddingBottom: '20px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                 <div style={{ width: '50px', height: '50px', borderRadius: '10px', background: 'linear-gradient(135deg, oklch(0.52 0.20 268), oklch(0.42 0.22 280))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '20px' }}>PV</div>
                 <div>
@@ -619,11 +685,40 @@ export default function PayrollClient({
               </div>
             </div>
 
+            {/* Pay schedule bar */}
+            {(printSlip.emp.start_date || payDates.length > 0) && (
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', marginBottom: '24px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                  Pay Schedule · Bi-weekly · {cur}
+                </div>
+                <div style={{ display: 'flex', gap: '20px', fontSize: '12px', color: '#475569', marginBottom: payDates.length ? '10px' : '0' }}>
+                  {printSlip.emp.start_date && <span><strong>Start:</strong> {fmtDate(printSlip.emp.start_date)}</span>}
+                  {printSlip.emp.training_end_date && <span><strong>Training until:</strong> {fmtDate(printSlip.emp.training_end_date)}</span>}
+                  {printSlip.emp.first_pay_date && <span><strong>First pay:</strong> {fmtDate(printSlip.emp.first_pay_date)}</span>}
+                </div>
+                {payDates.length > 0 && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {payDates.map((d, i) => (
+                      <div key={i} style={{
+                        padding: '3px 10px', borderRadius: '5px', fontSize: '11px',
+                        background: i === 0 ? '#4f46e5' : '#f1f5f9',
+                        color: i === 0 ? '#fff' : '#475569',
+                        fontWeight: i === 0 ? 700 : 400,
+                      }}>
+                        {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {i === 0 && ' ← next'}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
               <div>
                 <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '8px' }}>Employee</div>
                 <div style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>{printSlip.emp.name}</div>
-                <div style={{ fontSize: '13px', color: '#475569' }}>{printSlip.emp.role} · {printSlip.emp.department}</div>
+                <div style={{ fontSize: '13px', color: '#475569' }}>{printSlip.emp.role}{printSlip.emp.department ? ` · ${printSlip.emp.department}` : ''}</div>
                 <div style={{ fontSize: '12px', color: '#475569', marginTop: '8px', lineHeight: 1.8 }}>
                   Days present: {att.daysPresent}<br />
                   Days late: {att.daysLate}<br />
@@ -633,37 +728,36 @@ export default function PayrollClient({
                 </div>
               </div>
               <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '10px' }}>Payment Summary</div>
+                <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '10px' }}>Payment Summary ({cur})</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
                   <span style={{ color: '#475569' }}>Base Salary</span>
-                  <span style={{ fontWeight: 600 }}>${printSlip.base.toLocaleString()}</span>
+                  <span style={{ fontWeight: 600 }}>{fmt(printSlip.base, cur)}</span>
                 </div>
                 {(printSlip.bonuses ?? 0) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
                     <span style={{ color: '#475569' }}>Bonus</span>
-                    <span style={{ fontWeight: 600, color: '#10b981' }}>+${printSlip.bonuses}</span>
+                    <span style={{ fontWeight: 600, color: '#10b981' }}>+{fmt(printSlip.bonuses, cur)}</span>
                   </div>
                 )}
                 {customItems.map((ci, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
                     <span style={{ color: '#475569' }}>{ci.description || 'Custom item'}</span>
                     <span style={{ fontWeight: 600, color: ci.type === 'addition' ? '#10b981' : '#ef4444' }}>
-                      {ci.type === 'addition' ? '+' : '−'}${ci.amount.toFixed(2)}
+                      {ci.type === 'addition' ? '+' : '−'}{fmt(ci.amount, cur)}
                     </span>
                   </div>
                 ))}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', fontSize: '13px' }}>
                   <span style={{ color: '#ef4444' }}>Total Deductions</span>
-                  <span style={{ color: '#ef4444', fontWeight: 600 }}>−${printSlip.deductions.toLocaleString()}</span>
+                  <span style={{ color: '#ef4444', fontWeight: 600 }}>−{fmt(printSlip.deductions, cur)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '15px', fontWeight: 700 }}>Net Pay</span>
-                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#10b981' }}>${printSlip.net.toLocaleString()}</span>
+                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#10b981' }}>{fmt(printSlip.net, cur)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Itemized deductions */}
             {empViolations.length > 0 && (
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ fontSize: '12px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700, marginBottom: '10px' }}>Deduction Detail</div>
@@ -686,14 +780,14 @@ export default function PayrollClient({
                           {new Date(v.triggered_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'right', color: '#ef4444' }}>−{v.points_deducted}</td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>−${(v.salary_deducted ?? 0).toFixed(2)}</td>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>−{fmt(v.salary_deducted ?? 0, cur)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr style={{ background: '#fff7f7' }}>
                       <td colSpan={4} style={{ padding: '8px 10px', fontWeight: 700, fontSize: '13px' }}>Total Deductions</td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#ef4444', fontSize: '13px' }}>−${printSlip.deductions.toLocaleString()}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#ef4444', fontSize: '13px' }}>−{fmt(printSlip.deductions, cur)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -728,7 +822,6 @@ export default function PayrollClient({
         );
       })()}
 
-      {/* Toast */}
       {toast && <div className="tst">{toast}</div>}
     </>
   );
