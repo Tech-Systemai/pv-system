@@ -26,7 +26,7 @@ export default async function PayrollPage() {
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00Z`;
   const { data: violations } = await admin
     .from('violations')
-    .select('user_id, salary_deducted, points_deducted, triggered_at')
+    .select('user_id, salary_deducted, points_deducted, triggered_at, rule_name, explanation')
     .gte('triggered_at', monthStart);
 
   return (
