@@ -129,7 +129,9 @@ export default function UsersClient({
       first_pay_date: (fd.get('first_pay_date') as string) || null,
     };
     const { error } = await dbOp('profiles', 'update', updates, { id: editUser.id });
-    if (!error) {
+    if (error) {
+      alert(`Save failed: ${error}`);
+    } else {
       setUsers(prev => prev.map(u => u.id === editUser.id ? { ...u, ...updates } : u));
       setViewUser(null);
       setEditUser(null);
