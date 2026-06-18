@@ -44,6 +44,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   'remake-requests':      { title: 'Remake Requests',     sub: 'Stage 3 · post-delivery · customer remake claims & production tracking' },
   'condition-approval':   { title: 'Condition Approval',  sub: 'Stage 1 · pre-sale · dentist clears the patient as a veneer candidate' },
   'lab-fim':              { title: 'Lab Fault Manual',    sub: 'Lab fault codes and SOPs for quality and production issues' },
+  'personal-files':       { title: 'Personal Files',      sub: 'Confidential employee record · commendations & incidents · admins & owners only' },
 };
 
 export default function TopBarTitle({ role }: { role: string }) {

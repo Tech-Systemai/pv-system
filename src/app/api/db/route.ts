@@ -12,6 +12,7 @@ const ALLOWED_TABLES = [
   'impression_kits', 'impression_kit_photos',
   'remake_requests', 'remake_photos',
   'condition_approvals',
+  'personal_file_entries',
 ];
 
 export async function POST(req: NextRequest) {
