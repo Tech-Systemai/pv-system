@@ -614,7 +614,7 @@ export default function PayrollClient({
                   w1.otPay > 0 ? { label: `Week 1 OT — ${fmtH(w1.overtimeMins)} × ${fmt(rate, cur)}/hr`, value: `+${fmt(w1.otPay, cur)}`, color: 'var(--acc)' } : null,
                   w2.otPay > 0 ? { label: `Week 2 OT — ${fmtH(w2.overtimeMins)} × ${fmt(rate, cur)}/hr`, value: `+${fmt(w2.otPay, cur)}`, color: 'var(--acc)' } : null,
                   bonuses > 0 ? { label: 'Bonus', value: `+${fmt(bonuses, cur)}`, color: 'var(--ok)' } : null,
-                  ...customItems.map(ci => ({ label: ci.description || 'Custom item', value: `${ci.type === 'addition' ? '+' : '−'}${fmt(ci.amount, cur)}`, color: ci.type === 'addition' ? 'var(--ok)' : 'var(--err)' })),
+                  ...customItems.map((ci: any) => ({ label: ci.description || 'Custom item', value: `${ci.type === 'addition' ? '+' : '−'}${fmt(ci.amount, cur)}`, color: ci.type === 'addition' ? 'var(--ok)' : 'var(--err)' })),
                   deductions > 0 ? { label: 'Deductions (violations)', value: `−${fmt(deductions, cur)}`, color: 'var(--err)' } : null,
                 ].filter(Boolean).map((row: any, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
