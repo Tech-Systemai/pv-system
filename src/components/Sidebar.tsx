@@ -50,6 +50,7 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
     { head: 'Operations', items: [
       { id: 'schedule',   label: 'Schedules',           icon: '⏱',  module: 'schedule' },
       { id: 'approvals',  label: 'Approval Queue',      icon: '✓' },
+      { id: 'revenue',    label: 'Revenue Tracker',      icon: '$' },
       { id: 'tasks',      label: 'Task Flow',            icon: '✓',  module: 'tasks' },
       { id: 'reports',    label: 'Reports',              icon: '📊', module: 'reports' },
       { id: 'contracts',  label: 'Contracts',            icon: '📄', module: 'contracts' },
@@ -91,6 +92,7 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
     { head: 'Operations', items: [
       { id: 'schedule',   label: 'Schedules',             icon: '⏱',  module: 'schedule' },
       { id: 'approvals',  label: 'Approvals',             icon: '✓' },
+      { id: 'revenue',    label: 'Revenue Tracker',       icon: '$' },
       { id: 'tasks',      label: 'Tasks',                 icon: '✓',  module: 'tasks' },
       { id: 'reports',    label: 'Reports',               icon: '📊', module: 'reports' },
       { id: 'contracts',  label: 'Contracts',             icon: '📄', module: 'contracts' },
