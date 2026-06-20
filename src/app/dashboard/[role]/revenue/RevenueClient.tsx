@@ -331,9 +331,10 @@ function AgentRevenueView({ initialSales, currentUserId }: { initialSales: any[]
     const fd = new FormData(e.currentTarget);
     const newSale = {
       user_id: currentUserId,
-      customer_id: fd.get('customer_id') as string,
       customer_name: fd.get('customer_name') as string || null,
+      customer_email: fd.get('customer_email') as string || null,
       customer_phone: fd.get('customer_phone') as string || null,
+      payment_location: fd.get('payment_location') as string || null,
       amount: parseFloat(fd.get('amount') as string),
       type: 'Sale',
       status: 'Pending',
@@ -398,16 +399,20 @@ function AgentRevenueView({ initialSales, currentUserId }: { initialSales: any[]
           <form onSubmit={handleLog}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div className="pv-fld" style={{ margin: 0 }}>
-                <label>Customer ID</label>
-                <input type="text" name="customer_id" required placeholder="e.g. CUST-1042" />
+                <label>Customer Name</label>
+                <input type="text" name="customer_name" required placeholder="Full name" />
               </div>
               <div className="pv-fld" style={{ margin: 0 }}>
-                <label>Customer Name</label>
-                <input type="text" name="customer_name" placeholder="Full name" />
+                <label>Customer Email</label>
+                <input type="email" name="customer_email" placeholder="name@example.com" />
               </div>
               <div className="pv-fld" style={{ margin: 0 }}>
                 <label>Customer Phone</label>
                 <input type="tel" name="customer_phone" placeholder="+1 555 000 0000" />
+              </div>
+              <div className="pv-fld" style={{ margin: 0 }}>
+                <label>Payment Location</label>
+                <input type="text" name="payment_location" placeholder="e.g. Downtown Clinic" />
               </div>
               <div className="pv-fld" style={{ margin: 0 }}>
                 <label>Amount ($)</label>
@@ -439,6 +444,7 @@ function AgentRevenueView({ initialSales, currentUserId }: { initialSales: any[]
                 <tr>
                   <th>Customer</th>
                   <th>Phone</th>
+                  <th>Location</th>
                   <th>Date / Time</th>
                   <th>Amount</th>
                   <th>Status</th>
@@ -451,14 +457,15 @@ function AgentRevenueView({ initialSales, currentUserId }: { initialSales: any[]
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 32, height: 32, borderRadius: 8, background: 'oklch(0.96 0.05 145)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ok)', fontWeight: 700, fontSize: 14, flexShrink: 0 }}>$</div>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>{s.customer_name || s.customer_id}</div>
-                          {s.customer_name && s.customer_id && (
-                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{s.customer_id}</div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{s.customer_name || s.customer_email || '—'}</div>
+                          {s.customer_name && s.customer_email && (
+                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{s.customer_email}</div>
                           )}
                         </div>
                       </div>
                     </td>
                     <td style={{ fontSize: 12, color: 'var(--ink-4)' }}>{s.customer_phone || '—'}</td>
+                    <td style={{ fontSize: 12, color: 'var(--ink-4)' }}>{s.payment_location || '—'}</td>
                     <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>
                       {new Date(s.created_at).toLocaleString()}
                     </td>
