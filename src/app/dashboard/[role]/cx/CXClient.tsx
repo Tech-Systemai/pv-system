@@ -103,7 +103,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'agents'|'admin'|'no_update'|'unreachable'>('agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -133,12 +133,17 @@ export default function CXClient({
   const escalatedCount   = cases.filter(c => c.escalated).length;
   const noUpdateCount    = cases.filter(c => c.no_update_needed && !c.escalated).length;
   const unreachableCount = cases.filter(c => c.unreachable && !c.escalated).length;
+  // "New orders" = active, unassigned cases. They move to "Agents" the moment they get an assignee.
+  const isActiveCase     = (c: any) => !c.escalated && !c.no_update_needed && !c.unreachable;
+  const newOrdersCount   = cases.filter(c => isActiveCase(c) && !c.assigned_to).length;
+  const agentsCount      = cases.filter(c => isActiveCase(c) && c.assigned_to).length;
 
   const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !c.unreachable && !todayUpdatedIds.has(c.id);
 
   const filtered = cases.filter(c => {
     if (section === 'admin'       && !c.escalated)                                    return false;
-    if (section === 'agents'      && (c.escalated || c.no_update_needed || c.unreachable)) return false;
+    if (section === 'new'         && (!isActiveCase(c) || c.assigned_to))             return false;
+    if (section === 'agents'      && (!isActiveCase(c) || !c.assigned_to))            return false;
     if (section === 'no_update'   && (!c.no_update_needed || c.escalated))            return false;
     if (section === 'unreachable' && (!c.unreachable || c.escalated))                 return false;
     if (!searchQuery) return true;
@@ -373,11 +378,17 @@ export default function CXClient({
 
   /* ── Owner quick-look banner ────────────────────────────────── */
   const banner = (
-    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : 'AGENTS — ALL CUSTOMERS'}
+    <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : section === 'new' ? 'linear-gradient(135deg, oklch(0.98 0.02 200), oklch(0.97 0.03 215))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : section === 'new' ? 'oklch(0.38 0.18 200)' : 'var(--ink-4)', marginBottom: 6 }}>
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : 'AGENTS — ASSIGNED CUSTOMERS'}
       </div>
-      {section === 'agents' ? (
+      {section === 'new' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {newOrdersCount === 0
+            ? 'No new orders waiting. Every active customer has been assigned to an agent.'
+            : <><strong style={{ color: 'oklch(0.38 0.18 200)' }}>{newOrdersCount} new order{newOrdersCount !== 1 ? 's' : ''}</strong> waiting to be claimed. As soon as one is assigned to an agent it moves to the Agents section.</>}
+        </div>
+      ) : section === 'agents' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
           Tracking{' '}
           <strong style={{ color: 'var(--accent)' }}>{cases.length} active customer{cases.length !== 1 ? 's' : ''}</strong>{' '}
@@ -418,7 +429,11 @@ export default function CXClient({
         <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 2 }}>
           <button onClick={() => setSection('agents')}
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'agents' ? 'white' : 'transparent', color: section === 'agents' ? 'var(--ink)' : 'var(--ink-4)', boxShadow: section === 'agents' ? 'var(--sh-1)' : 'none' }}>
-            Agents · {cases.filter(c => !c.escalated).length}
+            Agents · {agentsCount}
+          </button>
+          <button onClick={() => setSection('new')}
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'new' ? 'oklch(0.92 0.06 200)' : 'transparent', color: section === 'new' ? 'oklch(0.36 0.16 200)' : (newOrdersCount > 0 ? 'oklch(0.44 0.16 200)' : 'var(--ink-4)'), boxShadow: section === 'new' ? 'var(--sh-1)' : 'none' }}>
+            🆕 New · {newOrdersCount}
           </button>
           <button onClick={() => setSection('admin')}
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.92 0.06 25)' : 'white') : 'transparent', color: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.38 0.20 25)' : 'var(--ink)') : (escalatedCount > 0 ? 'oklch(0.45 0.18 25)' : 'var(--ink-4)'), boxShadow: section === 'admin' ? 'var(--sh-1)' : 'none' }}>
@@ -434,7 +449,7 @@ export default function CXClient({
           </button>
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
-        {section === 'agents' && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
+        {(section === 'agents' || section === 'new') && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
         {isOwner && section === 'agents' && <button className="btn btn-sec btn-sm" onClick={() => setShowAddCol(true)}>+ Add column</button>}
         <button className="btn btn-sec btn-sm" onClick={exportCSV}>Export CSV</button>
         <div style={{ flex: 1 }} />
@@ -457,7 +472,7 @@ export default function CXClient({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : 'No customer cases found.'}
+          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
@@ -1056,13 +1071,17 @@ export default function CXClient({
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
-          {section === 'agents' ? 'Agents — All customers' : section === 'admin' ? 'Admin — Escalated cases' : 'No Update Needed'}
+          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : 'No Update Needed'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
-          {section === 'agents'
-            ? 'Every customer is visible here — color-coded by status · click any to log updates'
+          {section === 'new'
+            ? 'New orders waiting to be claimed — assign one to an agent and it moves to the Agents section'
+            : section === 'agents'
+            ? 'Customers assigned to an agent — color-coded by status · click any to log updates'
             : section === 'admin'
             ? 'Cases flagged by agents that require management review or action'
+            : section === 'unreachable'
+            ? 'Customers that could not be reached — click to manage or reactivate'
             : 'Customers that do not need a daily update — click to manage or reactivate'}
         </div>
       </div>
