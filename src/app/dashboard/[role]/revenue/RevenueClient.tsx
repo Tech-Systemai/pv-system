@@ -14,13 +14,14 @@ function barColor(pct: number) {
 // ---------- Management view ----------
 
 function MgmtRevenueView({
-  salesAgents, cxAgents, targets: initTargets, salesLogs, collectionLogs, period, cxBonus: initBonus,
+  salesAgents, cxAgents, targets: initTargets, salesLogs, collectionLogs, allSalesLogs, canManageLogs, period, cxBonus: initBonus,
 }: {
   salesAgents: Agent[]; cxAgents: Agent[];
   targets: Target[]; salesLogs: any[]; collectionLogs: any[];
+  allSalesLogs: any[]; canManageLogs: boolean;
   period: string; cxBonus: CxBonus;
 }) {
-  const [tab, setTab] = useState<'sales' | 'cx'>('sales');
+  const [tab, setTab] = useState<'sales' | 'cx' | 'logs'>('sales');
   const [targets, setTargets] = useState<Target[]>(initTargets);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editField, setEditField] = useState<'sales' | 'cx'>('sales');
@@ -30,6 +31,25 @@ function MgmtRevenueView({
   const [editBonus, setEditBonus] = useState(false);
   const [bonusDraft, setBonusDraft] = useState({ amount: String(initBonus.amount), threshold: String(initBonus.threshold) });
   const [savingBonus, setSavingBonus] = useState(false);
+
+  // Owner/Admin sale-log review
+  const [logs, setLogs] = useState<any[]>(allSalesLogs);
+  const [busyLog, setBusyLog] = useState<string | null>(null);
+
+  const setLogStatus = async (id: string, status: 'Verified' | 'Declined') => {
+    setBusyLog(id);
+    await dbOp('sales_logs', 'update', { status }, { id });
+    setLogs(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+    setBusyLog(null);
+  };
+
+  const deleteLog = async (id: string) => {
+    if (!window.confirm('Delete this sale log permanently? This cannot be undone.')) return;
+    setBusyLog(id);
+    await dbOp('sales_logs', 'delete', undefined, { id });
+    setLogs(prev => prev.filter(l => l.id !== id));
+    setBusyLog(null);
+  };
 
   const getTarget = (userId: string) => targets.find(t => t.user_id === userId);
   const getSalesCount = (userId: string) => salesLogs.filter(s => s.user_id === userId).length;
@@ -138,20 +158,23 @@ function MgmtRevenueView({
 
       {/* Tab selector */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['sales', 'cx'] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); setEditingId(null); }}
-            style={{
-              padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13,
-              background: tab === t ? 'var(--accent)' : 'var(--surface-2)',
-              color: tab === t ? '#fff' : 'var(--ink-3)',
-              transition: 'all .2s',
-            }}
-          >
-            {t === 'sales' ? '📈 Sales Targets' : '📋 CX Collection Targets'}
-          </button>
-        ))}
+        {(['sales', 'cx', ...(canManageLogs ? ['logs'] as const : [])] as const).map(t => {
+          const pendingCount = t === 'logs' ? logs.filter(l => (l.status ?? 'Pending') === 'Pending').length : 0;
+          return (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setEditingId(null); }}
+              style={{
+                padding: '8px 20px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                background: tab === t ? 'var(--accent)' : 'var(--surface-2)',
+                color: tab === t ? '#fff' : 'var(--ink-3)',
+                transition: 'all .2s',
+              }}
+            >
+              {t === 'sales' ? '📈 Sales Targets' : t === 'cx' ? '📋 CX Collection Targets' : `🧾 All Sales Logs${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+            </button>
+          );
+        })}
       </div>
 
       {/* Sales targets */}
@@ -312,6 +335,85 @@ function MgmtRevenueView({
             </div>
           </div>
         </>
+      )}
+
+      {/* All sales logs — owner/admin review, approve & delete */}
+      {tab === 'logs' && canManageLogs && (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">All Sales Logs</div>
+              <div className="card-sub">Only approved logs count toward commission · Delete inaccurate ones · {period}</div>
+            </div>
+          </div>
+          {logs.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+              No sales logged this period.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Customer</th>
+                    <th>Location</th>
+                    <th>Date / Time</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map(l => {
+                    const status = l.status ?? 'Pending';
+                    return (
+                      <tr key={l.id}>
+                        <td style={{ fontWeight: 600, fontSize: 13 }}>{l.profiles?.name ?? '—'}</td>
+                        <td>
+                          <div style={{ fontSize: 13 }}>{l.customer_name || l.customer_email || '—'}</div>
+                          {l.customer_name && l.customer_email && (
+                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{l.customer_email}</div>
+                          )}
+                        </td>
+                        <td style={{ fontSize: 12, color: 'var(--ink-4)' }}>{l.payment_location || '—'}</td>
+                        <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>
+                          {new Date(l.created_at).toLocaleString()}
+                        </td>
+                        <td style={{ fontWeight: 700, color: 'var(--ok)', fontSize: 14 }}>
+                          ${Number(l.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </td>
+                        <td>
+                          <span className={status === 'Verified' ? 'bdg bdg-ok' : status === 'Declined' ? 'bdg bdg-err' : 'bdg bdg-warn'}>{status}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            {status !== 'Verified' && (
+                              <button className="btn btn-sm" style={{ background: 'oklch(0.96 0.05 145)', color: 'var(--ok)', border: '1px solid oklch(0.88 0.07 145)' }}
+                                disabled={busyLog === l.id} onClick={() => setLogStatus(l.id, 'Verified')}>
+                                {busyLog === l.id ? '…' : '✓ Approve'}
+                              </button>
+                            )}
+                            {status === 'Pending' && (
+                              <button className="btn btn-sm btn-sec"
+                                disabled={busyLog === l.id} onClick={() => setLogStatus(l.id, 'Declined')}>
+                                ✕ Decline
+                              </button>
+                            )}
+                            <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)' }}
+                              disabled={busyLog === l.id} onClick={() => deleteLog(l.id)}>
+                              🗑 Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -490,6 +592,7 @@ function AgentRevenueView({ initialSales, currentUserId }: { initialSales: any[]
 
 export default function RevenueClient({
   isMgmt = false,
+  canManageLogs = false,
   initialSales,
   currentUserId,
   salesAgents,
@@ -497,10 +600,12 @@ export default function RevenueClient({
   targets,
   salesLogs,
   collectionLogs,
+  allSalesLogs,
   period,
   cxBonus,
 }: {
   isMgmt?: boolean;
+  canManageLogs?: boolean;
   initialSales: any[];
   currentUserId: string;
   salesAgents?: any[];
@@ -508,6 +613,7 @@ export default function RevenueClient({
   targets?: any[];
   salesLogs?: any[];
   collectionLogs?: any[];
+  allSalesLogs?: any[];
   period?: string;
   cxBonus?: CxBonus;
 }) {
@@ -519,6 +625,8 @@ export default function RevenueClient({
         targets={targets ?? []}
         salesLogs={salesLogs ?? []}
         collectionLogs={collectionLogs ?? []}
+        allSalesLogs={allSalesLogs ?? []}
+        canManageLogs={canManageLogs}
         period={period ?? ''}
         cxBonus={cxBonus ?? { amount: 3, threshold: 600 }}
       />

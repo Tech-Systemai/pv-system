@@ -31,11 +31,13 @@ export default async function TargetsPage() {
       .from('sales_logs')
       .select('user_id, amount')
       .eq('type', 'Sale')
+      .eq('status', 'Verified')
       .gte('created_at', startOfMonth.toISOString()),
     admin
       .from('sales_logs')
       .select('user_id, amount')
       .eq('type', 'Collection')
+      .eq('status', 'Verified')
       .gte('created_at', startOfMonth.toISOString()),
     admin
       .from('targets')
