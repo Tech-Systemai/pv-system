@@ -3,10 +3,11 @@ import { updateSession } from '@/utils/supabase/middleware';
 
 export async function proxy(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
+  const sub = host.split('.')[0].toLowerCase();
 
-  // Customer profile site (myprofile.pioneersveneers.com) — public, no auth.
+  // Customer profile site (portal.pioneersveneers.com) — public, no auth.
   // Serve the /portal app for this subdomain; the portal's own API is left alone.
-  if (host.startsWith('myprofile.')) {
+  if (sub === 'portal' || sub === 'myprofile') {
     const { pathname } = request.nextUrl;
     if (pathname.startsWith('/portal') || pathname.startsWith('/api/')) {
       return NextResponse.next();
