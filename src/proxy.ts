@@ -1,7 +1,21 @@
-import { type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/utils/supabase/middleware';
 
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get('host') ?? '';
+
+  // Customer profile site (myprofile.pioneersveneers.com) — public, no auth.
+  // Serve the /portal app for this subdomain; the portal's own API is left alone.
+  if (host.startsWith('myprofile.')) {
+    const { pathname } = request.nextUrl;
+    if (pathname.startsWith('/portal') || pathname.startsWith('/api/')) {
+      return NextResponse.next();
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = `/portal${pathname === '/' ? '' : pathname}`;
+    return NextResponse.rewrite(url);
+  }
+
   return await updateSession(request);
 }
 
