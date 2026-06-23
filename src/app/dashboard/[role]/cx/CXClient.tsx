@@ -454,8 +454,47 @@ export default function CXClient({
     patchCase({ stage_checklist: { ...cl, [stageKey]: [...done] } });
   };
 
-  const handlePushToCustomer = () => {
-    patchCase({ pushed_to_customer_at: new Date().toISOString() });
+  const [pushing, setPushing] = useState(false);
+  const handlePushToCustomer = async () => {
+    if (!selectedCase || pushing) return;
+    const sc = selectedCase;
+    const phoneKey = (sc.phone || '').replace(/\D/g, '');
+    if (phoneKey.length < 7) {
+      alert('Add a valid phone number to this case first — customers look up their profile by phone.');
+      return;
+    }
+    setPushing(true);
+    const done: string[] = sc.stages_done ?? [];
+    const curStage = PIPELINE_STAGES[Math.min(done.length, PIPELINE_STAGES.length - 1)];
+    const guide = curStage ? STAGE_GUIDE[curStage.key] : undefined;
+    const checked: number[] = (sc.stage_checklist ?? {})[curStage?.key ?? ''] ?? [];
+    const full = Number(sc.full_price) || 0;
+    const collected = Number(sc.amount_collected) || 0;
+    // Snapshot = only what the customer is allowed to see, keyed by case_id (PK → upsert).
+    const snapshot = {
+      case_id: sc.id,
+      phone: phoneKey,
+      customer_name: sc.customer_name ?? null,
+      order_number: sc.order_number ?? null,
+      status: sc.status ?? null,
+      stage_label: curStage?.label ?? null,
+      stage_pct: Math.round((done.length / PIPELINE_STAGES.length) * 100),
+      next_step_summary: guide?.summary ?? null,
+      next_steps: (guide?.steps ?? []).map((text, idx) => ({ text, done: checked.includes(idx) })),
+      tracking: (sc.tracking_log ?? []).map((t: any) => ({ label: t.label, number: t.number })),
+      full_price: full || null,
+      amount_collected: collected,
+      balance: full > 0 ? Math.max(0, full - collected) : null,
+      published_at: new Date().toISOString(),
+    };
+    const { error } = await dbOp('customer_portal', 'upsert', snapshot);
+    if (error) {
+      alert('Could not push to customer: ' + error);
+      setPushing(false);
+      return;
+    }
+    await patchCase({ pushed_to_customer_at: new Date().toISOString() });
+    setPushing(false);
   };
 
   const markCaseRead = (caseId: number) => {
@@ -864,11 +903,11 @@ export default function CXClient({
                 style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 ★ Referral{(selectedCase.referrals?.length ?? 0) > 0 ? ` · ${selectedCase.referrals.length}` : ''}
               </button>
-              <button className="btn btn-sec btn-sm" onClick={handlePushToCustomer}
+              <button className="btn btn-sec btn-sm" onClick={handlePushToCustomer} disabled={pushing}
                 style={selectedCase.pushed_to_customer_at
                   ? { background: 'oklch(0.93 0.05 145)', color: 'oklch(0.34 0.15 145)', border: '1px solid oklch(0.82 0.08 145)', display: 'flex', alignItems: 'center', gap: 5 }
                   : { display: 'flex', alignItems: 'center', gap: 5 }}>
-                {selectedCase.pushed_to_customer_at ? '✓ Pushed to customer' : '↗ Push to customer'}
+                {pushing ? 'Pushing…' : selectedCase.pushed_to_customer_at ? '✓ Pushed — update customer' : '↗ Push to customer'}
               </button>
             </div>
             {showReferralAdd && (

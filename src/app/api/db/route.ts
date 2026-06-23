@@ -13,6 +13,7 @@ const ALLOWED_TABLES = [
   'remake_requests', 'remake_photos',
   'condition_approvals',
   'personal_file_entries',
+  'customer_portal',
 ];
 
 export async function POST(req: NextRequest) {
