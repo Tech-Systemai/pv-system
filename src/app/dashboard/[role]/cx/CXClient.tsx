@@ -59,6 +59,72 @@ const STAGE_GROUPS = [
   { label: 'PRODUCTION',       keys: ['in_production', 'quality_check', 'collect_full_payment_veneers'] },
   { label: 'DELIVERY & AFTER', keys: ['veneers_shipped', 'veneers_delivered', 'completed_no_issues', 'referral_upsell'] },
 ];
+/* Per-stage agent guide. `summary` is the blue banner blurb; `steps` are the
+   checklist items an agent ticks off ("mark yes") as they complete each one.
+   Placeholder content — swap in the official step list per stage when provided. */
+const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
+  new_order: {
+    summary: 'Brand-new order. Confirm the details and welcome the customer.',
+    steps: ['Greet the customer and confirm their order', 'Verify shipping address and contact info', 'Walk them through the journey and timelines', 'Log first contact on file'],
+  },
+  imp_kit_sent: {
+    summary: 'Impressions kit is on the way. Share the tracking number and let the customer know to watch for it.',
+    steps: ['Share the tracking number with the customer', 'Confirm expected delivery window', 'Remind them to watch for the package'],
+  },
+  imp_kit_delivered: {
+    summary: 'Kit delivered. Make sure the customer knows how to take their impression.',
+    steps: ['Confirm the kit arrived', 'Offer a Zoom impression session', 'Send impression instructions'],
+  },
+  imp_appointment_done: {
+    summary: 'Impression appointment complete. Verify the impression looks good before send-back.',
+    steps: ['Review the impression photos', 'Confirm impression quality with the customer', 'Explain the send-back step'],
+  },
+  collect_payment: {
+    summary: 'Collect the partial or full payment before the kit goes to the lab.',
+    steps: ['Confirm the balance owed', 'Send the payment link', 'Record the payment once collected'],
+  },
+  waiting_sendback_tracking: {
+    summary: 'Waiting on the customer to ship the kit back. Get the send-back tracking number.',
+    steps: ['Ask the customer for the send-back tracking #', 'Log the tracking number', 'Confirm drop-off'],
+  },
+  imp_kit_on_way_to_lab: {
+    summary: 'Kit is heading to the lab. Track it until it arrives.',
+    steps: ['Confirm the kit is in transit to the lab', 'Monitor tracking', 'Notify the customer it is on the way'],
+  },
+  received_imp_kit_at_lab: {
+    summary: 'Lab has received the kit. Production can be queued.',
+    steps: ['Confirm lab receipt', 'Verify specs (shade, set) with the lab', 'Update the customer'],
+  },
+  in_production: {
+    summary: 'Veneers are being produced. Keep the customer informed.',
+    steps: ['Confirm production has started', 'Give the customer a production timeline', 'Set a mid-production follow-up'],
+  },
+  quality_check: {
+    summary: 'Quality check in progress before shipping.',
+    steps: ['Confirm QC passed', 'Flag any defects to the lab', 'Prepare the customer for shipping'],
+  },
+  collect_full_payment_veneers: {
+    summary: 'Collect the full remaining balance before the veneers ship.',
+    steps: ['Confirm remaining balance', 'Send the final payment link', 'Record the payment'],
+  },
+  veneers_shipped: {
+    summary: 'Veneers shipped. Share the tracking number.',
+    steps: ['Share the shipping tracking number', 'Confirm delivery window', 'Remind the customer to watch for it'],
+  },
+  veneers_delivered: {
+    summary: 'Veneers delivered. Confirm fit and satisfaction.',
+    steps: ['Confirm the veneers arrived', 'Check fit and look', 'Offer adhesive / support if needed'],
+  },
+  completed_no_issues: {
+    summary: 'Order complete with no issues. Wrap up.',
+    steps: ['Confirm the customer is satisfied', 'Close out the case', 'Note any outstanding balance'],
+  },
+  referral_upsell: {
+    summary: 'Happy customer — ask for a review and a referral.',
+    steps: ['Request a Google / Trustpilot review', 'Ask for a referral', 'Log any referral leads'],
+  },
+};
+
 const EXCEPTION_FLAGS = [
   { key: 'needs_new_imp_kit',               label: 'Needs new impression kit',          hue: 45,  chroma: 0.08 },
   { key: 'veneers_on_hold_failed_payment',  label: 'Veneers on hold — failed payment',  hue: 15,  chroma: 0.08 },
@@ -84,9 +150,12 @@ function fmtDate(iso: string) { return new Date(iso).toLocaleDateString('en-US',
 function initials(name: string) { return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'; }
 
 const EMPTY_FORM = {
-  customer_name: '', phone: '', pipeline_stage: 'IMP KIT SENT', status: 'New CX',
+  customer_name: '', phone: '', email: '', address: '', order_number: '',
+  veneer_set: '', veneer_shade: '', shipping: '', special_request: '',
+  pipeline_stage: 'IMP KIT SENT', status: 'New CX',
   priority: 'HIGH', issue: '', action_taken: '', customer_words: '', lab_notes: '',
-  payment_left: '', pay_status: 'Paid', assigned_to: '', on_hold: false, hold_reason: '',
+  full_price: '', amount_collected: '', payment_left: '', pay_status: 'Paid',
+  assigned_to: '', on_hold: false, hold_reason: '',
 };
 
 /* ── Component ───────────────────────────────────────────────── */
@@ -115,6 +184,9 @@ export default function CXClient({
   const [reassigningCaseId, setReassigningCaseId] = useState<number | null>(null);
   const [reassignValue, setReassignValue] = useState('');
   const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({});
+  const [showReferralAdd, setShowReferralAdd] = useState(false);
+  const [referralDraft, setReferralDraft] = useState({ name: '', phone: '' });
+  const [paymentInput, setPaymentInput] = useState('');
 
   const [form,      setForm]      = useState({ ...EMPTY_FORM });
   const [updateText, setUpdateText] = useState('');
@@ -169,10 +241,15 @@ export default function CXClient({
     setEditingCase(c);
     setForm({
       customer_name: c.customer_name ?? '', phone: c.phone ?? '',
+      email: c.email ?? '', address: c.address ?? '', order_number: c.order_number ?? '',
+      veneer_set: c.veneer_set ?? '', veneer_shade: c.veneer_shade ?? '',
+      shipping: c.shipping ?? '', special_request: c.special_request ?? '',
       pipeline_stage: c.pipeline_stage ?? 'IMP KIT SENT', status: c.status ?? 'New CX',
       priority: c.priority ?? 'HIGH', issue: c.issue ?? '',
       action_taken: c.action_taken ?? '', customer_words: c.customer_words ?? '',
-      lab_notes: c.lab_notes ?? '', payment_left: c.payment_left ?? '',
+      lab_notes: c.lab_notes ?? '',
+      full_price: c.full_price ?? '', amount_collected: c.amount_collected ?? '',
+      payment_left: c.payment_left ?? '',
       pay_status: c.pay_status ?? 'Paid', assigned_to: c.assigned_to ?? '',
       on_hold: c.on_hold ?? false, hold_reason: c.hold_reason ?? '',
     });
@@ -182,9 +259,25 @@ export default function CXClient({
   const handleSaveCase = async () => {
     if (!form.customer_name.trim()) return;
     setSavingCase(true);
+    const fullPrice  = form.full_price !== '' ? Number(form.full_price) : null;
+    const collected  = form.amount_collected !== '' ? Number(form.amount_collected) : 0;
+    // When a full price is set, payment_left is derived; otherwise honor the manual field.
+    const paymentLeft = fullPrice != null
+      ? Math.max(0, fullPrice - collected)
+      : (form.payment_left !== '' ? Number(form.payment_left) : null);
+    const payStatus = fullPrice != null
+      ? (collected >= fullPrice ? 'Paid' : collected > 0 ? 'Partial' : 'Defaulted')
+      : (form.pay_status || null);
     const payload: any = {
       customer_name: form.customer_name.trim(),
       phone: form.phone.trim(),
+      email: form.email.trim() || null,
+      address: form.address.trim() || null,
+      order_number: form.order_number.trim() || null,
+      veneer_set: form.veneer_set.trim() || null,
+      veneer_shade: form.veneer_shade.trim() || null,
+      shipping: form.shipping.trim() || null,
+      special_request: form.special_request.trim() || null,
       pipeline_stage: form.pipeline_stage,
       status: form.status,
       priority: form.priority,
@@ -192,8 +285,10 @@ export default function CXClient({
       action_taken: form.action_taken.trim(),
       customer_words: form.customer_words.trim(),
       lab_notes: form.lab_notes.trim(),
-      payment_left: form.payment_left !== '' ? Number(form.payment_left) : null,
-      pay_status: form.pay_status || null,
+      full_price: fullPrice,
+      amount_collected: collected,
+      payment_left: paymentLeft,
+      pay_status: payStatus,
       assigned_to: form.assigned_to || null,
       on_hold: form.on_hold,
       hold_reason: form.on_hold ? form.hold_reason.trim() : null,
@@ -319,6 +414,48 @@ export default function CXClient({
     await dbOp('cx_cases', 'update', payload, { id: selectedCase.id });
     setCases(prev => prev.map(c => c.id === selectedCase.id ? { ...c, ...payload } : c));
     setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
+  /* Generic patch for the open case — writes to DB and syncs local state. */
+  const patchCase = async (patch: Record<string, any>) => {
+    if (!selectedCase) return;
+    const payload = { ...patch, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: selectedCase.id });
+    setCases(prev => prev.map(c => c.id === selectedCase.id ? { ...c, ...payload } : c));
+    setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
+  const newEntryId = () =>
+    (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.round(Math.random() * 1e6);
+
+  const addLogEntry = (field: string, entry: Record<string, any>) => {
+    const list = selectedCase?.[field] ?? [];
+    patchCase({ [field]: [{ id: newEntryId(), by: currentUserId, date: today, ...entry }, ...list] });
+  };
+  const removeLogEntry = (field: string, id: string) => {
+    const list = (selectedCase?.[field] ?? []).filter((e: any) => e.id !== id);
+    patchCase({ [field]: list });
+  };
+
+  const handleRecordPayment = (amount: string) => {
+    const add = Number(amount);
+    if (!add || add <= 0 || !selectedCase) return;
+    const full = Number(selectedCase.full_price) || 0;
+    const collected = (Number(selectedCase.amount_collected) || 0) + add;
+    const left = full > 0 ? Math.max(0, full - collected) : selectedCase.payment_left;
+    const pay_status = full > 0 ? (collected >= full ? 'Paid' : collected > 0 ? 'Partial' : 'Defaulted') : selectedCase.pay_status;
+    patchCase({ amount_collected: collected, payment_left: left, pay_status });
+  };
+
+  const handleToggleGuideStep = (stageKey: string, idx: number) => {
+    const cl: Record<string, number[]> = selectedCase?.stage_checklist ?? {};
+    const done = new Set(cl[stageKey] ?? []);
+    if (done.has(idx)) done.delete(idx); else done.add(idx);
+    patchCase({ stage_checklist: { ...cl, [stageKey]: [...done] } });
+  };
+
+  const handlePushToCustomer = () => {
+    patchCase({ pushed_to_customer_at: new Date().toISOString() });
   };
 
   const markCaseRead = (caseId: number) => {
@@ -707,11 +844,59 @@ export default function CXClient({
             {initials(selectedCase.customer_name)}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)' }}>{selectedCase.customer_name}</div>
-            <div style={{ fontSize: 13, color: 'var(--ink-4)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span>📞 {selectedCase.phone}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)' }}>{selectedCase.customer_name}</span>
+              {selectedCase.order_number && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink-3)', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
+                  {selectedCase.order_number}
+                </span>
+              )}
               <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: 'var(--surface-2)', border: '1px solid var(--line)' }}>{selectedCase.pipeline_stage}</span>
             </div>
+            <div style={{ marginTop: 4, fontSize: 13, color: 'var(--ink-4)', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              {selectedCase.phone && <span>📞 {selectedCase.phone}</span>}
+              {selectedCase.email && <span>✉ {selectedCase.email}</span>}
+              {selectedCase.address && <span>📍 {selectedCase.address}</span>}
+            </div>
+            {/* Referral / Push-to-customer actions */}
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-sec btn-sm" onClick={() => setShowReferralAdd(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                ★ Referral{(selectedCase.referrals?.length ?? 0) > 0 ? ` · ${selectedCase.referrals.length}` : ''}
+              </button>
+              <button className="btn btn-sec btn-sm" onClick={handlePushToCustomer}
+                style={selectedCase.pushed_to_customer_at
+                  ? { background: 'oklch(0.93 0.05 145)', color: 'oklch(0.34 0.15 145)', border: '1px solid oklch(0.82 0.08 145)', display: 'flex', alignItems: 'center', gap: 5 }
+                  : { display: 'flex', alignItems: 'center', gap: 5 }}>
+                {selectedCase.pushed_to_customer_at ? '✓ Pushed to customer' : '↗ Push to customer'}
+              </button>
+            </div>
+            {showReferralAdd && (
+              <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--line)' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input value={referralDraft.name} onChange={e => setReferralDraft(p => ({ ...p, name: e.target.value }))}
+                    placeholder="Referred person's name" className="fld-input" style={{ height: 30, fontSize: 12, flex: 1, minWidth: 140 }} autoFocus />
+                  <input value={referralDraft.phone} onChange={e => setReferralDraft(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="Phone / email" className="fld-input" style={{ height: 30, fontSize: 12, flex: 1, minWidth: 120 }} />
+                  <button className="btn btn-acc btn-sm" disabled={!referralDraft.name.trim()}
+                    onClick={() => { addLogEntry('referrals', { name: referralDraft.name.trim(), phone: referralDraft.phone.trim() }); setReferralDraft({ name: '', phone: '' }); setShowReferralAdd(false); }}>
+                    Add referral
+                  </button>
+                </div>
+                {(selectedCase.referrals?.length ?? 0) > 0 && (
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {selectedCase.referrals.map((r: any) => (
+                      <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-3)' }}>
+                        <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{r.name}</span>
+                        {r.phone && <span style={{ color: 'var(--ink-4)' }}>{r.phone}</span>}
+                        <span style={{ color: 'var(--ink-5)', fontSize: 11 }}>· {r.date}</span>
+                        <button onClick={() => removeLogEntry('referrals', r.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 13 }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               {reassigningCaseId === selectedCase.id ? (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -789,6 +974,128 @@ export default function CXClient({
             <button onClick={() => handleToggleHold(selectedCase)} style={{ marginLeft: 'auto', fontSize: 12, background: 'none', border: '1px solid var(--line)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', color: 'var(--ink-4)' }}>Remove hold</button>
           </div>
         )}
+
+        {/* Order details */}
+        <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)', background: 'var(--surface)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ width: 16, height: 16, borderRadius: 4, background: 'oklch(0.92 0.05 260)', color: 'oklch(0.40 0.16 260)', fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>▣</span>
+              Order details
+            </div>
+            {isMgmt && <button className="btn btn-sec btn-sm" onClick={() => { openEdit(selectedCase); setSelectedCase(null); }}>✎ Edit</button>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            {[
+              { label: 'VENEER SET', value: selectedCase.veneer_set },
+              { label: 'VENEER SHADE', value: selectedCase.veneer_shade },
+              { label: 'SHIPPING', value: selectedCase.shipping },
+            ].map(d => (
+              <div key={d.label}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 4 }}>{d.label}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: d.value ? 'var(--ink)' : 'var(--ink-5)' }}>{d.value || '—'}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 4 }}>SPECIAL REQUEST NOTES</div>
+            <div style={{ fontSize: 13, color: selectedCase.special_request ? 'var(--ink-3)' : 'var(--ink-5)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{selectedCase.special_request || '—'}</div>
+          </div>
+        </div>
+
+        {/* Next-step guide for the current stage */}
+        {(() => {
+          const curKey = PIPELINE_STAGES[Math.min(stagesDone.length, PIPELINE_STAGES.length - 1)]?.key;
+          const guide = curKey ? STAGE_GUIDE[curKey] : undefined;
+          const curLabel = PIPELINE_STAGES.find(s => s.key === curKey)?.label ?? '';
+          const checked: number[] = (selectedCase.stage_checklist ?? {})[curKey] ?? [];
+          if (!guide) return null;
+          return (
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)', background: 'oklch(0.985 0.012 255)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: 'oklch(0.45 0.16 260)', marginBottom: 6 }}>
+                ▶ NEXT STEP GUIDE · {curLabel.toUpperCase()}
+              </div>
+              <div style={{ fontSize: 14, color: 'var(--ink)', lineHeight: 1.6, marginBottom: 12 }}>{guide.summary}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {guide.steps.map((step, idx) => {
+                  const isDone = checked.includes(idx);
+                  return (
+                    <button key={idx} onClick={() => handleToggleGuideStep(curKey, idx)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                        background: isDone ? 'oklch(0.95 0.04 145)' : 'white',
+                        border: `1px solid ${isDone ? 'oklch(0.82 0.08 145)' : 'var(--line)'}` }}>
+                      <span style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: isDone ? 'oklch(0.55 0.16 145)' : 'transparent',
+                        border: isDone ? 'none' : '2px solid oklch(0.80 0.02 260)' }}>
+                        {isDone && <span style={{ color: 'white', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                      </span>
+                      <span style={{ fontSize: 13, color: isDone ? 'oklch(0.34 0.14 145)' : 'var(--ink-3)', fontWeight: isDone ? 600 : 500 }}>{step}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: isDone ? 'oklch(0.40 0.15 145)' : 'var(--ink-5)' }}>
+                        {isDone ? 'Yes ✓' : 'Mark yes'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Payment */}
+        {(() => {
+          const full = Number(selectedCase.full_price) || 0;
+          const collected = Number(selectedCase.amount_collected) || 0;
+          const left = full > 0 ? Math.max(0, full - collected) : (Number(selectedCase.payment_left) || 0);
+          const pct = full > 0 ? Math.min(100, Math.round((collected / full) * 100)) : 0;
+          const complete = full > 0 && collected >= full;
+          const accent = complete ? 145 : 25;
+          return (
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', color: `oklch(0.45 0.18 ${accent})`, display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: `oklch(0.55 0.20 ${accent})` }} />
+                  PAYMENT — {complete ? 'PAID IN FULL' : 'COLLECTION INCOMPLETE'}
+                </div>
+                {full > 0 && !complete && (
+                  <span style={{ fontSize: 12, fontWeight: 800, padding: '3px 11px', borderRadius: 999, background: 'oklch(0.55 0.20 25)', color: 'white' }}>
+                    ${left.toLocaleString('en-US', { minimumFractionDigits: 0 })} still owed
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 2 }}>FULL PRICE</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--ink)' }}>${full.toLocaleString('en-US', { minimumFractionDigits: 0 })}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 2 }}>COLLECTED</div>
+                  <div style={{ fontSize: 34, fontWeight: 900, color: 'oklch(0.45 0.16 145)', lineHeight: 1 }}>${collected.toLocaleString('en-US', { minimumFractionDigits: 0 })}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 2 }}>LEFT TO COLLECT</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: left > 0 ? 'oklch(0.50 0.20 25)' : 'var(--ink-5)' }}>${left.toLocaleString('en-US', { minimumFractionDigits: 0 })}</div>
+                </div>
+              </div>
+              {full > 0 && (
+                <div style={{ height: 6, borderRadius: 999, background: 'oklch(0.92 0.01 260)', marginBottom: 12, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 999, background: `oklch(0.55 0.18 ${accent})`, width: `${pct}%`, transition: 'width 0.25s ease' }} />
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: 'var(--ink-5)' }}>{full > 0 ? `${pct}% collected of $${full.toLocaleString('en-US')}` : 'Set a full price on the case to track collection.'}</span>
+                <div style={{ flex: 1 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-4)' }}>$</span>
+                  <input type="number" min="0" step="0.01" value={paymentInput} onChange={e => setPaymentInput(e.target.value)}
+                    placeholder="0.00" className="fld-input" style={{ height: 34, width: 120, fontSize: 13 }} />
+                  <button className="btn btn-acc btn-sm" disabled={!paymentInput || Number(paymentInput) <= 0}
+                    onClick={() => { handleRecordPayment(paymentInput); setPaymentInput(''); }}>
+                    Record payment
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Pipeline tracker */}
         <div style={{ padding: '18px 24px 16px', borderBottom: '1px solid var(--line)' }}>
@@ -873,22 +1180,23 @@ export default function CXClient({
 
         {/* Body: two columns */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
-          {/* Left: case details */}
+          {/* Left: case logs */}
           <div style={{ padding: '20px 22px', borderRight: '1px solid var(--line)' }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)', marginBottom: 14 }}>THE CASE</div>
-            {[
-              { label: 'ISSUE', value: selectedCase.issue, icon: null },
-              { label: 'ACTION TAKEN', value: selectedCase.action_taken, icon: '→' },
-              { label: "CUSTOMER'S WORDS", value: selectedCase.customer_words, icon: '"' },
-              { label: 'LAB NOTES', value: selectedCase.lab_notes, icon: '⚙' },
-            ].map(f => f.value && (
-              <div key={f.label} style={{ marginBottom: 14, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 10, borderLeft: '3px solid var(--line)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-5)', marginBottom: 6 }}>
-                  {f.icon && <span style={{ marginRight: 5 }}>{f.icon}</span>}{f.label}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{f.value}</div>
-              </div>
-            ))}
+            <LogCard title="Issues" icon="⚑" hue={25} entries={selectedCase.issues_log ?? []} nameMap={nameMap}
+              placeholder="Describe the issue…" addLabel="Add"
+              onAdd={text => addLogEntry('issues_log', { text })} onRemove={id => removeLogEntry('issues_log', id)} />
+            <LogCard title="Customer notes" icon="✉" hue={235} entries={selectedCase.customer_notes_log ?? []} nameMap={nameMap}
+              placeholder="What the customer said or wants…" addLabel="Add"
+              onAdd={text => addLogEntry('customer_notes_log', { text })} onRemove={id => removeLogEntry('customer_notes_log', id)} />
+            <LogCard title="Lab notes" icon="⚙" hue={260} entries={selectedCase.lab_notes_log ?? []} nameMap={nameMap}
+              placeholder="Internal lab / production note…" addLabel="Add"
+              onAdd={text => addLogEntry('lab_notes_log', { text })} onRemove={id => removeLogEntry('lab_notes_log', id)} />
+            <TrackingCard entries={selectedCase.tracking_log ?? []} nameMap={nameMap}
+              onAdd={(label, number) => addLogEntry('tracking_log', { label, number })} onRemove={id => removeLogEntry('tracking_log', id)} />
+            <LogCard title="Remakes" icon="↻" hue={300} entries={selectedCase.remakes_log ?? []} nameMap={nameMap}
+              placeholder="Reason for the remake…" addLabel="Log remake"
+              onAdd={text => addLogEntry('remakes_log', { text })} onRemove={id => removeLogEntry('remakes_log', id)} />
           </div>
 
           {/* Right: update log */}
@@ -988,8 +1296,19 @@ export default function CXClient({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="pv-fld"><label>Customer Name *</label><input value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))} placeholder="Full name" autoFocus /></div>
-          <div className="pv-fld"><label>Phone</label><input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="000-000-0000" /></div>
+          <div className="pv-fld"><label>Order Number</label><input value={form.order_number} onChange={e => setForm(p => ({ ...p, order_number: e.target.value }))} placeholder="e.g. PV-4404" /></div>
         </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div className="pv-fld"><label>Phone</label><input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="000-000-0000" /></div>
+          <div className="pv-fld"><label>Email</label><input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="name@email.com" /></div>
+        </div>
+        <div className="pv-fld"><label>Address</label><input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} placeholder="Full shipping address" /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <div className="pv-fld"><label>Veneer Set</label><input value={form.veneer_set} onChange={e => setForm(p => ({ ...p, veneer_set: e.target.value }))} placeholder="e.g. Bottom Only" /></div>
+          <div className="pv-fld"><label>Veneer Shade</label><input value={form.veneer_shade} onChange={e => setForm(p => ({ ...p, veneer_shade: e.target.value }))} placeholder="e.g. Super White" /></div>
+          <div className="pv-fld"><label>Shipping</label><input value={form.shipping} onChange={e => setForm(p => ({ ...p, shipping: e.target.value }))} placeholder="e.g. Standard" /></div>
+        </div>
+        <div className="pv-fld"><label>Special Request Notes</label><textarea rows={2} value={form.special_request} onChange={e => setForm(p => ({ ...p, special_request: e.target.value }))} placeholder="Any special requests for this order…" /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           <div className="pv-fld">
             <label>Pipeline Stage</label>
@@ -1016,14 +1335,12 @@ export default function CXClient({
         <div className="pv-fld"><label>Lab Notes</label><input value={form.lab_notes} onChange={e => setForm(p => ({ ...p, lab_notes: e.target.value }))} placeholder="Internal lab / production notes…" /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           <div className="pv-fld">
-            <label>Payment Left ($)</label>
-            <input type="number" min="0" step="0.01" value={form.payment_left} onChange={e => setForm(p => ({ ...p, payment_left: e.target.value }))} placeholder="0.00" />
+            <label>Full Price ($)</label>
+            <input type="number" min="0" step="0.01" value={form.full_price} onChange={e => setForm(p => ({ ...p, full_price: e.target.value }))} placeholder="e.g. 800" />
           </div>
           <div className="pv-fld">
-            <label>Pay Status</label>
-            <select value={form.pay_status} onChange={e => setForm(p => ({ ...p, pay_status: e.target.value }))}>
-              <option>Paid</option><option>Partial</option><option>Defaulted</option>
-            </select>
+            <label>Amount Collected ($)</label>
+            <input type="number" min="0" step="0.01" value={form.amount_collected} onChange={e => setForm(p => ({ ...p, amount_collected: e.target.value }))} placeholder="0.00" />
           </div>
           <div className="pv-fld">
             <label>Assigned To</label>
@@ -1143,6 +1460,97 @@ function EscalateModal({ customerName, onConfirm, onClose }: { customerName: str
             ⚠ Escalate to admin
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Multi-entry log card (Issues / Customer notes / Lab notes / Remakes) ── */
+function LogCard({ title, icon, hue, entries, nameMap, placeholder, addLabel, onAdd, onRemove }: {
+  title: string; icon: string; hue: number; entries: any[]; nameMap: Record<string, string>;
+  placeholder: string; addLabel: string; onAdd: (text: string) => void; onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const accent = `oklch(0.50 0.16 ${hue})`;
+  const submit = () => { if (draft.trim()) { onAdd(draft.trim()); setDraft(''); setOpen(false); } };
+  return (
+    <div style={{ marginBottom: 14, border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderLeft: `3px solid ${accent}` }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ color: accent }}>{icon}</span>{title}
+          {entries.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: `oklch(0.94 0.04 ${hue})`, color: accent }}>{entries.length}</span>}
+        </div>
+        <button onClick={() => setOpen(v => !v)} className="btn btn-sec btn-sm">+ {addLabel}</button>
+      </div>
+      {open && (
+        <div style={{ padding: '0 12px 10px' }}>
+          <textarea value={draft} onChange={e => setDraft(e.target.value)} placeholder={placeholder} rows={2} autoFocus
+            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit(); }}
+            style={{ width: '100%', resize: 'none', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, outline: 'none', fontFamily: 'inherit' }} />
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button className="btn btn-acc btn-sm" disabled={!draft.trim()} onClick={submit}>Save</button>
+            <button className="btn btn-sec btn-sm" onClick={() => { setOpen(false); setDraft(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div style={{ padding: entries.length ? '0 12px 10px' : '0 12px 12px' }}>
+        {entries.length === 0 && <div style={{ fontSize: 12, color: 'var(--ink-5)', fontStyle: 'italic' }}>No {title.toLowerCase()} yet.</div>}
+        {entries.map((e: any) => (
+          <div key={e.id} style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 8, marginTop: 6 }}>
+            <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{e.text}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: 'var(--ink-5)' }}>{e.date} · {nameMap[e.by]?.split(' ')[0] ?? 'Unknown'}</span>
+              <button onClick={() => onRemove(e.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 12 }}>✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Tracking log card (label + number) ─────────────────────────── */
+function TrackingCard({ entries, nameMap, onAdd, onRemove }: {
+  entries: any[]; nameMap: Record<string, string>; onAdd: (label: string, number: string) => void; onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [number, setNumber] = useState('');
+  const accent = 'oklch(0.50 0.16 220)';
+  const submit = () => { if (number.trim()) { onAdd(label.trim() || 'Tracking', number.trim()); setLabel(''); setNumber(''); setOpen(false); } };
+  return (
+    <div style={{ marginBottom: 14, border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderLeft: `3px solid ${accent}` }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={{ color: accent }}>🚚</span>Tracking log
+          {entries.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'oklch(0.94 0.04 220)', color: accent }}>{entries.length}</span>}
+        </div>
+        <button onClick={() => setOpen(v => !v)} className="btn btn-sec btn-sm">+ Add tracking</button>
+      </div>
+      {open && (
+        <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <input value={label} onChange={e => setLabel(e.target.value)} placeholder="Label (e.g. IMP Kit → Customer)" className="fld-input" style={{ height: 32, fontSize: 12 }} autoFocus />
+          <input value={number} onChange={e => setNumber(e.target.value)} placeholder="Tracking number" className="fld-input" style={{ height: 32, fontSize: 12, fontFamily: 'monospace' }}
+            onKeyDown={e => { if (e.key === 'Enter') submit(); }} />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-acc btn-sm" disabled={!number.trim()} onClick={submit}>Save</button>
+            <button className="btn btn-sec btn-sm" onClick={() => { setOpen(false); setLabel(''); setNumber(''); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div style={{ padding: entries.length ? '0 12px 10px' : '0 12px 12px' }}>
+        {entries.length === 0 && <div style={{ fontSize: 12, color: 'var(--ink-5)', fontStyle: 'italic' }}>No tracking numbers yet.</div>}
+        {entries.map((e: any) => (
+          <div key={e.id} style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 8, marginTop: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'white', border: '1px solid var(--line)', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{e.label}</span>
+              <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--ink)' }}>{e.number}</span>
+              <button onClick={() => onRemove(e.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 12 }}>✕</button>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--ink-5)', marginTop: 4 }}>{e.date} · {nameMap[e.by]?.split(' ')[0] ?? 'Unknown'}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
