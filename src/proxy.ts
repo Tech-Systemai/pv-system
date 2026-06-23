@@ -5,9 +5,11 @@ export async function proxy(request: NextRequest) {
   const host = request.headers.get('host') ?? '';
   const sub = host.split('.')[0].toLowerCase();
 
-  // Customer profile site (portal.pioneersveneers.com) — public, no auth.
-  // Serve the /portal app for this subdomain; the portal's own API is left alone.
-  if (sub === 'portal' || sub === 'myprofile') {
+  // Customer profile site — a SEPARATE public site on its own subdomain
+  // (e.g. myprofile.pioneersveneers.com). This must NOT touch `portal.*`,
+  // which is the full internal system. Only the dedicated customer subdomain
+  // is rewritten to the public /portal page.
+  if (sub === 'myprofile') {
     const { pathname } = request.nextUrl;
     if (pathname.startsWith('/portal') || pathname.startsWith('/api/')) {
       return NextResponse.next();
