@@ -500,11 +500,20 @@ function WhiteboardView({ board, onUpdate, onBack }: {
     return () => window.removeEventListener('keydown', handler);
   }, [selId, onUpdate]);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const rect = containerRef.current!.getBoundingClientRect();
-    zoom(e.deltaY < 0 ? 1.1 : 0.9, e.clientX - rect.left, e.clientY - rect.top);
-  };
+  // Attach the wheel listener natively with { passive: false }. React's onWheel
+  // is registered as passive, so e.preventDefault() there is ignored and the
+  // browser performs its own ctrl+wheel page zoom on top of the canvas zoom.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      zoom(e.deltaY < 0 ? 1.1 : 0.9, e.clientX - rect.left, e.clientY - rect.top);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -672,7 +681,7 @@ function WhiteboardView({ board, onUpdate, onBack }: {
           )}
         </div>
 
-        <div ref={containerRef} onPointerDown={handleCanvasPD} onWheel={handleWheel}
+        <div ref={containerRef} onPointerDown={handleCanvasPD}
           style={{ flex: 1, overflow: 'hidden', position: 'relative', cursor, background: 'var(--surface-2)', backgroundImage: 'radial-gradient(circle, oklch(0.84 0.01 265) 1px, transparent 1px)', backgroundSize: '28px 28px', touchAction: 'none' }}>
           <div style={{ position: 'absolute', transformOrigin: '0 0', transform: `translate(${xf.x}px,${xf.y}px) scale(${xf.s})`, width: 3600, height: 2800 }}>
             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
