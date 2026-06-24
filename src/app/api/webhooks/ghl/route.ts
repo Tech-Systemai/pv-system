@@ -49,9 +49,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
+  // Diagnostic: log the keys GHL actually sends so the field mapping can be
+  // verified from Vercel logs. Safe to remove once the integration is confirmed.
+  console.log('GHL webhook payload keys:', JSON.stringify(Object.keys(body ?? {})));
+
   // ── Map GHL fields → case fields ────────────────────────────────────────────
   const ghlId = pick(body, 'ghl_contact_id', 'contact_id', 'id');
   if (!ghlId) {
+    console.warn('GHL webhook missing contact id. Full body:', JSON.stringify(body));
     return NextResponse.json({ error: 'Missing ghl_contact_id' }, { status: 400 });
   }
 
