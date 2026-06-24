@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
     order_number: pick(body, 'order_number') || null,
     veneer_set:   pick(body, 'veneer_set') || null,
     veneer_shade: pick(body, 'veneer_shade') || null,
+    special_request: pick(body, 'special_request', 'special_note', 'note') || null,
     full_price: fullPrice,
     amount_collected: collected,
     payment_left: paymentLeft,
