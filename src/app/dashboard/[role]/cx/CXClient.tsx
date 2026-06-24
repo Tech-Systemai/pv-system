@@ -1025,7 +1025,7 @@ export default function CXClient({
               <span style={{ width: 16, height: 16, borderRadius: 4, background: 'oklch(0.92 0.05 260)', color: 'oklch(0.40 0.16 260)', fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>▣</span>
               Order details
             </div>
-            {isMgmt && <button className="btn btn-sec btn-sm" onClick={() => { openEdit(selectedCase); setSelectedCase(null); }}>✎ Edit</button>}
+            <button className="btn btn-sec btn-sm" onClick={() => { openEdit(selectedCase); setSelectedCase(null); }}>✎ Edit</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             {[
@@ -1320,7 +1320,7 @@ export default function CXClient({
               <button className="btn btn-sm btn-sec" onClick={() => { setShowHoldInput(false); setHoldInputText(''); }}>Cancel</button>
             </div>
           )}
-          {isMgmt && <button className="btn btn-sec btn-sm" onClick={() => { openEdit(selectedCase); setSelectedCase(null); }}>Edit case</button>}
+          <button className="btn btn-sec btn-sm" onClick={() => { openEdit(selectedCase); setSelectedCase(null); }}>Edit case</button>
           {isMgmt && <button className="btn btn-sm" style={{ color: 'var(--err)', background: 'var(--surface-2)', border: '1px solid var(--line)' }} onClick={() => handleDeleteCase(selectedCase.id)}>Delete</button>}
           <button className="btn btn-acc btn-sm" style={{ marginLeft: 'auto' }} onClick={() => { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); }}>Done</button>
         </div>
