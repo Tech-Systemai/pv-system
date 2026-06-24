@@ -677,7 +677,11 @@ export default function CXClient({
                   {c.unreachable && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.06 290)', color: 'oklch(0.38 0.18 290)' }}>📵 UNREACHABLE</span>}
                   {updateDue && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.94 0.06 80)', color: 'oklch(0.40 0.18 80)' }}>⚠ UPDATE DUE</span>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>{c.phone}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-4)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  {c.phone && <span>📞 {c.phone}</span>}
+                  {c.email && <span>✉ {c.email}</span>}
+                  {c.address && <span>📍 {c.address}</span>}
+                </div>
                 {reassigningCaseId === c.id ? (
                   <div onClick={e => e.stopPropagation()} style={{ marginTop: 6, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                     <select value={reassignValue} onChange={e => setReassignValue(e.target.value)}
