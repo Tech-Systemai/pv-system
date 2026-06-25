@@ -149,6 +149,34 @@ function daysOpen(iso: string) { return Math.max(0, Math.floor((Date.now() - new
 function fmtDate(iso: string) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function initials(name: string) { return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'; }
 
+/* Shippo parcel presets. Dimensions are inches, weight is pounds — placeholder
+   values; tune them to your real impression-kit / veneer-box packaging. */
+const PARCEL_PRESETS = [
+  { key: 'imp_kit', label: 'Impression kit', length: 9, width: 7, height: 2, weight: 1 },
+  { key: 'veneers', label: 'Veneer box',     length: 6, width: 4, height: 2, weight: 0.5 },
+  { key: 'custom',  label: 'Custom',         length: 0, width: 0, height: 0, weight: 0 },
+];
+
+/* Best-effort parse of the case's free-text `address` into Shippo's structured
+   fields. The agent confirms/corrects the result in the dialog before sending,
+   so a rough parse is fine — US-focused (street, city, ST, ZIP). */
+function parseUsAddress(raw: string) {
+  const out = { street1: '', street2: '', city: '', state: '', zip: '', country: 'US' };
+  const txt = (raw ?? '').replace(/\s+/g, ' ').trim();
+  if (!txt) return out;
+  let rest = txt;
+  const zipM = rest.match(/(\d{5})(?:-\d{4})?\s*$/);
+  if (zipM) { out.zip = zipM[1]; rest = rest.slice(0, zipM.index).trim().replace(/,\s*$/, ''); }
+  const stM = rest.match(/[,\s]([A-Za-z]{2})\s*$/);
+  if (stM) { out.state = stM[1].toUpperCase(); rest = rest.slice(0, stM.index).trim().replace(/,\s*$/, ''); }
+  const parts = rest.split(',').map(s => s.trim()).filter(Boolean);
+  if (parts.length) out.city = parts.pop() || '';
+  if (parts.length) out.street1 = parts.shift() || '';
+  if (parts.length) out.street2 = parts.join(', ');
+  if (!out.street1 && out.city) { out.street1 = out.city; out.city = ''; }
+  return out;
+}
+
 const EMPTY_FORM = {
   customer_name: '', phone: '', email: '', address: '', order_number: '',
   veneer_set: '', veneer_shade: '', shipping: '', special_request: '',
@@ -456,6 +484,34 @@ export default function CXClient({
     patchCase({ stage_checklist: { ...cl, [stageKey]: [...done] } });
   };
 
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [creatingLabel, setCreatingLabel] = useState(false);
+  /* Create a Shippo label from the confirmed to-address + parcel, then drop the
+     resulting tracking number (and printable label URL) into the case's
+     tracking log via the same entry shape the manual "Add tracking" uses. */
+  const handleCreateLabel = async (to: Record<string, any>, parcel: Record<string, number>) => {
+    if (!selectedCase) return null;
+    setCreatingLabel(true);
+    try {
+      const res = await fetch('/api/shippo/create-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, parcel }),
+      });
+      const json = await res.json();
+      if (!res.ok) { alert('Could not create label: ' + (json.error || 'Unknown error')); return null; }
+      addLogEntry('tracking_log', {
+        label: `${json.carrier ?? ''} ${json.servicelevel ?? ''}`.trim() || 'Shipping',
+        number: json.tracking_number,
+        label_url: json.label_url ?? null,
+        tracking_url: json.tracking_url ?? null,
+      });
+      return json;
+    } finally {
+      setCreatingLabel(false);
+    }
+  };
+
   const [pushing, setPushing] = useState(false);
   const handlePushToCustomer = async () => {
     if (!selectedCase || pushing) return;
@@ -668,21 +724,28 @@ export default function CXClient({
         const collectedAmt = Number(c.amount_collected) || 0;
         const collectedPct = fullPrice > 0 ? Math.min(100, Math.round((collectedAmt / fullPrice) * 100)) : null;
         const fullyPaid = fullPrice > 0 && collectedAmt >= fullPrice;
+        const stagesDoneCount = Array.isArray(c.stages_done) ? c.stages_done.length : 0;
+        const stagePct = Math.round((stagesDoneCount / PIPELINE_STAGES.length) * 100);
         return (
           <div key={c.id} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}
             style={{ position: 'relative', background: 'white', border: '1px solid var(--line)', borderLeft: `4px solid ${border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow .12s, transform .12s', outline: updateDue ? '1.5px solid oklch(0.80 0.12 80)' : 'none' }}
             onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = ''; }}>
-            {fullyPaid ? (
-              <span style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 10px', borderRadius: 8, color: 'oklch(0.40 0.18 145)', background: 'oklch(0.96 0.05 145)', border: '2px solid oklch(0.55 0.18 145)', transform: 'rotate(4deg)', textTransform: 'uppercase' }}>
-                ✓ Ready to be shipped
+            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+              {fullyPaid ? (
+                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 10px', borderRadius: 8, color: 'oklch(0.40 0.18 145)', background: 'oklch(0.96 0.05 145)', border: '2px solid oklch(0.55 0.18 145)', transform: 'rotate(4deg)', textTransform: 'uppercase' }}>
+                  ✓ Ready to be shipped
+                </span>
+              ) : collectedPct != null && (
+                <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, color: 'oklch(0.38 0.16 145)', background: 'oklch(0.95 0.05 145)', border: '1px solid oklch(0.85 0.07 145)' }}>
+                  {collectedPct}% paid
+                </span>
+              )}
+              <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, color: 'oklch(0.38 0.16 260)', background: 'oklch(0.95 0.05 260)', border: '1px solid oklch(0.85 0.07 260)' }}>
+                {stagePct}% stage
               </span>
-            ) : collectedPct != null && (
-              <span style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, fontSize: 12, fontWeight: 800, padding: '3px 9px', borderRadius: 20, color: 'oklch(0.38 0.16 145)', background: 'oklch(0.95 0.05 145)', border: '1px solid oklch(0.85 0.07 145)' }}>
-                {collectedPct}%
-              </span>
-            )}
-            <div style={{ padding: `14px ${fullyPaid ? 150 : collectedPct != null ? 60 : 16}px 10px 16px`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            </div>
+            <div style={{ padding: `14px ${fullyPaid ? 150 : 86}px 10px 16px`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <div style={{ width: 38, height: 38, borderRadius: '50%', background: `oklch(0.50 0.20 ${STATUS_HUE[c.status] ?? 200})`, color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {initials(c.customer_name)}
               </div>
@@ -931,6 +994,10 @@ export default function CXClient({
                   ? { background: 'oklch(0.93 0.05 145)', color: 'oklch(0.34 0.15 145)', border: '1px solid oklch(0.82 0.08 145)', display: 'flex', alignItems: 'center', gap: 5 }
                   : { display: 'flex', alignItems: 'center', gap: 5 }}>
                 {pushing ? 'Pushing…' : selectedCase.pushed_to_customer_at ? '✓ Pushed — update customer' : '↗ Push to customer'}
+              </button>
+              <button className="btn btn-acc btn-sm" onClick={() => setShowLabelModal(true)} disabled={creatingLabel}
+                style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                {creatingLabel ? 'Creating…' : '🏷 Create label'}
               </button>
             </div>
             {showReferralAdd && (
@@ -1347,6 +1414,12 @@ export default function CXClient({
 
       {/* Escalate modal on top */}
       {showEscalate && <EscalateModal customerName={selectedCase.customer_name} onConfirm={handleEscalate} onClose={() => setShowEscalate(false)} />}
+
+      {/* Create-label confirm dialog */}
+      {showLabelModal && (
+        <CreateLabelModal caseData={selectedCase} creating={creatingLabel}
+          onCreate={handleCreateLabel} onClose={() => setShowLabelModal(false)} />
+      )}
     </div>
   );
 
@@ -1573,8 +1646,9 @@ function LogCard({ title, icon, hue, entries, nameMap, placeholder, addLabel, on
 }
 
 /* ── Tracking log card (label + number) ─────────────────────────── */
-function TrackingCard({ entries, nameMap, onAdd, onRemove }: {
+function TrackingCard({ entries, nameMap, onAdd, onRemove, onCreateLabel }: {
   entries: any[]; nameMap: Record<string, string>; onAdd: (label: string, number: string) => void; onRemove: (id: string) => void;
+  onCreateLabel?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
@@ -1588,7 +1662,10 @@ function TrackingCard({ entries, nameMap, onAdd, onRemove }: {
           <span style={{ color: accent }}>🚚</span>Tracking log
           {entries.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'oklch(0.94 0.04 220)', color: accent }}>{entries.length}</span>}
         </div>
-        <button onClick={() => setOpen(v => !v)} className="btn btn-sec btn-sm">+ Add tracking</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {onCreateLabel && <button onClick={onCreateLabel} className="btn btn-acc btn-sm">🏷 Create label</button>}
+          <button onClick={() => setOpen(v => !v)} className="btn btn-sec btn-sm">+ Add tracking</button>
+        </div>
       </div>
       {open && (
         <div style={{ padding: '0 12px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1610,6 +1687,12 @@ function TrackingCard({ entries, nameMap, onAdd, onRemove }: {
               <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--ink)' }}>{e.number}</span>
               <button onClick={() => onRemove(e.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 12 }}>✕</button>
             </div>
+            {(e.label_url || e.tracking_url) && (
+              <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                {e.label_url && <a href={e.label_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.50 0.16 220)' }}>🖨 Print label</a>}
+                {e.tracking_url && <a href={e.tracking_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.50 0.16 145)' }}>📦 Track</a>}
+              </div>
+            )}
             <div style={{ fontSize: 10, color: 'var(--ink-5)', marginTop: 4 }}>{e.date} · {nameMap[e.by]?.split(' ')[0] ?? 'Unknown'}</div>
           </div>
         ))}
@@ -1629,5 +1712,110 @@ function AddColumnModal({ onConfirm, onClose }: { onConfirm: (name: string) => v
         <button type="button" className="btn btn-sec" onClick={onClose}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+/* ── Create shipping label modal (Shippo) ───────────────────────── */
+function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
+  caseData: any; creating: boolean;
+  onCreate: (to: Record<string, any>, parcel: Record<string, number>) => Promise<any>;
+  onClose: () => void;
+}) {
+  const parsed = parseUsAddress(caseData?.address ?? '');
+  const [to, setTo] = useState({
+    name: caseData?.customer_name ?? '',
+    phone: caseData?.phone ?? '',
+    email: caseData?.email ?? '',
+    street1: parsed.street1, street2: parsed.street2,
+    city: parsed.city, state: parsed.state, zip: parsed.zip, country: 'US',
+  });
+  const [presetKey, setPresetKey] = useState(PARCEL_PRESETS[0].key);
+  const preset = PARCEL_PRESETS.find(p => p.key === presetKey) ?? PARCEL_PRESETS[0];
+  const [parcel, setParcel] = useState({ length: preset.length, width: preset.width, height: preset.height, weight: preset.weight });
+  const [done, setDone] = useState<any>(null);
+
+  const choosePreset = (key: string) => {
+    setPresetKey(key);
+    const p = PARCEL_PRESETS.find(x => x.key === key) ?? PARCEL_PRESETS[0];
+    if (key !== 'custom') setParcel({ length: p.length, width: p.width, height: p.height, weight: p.weight });
+  };
+
+  const field = (k: keyof typeof to) => (e: any) => setTo(t => ({ ...t, [k]: e.target.value }));
+  const numField = (k: keyof typeof parcel) => (e: any) => setParcel(p => ({ ...p, [k]: Number(e.target.value) }));
+
+  const canSubmit = to.street1.trim() && to.city.trim() && to.state.trim() && to.zip.trim()
+    && parcel.length > 0 && parcel.width > 0 && parcel.height > 0 && parcel.weight > 0;
+
+  const submit = async () => {
+    const res = await onCreate(to, parcel);
+    if (res) { setDone(res); if (res.label_url) window.open(res.label_url, '_blank', 'noopener'); }
+  };
+
+  const lbl = { fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)' } as const;
+
+  return (
+    <div className="mb" style={{ zIndex: 9999 }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="md" style={{ width: 560 }}>
+        <div className="md-t">🏷 Create shipping label</div>
+
+        {done ? (
+          <div>
+            <div style={{ padding: '14px 16px', background: 'oklch(0.96 0.05 145)', border: '1px solid oklch(0.85 0.07 145)', borderRadius: 10, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.38 0.16 145)', marginBottom: 6 }}>
+                ✓ Label created — {done.carrier} {done.servicelevel}{done.amount ? ` · ${done.amount} ${done.currency}` : ''}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--ink)' }}>Tracking: <span style={{ fontFamily: 'monospace' }}>{done.tracking_number}</span></div>
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>Added to this case&apos;s tracking log.</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {done.label_url && <a className="btn btn-acc" href={done.label_url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}>🖨 Open / print label</a>}
+              <button className="btn btn-sec" onClick={onClose}>Done</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: 'var(--ink-4)', margin: '0 0 16px' }}>
+              We pre-filled the recipient from the case address. Confirm or fix it, pick the parcel, then create the label in Shippo.
+            </p>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-4)', marginBottom: 8 }}>SHIP TO</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div className="pv-fld"><label style={lbl}>NAME</label><input value={to.name} onChange={field('name')} /></div>
+              <div className="pv-fld"><label style={lbl}>PHONE</label><input value={to.phone} onChange={field('phone')} /></div>
+            </div>
+            <div className="pv-fld" style={{ marginBottom: 10 }}><label style={lbl}>STREET</label><input value={to.street1} onChange={field('street1')} placeholder="123 Main St" autoFocus /></div>
+            <div className="pv-fld" style={{ marginBottom: 10 }}><label style={lbl}>STREET 2 (APT / SUITE)</label><input value={to.street2} onChange={field('street2')} placeholder="Apt 4" /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+              <div className="pv-fld"><label style={lbl}>CITY</label><input value={to.city} onChange={field('city')} /></div>
+              <div className="pv-fld"><label style={lbl}>STATE</label><input value={to.state} onChange={field('state')} maxLength={2} placeholder="TX" /></div>
+              <div className="pv-fld"><label style={lbl}>ZIP</label><input value={to.zip} onChange={field('zip')} placeholder="78701" /></div>
+            </div>
+
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-4)', marginBottom: 8 }}>PARCEL</div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              {PARCEL_PRESETS.map(p => (
+                <button key={p.key} onClick={() => choosePreset(p.key)}
+                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1.5px solid ${presetKey === p.key ? 'var(--accent)' : 'var(--line)'}`, background: presetKey === p.key ? 'oklch(0.95 0.04 250)' : 'white', fontWeight: 700, fontSize: 12, cursor: 'pointer', color: presetKey === p.key ? 'var(--accent)' : 'var(--ink-4)' }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 18 }}>
+              <div className="pv-fld"><label style={lbl}>LENGTH (in)</label><input type="number" value={parcel.length || ''} onChange={numField('length')} /></div>
+              <div className="pv-fld"><label style={lbl}>WIDTH (in)</label><input type="number" value={parcel.width || ''} onChange={numField('width')} /></div>
+              <div className="pv-fld"><label style={lbl}>HEIGHT (in)</label><input type="number" value={parcel.height || ''} onChange={numField('height')} /></div>
+              <div className="pv-fld"><label style={lbl}>WEIGHT (lb)</label><input type="number" step="0.1" value={parcel.weight || ''} onChange={numField('weight')} /></div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-sec" onClick={onClose} disabled={creating}>Cancel</button>
+              <button className="btn btn-acc" style={{ flex: 1 }} onClick={submit} disabled={!canSubmit || creating}>
+                {creating ? 'Creating…' : '🏷 Create label'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
