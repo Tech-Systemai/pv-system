@@ -172,7 +172,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'>('agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -209,10 +209,12 @@ export default function CXClient({
   const isActiveCase     = (c: any) => !c.escalated && !c.no_update_needed && !c.unreachable;
   const newOrdersCount   = cases.filter(c => isActiveCase(c) && !c.assigned_to).length;
   const agentsCount      = cases.filter(c => isActiveCase(c) && c.assigned_to).length;
+  const myCasesCount     = cases.filter(c => c.assigned_to === currentUserId).length;
 
   const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !c.unreachable && !todayUpdatedIds.has(c.id);
 
   const filtered = cases.filter(c => {
+    if (section === 'my_cases'    && c.assigned_to !== currentUserId)                 return false;
     if (section === 'admin'       && !c.escalated)                                    return false;
     if (section === 'new'         && (!isActiveCase(c) || c.assigned_to))             return false;
     if (section === 'agents'      && (!isActiveCase(c) || !c.assigned_to))            return false;
@@ -623,6 +625,10 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'unreachable' ? 'oklch(0.92 0.06 290)' : 'transparent', color: section === 'unreachable' ? 'oklch(0.38 0.18 290)' : (unreachableCount > 0 ? 'oklch(0.45 0.15 290)' : 'var(--ink-4)'), boxShadow: section === 'unreachable' ? 'var(--sh-1)' : 'none' }}>
             📵 Unreachable · {unreachableCount}
           </button>
+          <button onClick={() => setSection('my_cases')} title="Only the cases assigned to you"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'my_cases' ? 'oklch(0.55 0.16 250)' : 'transparent', color: section === 'my_cases' ? 'white' : 'var(--ink-4)', boxShadow: section === 'my_cases' ? 'var(--sh-1)' : 'none' }}>
+            👤 My Cases · {myCasesCount}
+          </button>
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
         {(section === 'agents' || section === 'new') && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
@@ -648,7 +654,7 @@ export default function CXClient({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          {section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : 'No customer cases found.'}
+          {section === 'my_cases' ? 'No cases are assigned to you right now.' : section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
