@@ -498,6 +498,7 @@ export default function CXClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to, parcel,
+          case_id: selectedCase.id,
           order_number: selectedCase.order_number || `CX-${selectedCase.id}`,
           item_title: selectedCase.veneer_set ? `Veneers — ${selectedCase.veneer_set}` : 'Impression kit',
         }),
