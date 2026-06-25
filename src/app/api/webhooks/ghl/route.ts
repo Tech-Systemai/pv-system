@@ -56,20 +56,32 @@ export async function POST(req: NextRequest) {
   console.log('GHL webhook payload:', JSON.stringify(body ?? {}));
 
   // ── Map GHL fields → case fields ────────────────────────────────────────────
-  const ghlId = pick(body, 'ghl_contact_id', 'contact_id', 'id');
+  // GHL doesn't only send the snake_case keys we configure under "Custom Data".
+  // It also auto-includes every contact custom field at the top level keyed by
+  // its *display name* ("Veneer Set", "Full Price", …), and may nest the
+  // configured custom data under `customData` and the contact under `contact`.
+  // Flatten all three sources so pick() finds the value wherever GHL puts it
+  // (top-level body wins, then customData, then the nested contact object).
+  const src = {
+    ...(typeof body?.contact === 'object' ? body.contact : {}),
+    ...(typeof body?.customData === 'object' ? body.customData : {}),
+    ...(body ?? {}),
+  };
+
+  const ghlId = pick(src, 'ghl_contact_id', 'contact_id', 'id');
   if (!ghlId) {
     console.warn('GHL webhook missing contact id. Full body:', JSON.stringify(body));
     return NextResponse.json({ error: 'Missing ghl_contact_id' }, { status: 400 });
   }
 
-  const first = pick(body, 'first_name', 'firstName');
-  const last  = pick(body, 'last_name', 'lastName');
+  const first = pick(src, 'first_name', 'firstName', 'First Name');
+  const last  = pick(src, 'last_name', 'lastName', 'Last Name');
   const customerName = [first, last].filter(Boolean).join(' ').trim()
-    || pick(body, 'full_name', 'name', 'contact_name')
+    || pick(src, 'full_name', 'name', 'contact_name', 'Full Name')
     || 'Unknown';
 
-  const fullPrice = toNum(pick(body, 'full_price'));
-  const collected = toNum(pick(body, 'amount_collected')) ?? 0;
+  const fullPrice = toNum(pick(src, 'full_price', 'Full Price'));
+  const collected = toNum(pick(src, 'amount_collected', 'Total Paid')) ?? 0;
   // Mirror the client's payment math: derive balance + status when a price is set.
   const paymentLeft = fullPrice != null ? Math.max(0, fullPrice - collected) : null;
   const payStatus = fullPrice != null
@@ -78,15 +90,16 @@ export async function POST(req: NextRequest) {
 
   // Fields synced from CRM. These overwrite on every event; agent-owned fields
   // (status, pipeline_stage, assigned_to, etc.) are left untouched on update.
+  // Each pick lists the configured key first, then the GHL display-name fallback.
   const synced: Record<string, any> = {
     customer_name: customerName,
-    phone:   pick(body, 'phone') || null,
-    email:   pick(body, 'email') || null,
-    address: pick(body, 'address', 'full_address') || null,
-    order_number: pick(body, 'order_number') || null,
-    veneer_set:   pick(body, 'veneer_set') || null,
-    veneer_shade: pick(body, 'veneer_shade') || null,
-    special_request: pick(body, 'special_request', 'special_note', 'note') || null,
+    phone:   pick(src, 'phone', 'Phone') || null,
+    email:   pick(src, 'email', 'Email') || null,
+    address: pick(src, 'address', 'full_address', 'Address') || null,
+    order_number: pick(src, 'order_number', 'Order Number') || null,
+    veneer_set:   pick(src, 'veneer_set', 'Veneer Set') || null,
+    veneer_shade: pick(src, 'veneer_shade', 'Veneer Shade') || null,
+    special_request: pick(src, 'special_request', 'special_note', 'note', 'Special Request Notes') || null,
     full_price: fullPrice,
     amount_collected: collected,
     payment_left: paymentLeft,
@@ -104,16 +117,6 @@ export async function POST(req: NextRequest) {
     full_price: synced.full_price,
     amount_collected: synced.amount_collected,
     special_request: synced.special_request,
-    // Raw, untouched values straight from GHL — distinguishes "GHL sent empty"
-    // from "GHL sent the literal {{tag}}" (i.e. tag never resolved).
-    raw: {
-      veneer_set: body?.veneer_set ?? null,
-      veneer_shade: body?.veneer_shade ?? null,
-      price: body?.full_price ?? null,
-      total_paid: body?.amount_collected ?? null,
-      special_request: body?.special_request ?? null,
-    },
-    all_keys: Object.keys(body ?? {}),
   };
 
   const admin = createAdminClient();
