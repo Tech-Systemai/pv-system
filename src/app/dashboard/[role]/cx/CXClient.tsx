@@ -755,8 +755,9 @@ export default function CXClient({
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
                     background: c.source === 'Shopify' ? 'oklch(0.93 0.08 150)' : 'oklch(0.93 0.04 250)',
                     color: c.source === 'Shopify' ? 'oklch(0.40 0.14 150)' : 'oklch(0.40 0.12 250)' }}>
-                    {c.source === 'Shopify' ? `🛒 Shopify${c.order_number ? ` · ${c.order_number}` : ''}` : '🗂 CRM'}
+                    {c.source === 'Shopify' ? '🛒 Shopify' : '🗂 CRM'}
                   </span>
+                  {c.order_number && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'oklch(0.93 0.05 80)', color: 'oklch(0.38 0.15 80)' }}>📦 Order #{c.order_number}</span>}
                   {c.escalated && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.06 25)', color: 'oklch(0.40 0.20 25)' }}>⚠ ESCALATED</span>}
                   {c.on_hold && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0 0)', color: 'oklch(0.45 0 0)' }}>🔒 ON HOLD</span>}
                   {c.no_update_needed && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.05 145)', color: 'oklch(0.36 0.15 145)' }}>✓ NO UPDATE</span>}
@@ -976,8 +977,8 @@ export default function CXClient({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)' }}>{selectedCase.customer_name}</span>
               {selectedCase.order_number && (
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink-3)', fontFamily: 'monospace', letterSpacing: '0.02em' }}>
-                  {selectedCase.order_number}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 13, padding: '4px 12px', borderRadius: 20, background: 'oklch(0.93 0.05 80)', color: 'oklch(0.38 0.15 80)' }}>
+                  📦 Order #{selectedCase.order_number}
                 </span>
               )}
               <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
@@ -1440,7 +1441,7 @@ export default function CXClient({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="pv-fld"><label>Customer Name *</label><input value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))} placeholder="Full name" autoFocus /></div>
-          <div className="pv-fld"><label>Order Number</label><input value={form.order_number} onChange={e => setForm(p => ({ ...p, order_number: e.target.value }))} placeholder="e.g. PV-4404" /></div>
+          <div className="pv-fld"><label>Order Number</label><input value={form.order_number} onChange={e => setForm(p => ({ ...p, order_number: e.target.value }))} placeholder="Leave blank to auto-assign" /></div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div className="pv-fld"><label>Phone</label><input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="000-000-0000" /></div>
