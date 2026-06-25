@@ -149,12 +149,12 @@ function daysOpen(iso: string) { return Math.max(0, Math.floor((Date.now() - new
 function fmtDate(iso: string) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function initials(name: string) { return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'; }
 
-/* Shippo parcel presets. Dimensions are inches, weight is pounds — placeholder
-   values; tune them to your real impression-kit / veneer-box packaging. */
+/* Shippo parcel presets. Dimensions are inches, weight is ounces. */
 const PARCEL_PRESETS = [
-  { key: 'imp_kit', label: 'Impression kit', length: 9, width: 7, height: 2, weight: 1 },
-  { key: 'veneers', label: 'Veneer box',     length: 6, width: 4, height: 2, weight: 0.5 },
-  { key: 'custom',  label: 'Custom',         length: 0, width: 0, height: 0, weight: 0 },
+  { key: 'imp_kit_1', label: '1 imp. kit',  length: 11, width: 10, height: 3, weight: 0.12 },
+  { key: 'imp_kit_2', label: '2 imp. kits', length: 22, width: 20, height: 6, weight: 0.24 },
+  { key: 'veneers',   label: 'Veneer box',  length: 11, width: 13, height: 3, weight: 0.12 },
+  { key: 'custom',    label: 'Custom',      length: 0,  width: 0,  height: 0, weight: 0 },
 ];
 
 /* Best-effort parse of the case's free-text `address` into Shippo's structured
@@ -1805,7 +1805,7 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
               <div className="pv-fld"><label style={lbl}>LENGTH (in)</label><input type="number" value={parcel.length || ''} onChange={numField('length')} /></div>
               <div className="pv-fld"><label style={lbl}>WIDTH (in)</label><input type="number" value={parcel.width || ''} onChange={numField('width')} /></div>
               <div className="pv-fld"><label style={lbl}>HEIGHT (in)</label><input type="number" value={parcel.height || ''} onChange={numField('height')} /></div>
-              <div className="pv-fld"><label style={lbl}>WEIGHT (lb)</label><input type="number" step="0.1" value={parcel.weight || ''} onChange={numField('weight')} /></div>
+              <div className="pv-fld"><label style={lbl}>WEIGHT (oz)</label><input type="number" step="0.01" value={parcel.weight || ''} onChange={numField('weight')} /></div>
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>

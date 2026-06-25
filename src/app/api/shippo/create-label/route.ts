@@ -37,7 +37,7 @@ type Address = {
 };
 type Parcel = {
   length: number; width: number; height: number; // inches
-  weight: number;                                 // pounds
+  weight: number;                                 // ounces
 };
 
 function fromAddress(): Address | { error: string } {
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       address_to: { ...to, country: to.country || 'US' },
       parcels: [{
         length: String(parcel.length), width: String(parcel.width), height: String(parcel.height),
-        distance_unit: 'in', weight: String(parcel.weight), mass_unit: 'lb',
+        distance_unit: 'in', weight: String(parcel.weight), mass_unit: 'oz',
       }],
       async: false,
     }, token);
