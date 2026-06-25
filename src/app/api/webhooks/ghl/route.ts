@@ -104,6 +104,16 @@ export async function POST(req: NextRequest) {
     full_price: synced.full_price,
     amount_collected: synced.amount_collected,
     special_request: synced.special_request,
+    // Raw, untouched values straight from GHL — distinguishes "GHL sent empty"
+    // from "GHL sent the literal {{tag}}" (i.e. tag never resolved).
+    raw: {
+      veneer_set: body?.veneer_set ?? null,
+      veneer_shade: body?.veneer_shade ?? null,
+      price: body?.full_price ?? null,
+      total_paid: body?.amount_collected ?? null,
+      special_request: body?.special_request ?? null,
+    },
+    all_keys: Object.keys(body ?? {}),
   };
 
   const admin = createAdminClient();
