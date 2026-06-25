@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
     const insert = {
       ...synced,
       ghl_contact_id: ghlId,
+      source: 'CRM',
       status: 'New CX',
       priority: 'HIGH',
       issue: '',

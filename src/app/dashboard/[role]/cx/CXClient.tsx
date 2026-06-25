@@ -329,7 +329,7 @@ export default function CXClient({
       setCases(prev => prev.map(c => c.id === editingCase.id ? { ...c, ...payload } : c));
       if (selectedCase?.id === editingCase.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
     } else {
-      const { data } = await dbOp('cx_cases', 'insert', { ...payload, created_by: currentUserId });
+      const { data } = await dbOp('cx_cases', 'insert', { ...payload, created_by: currentUserId, source: 'CRM' });
       if (data?.[0]) setCases(prev => [data[0], ...prev]);
     }
     setSavingCase(false);
@@ -752,6 +752,11 @@ export default function CXClient({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</span>
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: pm.bg, color: pm.color }}>{c.priority}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                    background: c.source === 'Shopify' ? 'oklch(0.93 0.08 150)' : 'oklch(0.93 0.04 250)',
+                    color: c.source === 'Shopify' ? 'oklch(0.40 0.14 150)' : 'oklch(0.40 0.12 250)' }}>
+                    {c.source === 'Shopify' ? `🛒 Shopify${c.order_number ? ` · ${c.order_number}` : ''}` : '🗂 CRM'}
+                  </span>
                   {c.escalated && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.06 25)', color: 'oklch(0.40 0.20 25)' }}>⚠ ESCALATED</span>}
                   {c.on_hold && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0 0)', color: 'oklch(0.45 0 0)' }}>🔒 ON HOLD</span>}
                   {c.no_update_needed && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'oklch(0.92 0.05 145)', color: 'oklch(0.36 0.15 145)' }}>✓ NO UPDATE</span>}
@@ -975,6 +980,11 @@ export default function CXClient({
                   {selectedCase.order_number}
                 </span>
               )}
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
+                background: selectedCase.source === 'Shopify' ? 'oklch(0.93 0.08 150)' : 'oklch(0.93 0.04 250)',
+                color: selectedCase.source === 'Shopify' ? 'oklch(0.40 0.14 150)' : 'oklch(0.40 0.12 250)' }}>
+                {selectedCase.source === 'Shopify' ? '🛒 Source: Shopify' : '🗂 Source: CRM'}
+              </span>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: 'var(--surface-2)', border: '1px solid var(--line)' }}>{selectedCase.pipeline_stage}</span>
             </div>
             <div style={{ marginTop: 4, fontSize: 13, color: 'var(--ink-4)', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
