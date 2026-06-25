@@ -486,8 +486,8 @@ export default function CXClient({
 
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [creatingLabel, setCreatingLabel] = useState(false);
-  /* Push the confirmed to-address + parcel to Shippo as a shipment. This does
-     NOT buy a label — it makes the shipment appear in the Shippo dashboard with
+  /* Push the confirmed to-address + parcel to Shippo as an ORDER. This does NOT
+     buy a label — it makes the order appear in the Shippo "Orders" tab with
      rates and a "Buy" button, where the team purchases it. */
   const handleCreateLabel = async (to: Record<string, any>, parcel: Record<string, number>) => {
     if (!selectedCase) return null;
@@ -496,7 +496,11 @@ export default function CXClient({
       const res = await fetch('/api/shippo/create-label', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, parcel }),
+        body: JSON.stringify({
+          to, parcel,
+          order_number: selectedCase.order_number || `CX-${selectedCase.id}`,
+          item_title: selectedCase.veneer_set ? `Veneers — ${selectedCase.veneer_set}` : 'Impression kit',
+        }),
       });
       const json = await res.json();
       if (!res.ok) { alert('Could not send to Shippo: ' + (json.error || 'Unknown error')); return null; }
@@ -1756,13 +1760,13 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
           <div>
             <div style={{ padding: '14px 16px', background: 'oklch(0.96 0.05 145)', border: '1px solid oklch(0.85 0.07 145)', borderRadius: 10, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.38 0.16 145)', marginBottom: 6 }}>
-                ✓ Sent to Shippo{done.carrier ? ` — est. ${done.carrier} ${done.servicelevel}` : ''}{done.amount ? ` · ${done.amount} ${done.currency}` : ''}
+                ✓ Sent to Shippo{done.order_number ? ` — order ${done.order_number}` : ''}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--ink)' }}>Open Shippo to buy the label and get the tracking number.</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>The shipment is now in your Shippo dashboard with a Buy button.</div>
+              <div style={{ fontSize: 13, color: 'var(--ink)' }}>Open Shippo&apos;s <strong>Orders</strong> tab to buy the label and get the tracking number.</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>The order is now in your Shippo dashboard with a Buy button.</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <a className="btn btn-acc" href={done.buy_url || 'https://apps.goshippo.com/orders'} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}>🛒 Open Shippo to buy</a>
+              <a className="btn btn-acc" href={done.buy_url || 'https://apps.goshippo.com/orders'} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}>🛒 Open Shippo Orders</a>
               <button className="btn btn-sec" onClick={onClose}>Done</button>
             </div>
           </div>

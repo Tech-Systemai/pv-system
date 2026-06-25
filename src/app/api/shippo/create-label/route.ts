@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
-/* Shippo → shipment creator (does NOT buy the label).
+/* Shippo → ORDER creator (does NOT buy the label).
  *
- * The CX portal POSTs a confirmed recipient address + parcel here. We call
- * Shippo to create + rate the shipment, which makes it show up in the Shippo
- * dashboard with live rates and a "Buy" button. The team buys the label there
- * (so billing stays in Shippo). We return the cheapest rate as a price preview.
+ * The CX portal POSTs a confirmed recipient address + parcel here. We create a
+ * Shippo *Order* (not a bare shipment) so it lands in the dashboard's "Orders"
+ * tab with live rates and a "Buy" button — the team buys the label there (so
+ * billing stays in Shippo). NOTE: a bare /shipments/ call does NOT show in the
+ * Orders tab, which is why orders are used here.
  *
  * Auth: must be a logged-in portal user (same gate as /api/db).
  *
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
   const from = fromAddress();
   if ('error' in from) return NextResponse.json({ error: from.error }, { status: 500 });
 
-  let body: { to?: Address; parcel?: Parcel };
+  let body: { to?: Address; parcel?: Parcel; order_number?: string; item_title?: string };
   try {
     body = await req.json();
   } catch {
@@ -99,46 +100,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Parcel must have positive length, width, height and weight' }, { status: 400 });
   }
 
+  const orderNumber = String(body.order_number || '').trim() || `CX-${Date.now()}`;
+  const itemTitle = String(body.item_title || '').trim() || 'Pioneers Veneers order';
+
   try {
-    // ── 1. Rate the shipment ─────────────────────────────────────────────────
-    const shipment = await shippo('/shipments/', {
-      address_from: from,
-      address_to: { ...to, country: to.country || 'US' },
-      parcels: [{
-        length: String(parcel.length), width: String(parcel.width), height: String(parcel.height),
-        distance_unit: 'in', weight: String(parcel.weight), mass_unit: 'oz',
+    // Create a Shippo ORDER (not a bare shipment) so it shows in the "Orders"
+    // tab with a Buy button. Orders store weight but not L/W/H, so we stash the
+    // parcel dimensions in the notes for whoever buys the label.
+    const order = await shippo('/orders/', {
+      to_address: { ...to, country: to.country || 'US' },
+      from_address: from,
+      line_items: [{
+        title: itemTitle,
+        quantity: 1,
+        total_price: '0.00',
+        currency: 'USD',
+        weight: String(parcel.weight),
+        weight_unit: 'oz',
+        sku: orderNumber,
       }],
-      async: false,
+      placed_at: new Date().toISOString(),
+      order_number: orderNumber,
+      order_status: 'PAID',
+      currency: 'USD',
+      weight: String(parcel.weight),
+      weight_unit: 'oz',
+      total_price: '0.00',
+      subtotal_price: '0.00',
+      shipping_cost: '0.00',
+      shipping_cost_currency: 'USD',
+      total_tax: '0.00',
+      notes: `Parcel: ${parcel.length} x ${parcel.width} x ${parcel.height} in, ${parcel.weight} oz`,
     }, token);
 
-    if (!shipment.ok) {
-      const msg = shipment.json?.detail || JSON.stringify(shipment.json);
-      return NextResponse.json({ error: `Shippo rating failed: ${msg}` }, { status: 502 });
+    if (!order.ok || !order.json?.object_id) {
+      const msg = order.json?.detail || JSON.stringify(order.json);
+      return NextResponse.json({ error: `Shippo order failed: ${msg}` }, { status: 502 });
     }
 
-    let rates: any[] = shipment.json?.rates ?? [];
-    if (!rates.length) {
-      const msgs = (shipment.json?.messages ?? []).map((m: any) => m.text).filter(Boolean).join('; ');
-      return NextResponse.json({ error: `No rates returned${msgs ? ': ' + msgs : ' — check the address.'}` }, { status: 422 });
-    }
-
-    const preferred = process.env.SHIPPO_PREFERRED_CARRIER?.toUpperCase();
-    if (preferred) {
-      const filtered = rates.filter(r => String(r.provider).toUpperCase() === preferred);
-      if (filtered.length) rates = filtered;
-    }
-    rates.sort((a, b) => Number(a.amount) - Number(b.amount));
-    const rate = rates[0];
-
-    // No purchase. The shipment is now in the Shippo dashboard with rates and a
-    // "Buy" button — the team buys the label there. Return the cheapest rate as
-    // a price preview so the agent knows roughly what it will cost.
+    // No purchase. The order is now in the Shippo "Orders" tab with a Buy button.
     return NextResponse.json({
-      shipment_id: shipment.json.object_id,
-      carrier: rate.provider,
-      servicelevel: rate.servicelevel?.name ?? '',
-      amount: rate.amount,
-      currency: rate.currency,
+      order_id: order.json.object_id,
+      order_number: order.json.order_number ?? orderNumber,
       buy_url: 'https://apps.goshippo.com/orders',
     });
   } catch (err: any) {
