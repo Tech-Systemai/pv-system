@@ -130,7 +130,11 @@ export async function POST(req: NextRequest) {
     if (selErr) throw selErr;
 
     if (existing) {
-      const { error } = await admin.from('cx_cases').update(synced).eq('id', existing.id);
+      // Never overwrite an assigned order_number with an empty value — the
+      // portal numbers CRM orders (6000+) and a re-sync must not wipe that.
+      const patch: Record<string, any> = { ...synced };
+      if (!patch.order_number) delete patch.order_number;
+      const { error } = await admin.from('cx_cases').update(patch).eq('id', existing.id);
       if (error) throw error;
       return NextResponse.json({ ok: true, action: 'updated', case_id: existing.id, received });
     }
