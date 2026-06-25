@@ -486,9 +486,9 @@ export default function CXClient({
 
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [creatingLabel, setCreatingLabel] = useState(false);
-  /* Create a Shippo label from the confirmed to-address + parcel, then drop the
-     resulting tracking number (and printable label URL) into the case's
-     tracking log via the same entry shape the manual "Add tracking" uses. */
+  /* Push the confirmed to-address + parcel to Shippo as a shipment. This does
+     NOT buy a label — it makes the shipment appear in the Shippo dashboard with
+     rates and a "Buy" button, where the team purchases it. */
   const handleCreateLabel = async (to: Record<string, any>, parcel: Record<string, number>) => {
     if (!selectedCase) return null;
     setCreatingLabel(true);
@@ -499,13 +499,7 @@ export default function CXClient({
         body: JSON.stringify({ to, parcel }),
       });
       const json = await res.json();
-      if (!res.ok) { alert('Could not create label: ' + (json.error || 'Unknown error')); return null; }
-      addLogEntry('tracking_log', {
-        label: `${json.carrier ?? ''} ${json.servicelevel ?? ''}`.trim() || 'Shipping',
-        number: json.tracking_number,
-        label_url: json.label_url ?? null,
-        tracking_url: json.tracking_url ?? null,
-      });
+      if (!res.ok) { alert('Could not send to Shippo: ' + (json.error || 'Unknown error')); return null; }
       return json;
     } finally {
       setCreatingLabel(false);
@@ -997,7 +991,7 @@ export default function CXClient({
               </button>
               <button className="btn btn-acc btn-sm" onClick={() => setShowLabelModal(true)} disabled={creatingLabel}
                 style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                {creatingLabel ? 'Creating…' : '🏷 Create label'}
+                {creatingLabel ? 'Sending…' : '🏷 Send to Shippo'}
               </button>
             </div>
             {showReferralAdd && (
@@ -1663,7 +1657,7 @@ function TrackingCard({ entries, nameMap, onAdd, onRemove, onCreateLabel }: {
           {entries.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: 'oklch(0.94 0.04 220)', color: accent }}>{entries.length}</span>}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {onCreateLabel && <button onClick={onCreateLabel} className="btn btn-acc btn-sm">🏷 Create label</button>}
+          {onCreateLabel && <button onClick={onCreateLabel} className="btn btn-acc btn-sm">🏷 Send to Shippo</button>}
           <button onClick={() => setOpen(v => !v)} className="btn btn-sec btn-sm">+ Add tracking</button>
         </div>
       </div>
@@ -1748,7 +1742,7 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
 
   const submit = async () => {
     const res = await onCreate(to, parcel);
-    if (res) { setDone(res); if (res.label_url) window.open(res.label_url, '_blank', 'noopener'); }
+    if (res) setDone(res);
   };
 
   const lbl = { fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)' } as const;
@@ -1756,26 +1750,26 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
   return (
     <div className="mb" style={{ zIndex: 9999 }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="md" style={{ width: 560 }}>
-        <div className="md-t">🏷 Create shipping label</div>
+        <div className="md-t">🏷 Send shipment to Shippo</div>
 
         {done ? (
           <div>
             <div style={{ padding: '14px 16px', background: 'oklch(0.96 0.05 145)', border: '1px solid oklch(0.85 0.07 145)', borderRadius: 10, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: 'oklch(0.38 0.16 145)', marginBottom: 6 }}>
-                ✓ Label created — {done.carrier} {done.servicelevel}{done.amount ? ` · ${done.amount} ${done.currency}` : ''}
+                ✓ Sent to Shippo{done.carrier ? ` — est. ${done.carrier} ${done.servicelevel}` : ''}{done.amount ? ` · ${done.amount} ${done.currency}` : ''}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--ink)' }}>Tracking: <span style={{ fontFamily: 'monospace' }}>{done.tracking_number}</span></div>
-              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>Added to this case&apos;s tracking log.</div>
+              <div style={{ fontSize: 13, color: 'var(--ink)' }}>Open Shippo to buy the label and get the tracking number.</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 6 }}>The shipment is now in your Shippo dashboard with a Buy button.</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              {done.label_url && <a className="btn btn-acc" href={done.label_url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}>🖨 Open / print label</a>}
+              <a className="btn btn-acc" href={done.buy_url || 'https://apps.goshippo.com/orders'} target="_blank" rel="noopener noreferrer" style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}>🛒 Open Shippo to buy</a>
               <button className="btn btn-sec" onClick={onClose}>Done</button>
             </div>
           </div>
         ) : (
           <>
             <p style={{ fontSize: 13, color: 'var(--ink-4)', margin: '0 0 16px' }}>
-              We pre-filled the recipient from the case address. Confirm or fix it, pick the parcel, then create the label in Shippo.
+              We pre-filled the recipient from the case address. Confirm or fix it, pick the parcel, then send it to Shippo — you&apos;ll buy the label in the Shippo dashboard.
             </p>
 
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-4)', marginBottom: 8 }}>SHIP TO</div>
@@ -1811,7 +1805,7 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-sec" onClick={onClose} disabled={creating}>Cancel</button>
               <button className="btn btn-acc" style={{ flex: 1 }} onClick={submit} disabled={!canSubmit || creating}>
-                {creating ? 'Creating…' : '🏷 Create label'}
+                {creating ? 'Sending…' : '🏷 Send to Shippo'}
               </button>
             </div>
           </>

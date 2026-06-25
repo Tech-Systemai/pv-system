@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 
-/* Shippo → shipping-label creator.
+/* Shippo → shipment creator (does NOT buy the label).
  *
  * The CX portal POSTs a confirmed recipient address + parcel here. We call
- * Shippo to (1) rate the shipment and (2) purchase a label, then return the
- * tracking number + printable label URL so the agent can drop it straight into
- * the case's tracking log.
+ * Shippo to create + rate the shipment, which makes it show up in the Shippo
+ * dashboard with live rates and a "Buy" button. The team buys the label there
+ * (so billing stays in Shippo). We return the cheapest rate as a price preview.
  *
  * Auth: must be a logged-in portal user (same gate as /api/db).
  *
@@ -130,26 +130,16 @@ export async function POST(req: NextRequest) {
     rates.sort((a, b) => Number(a.amount) - Number(b.amount));
     const rate = rates[0];
 
-    // ── 2. Purchase the label ────────────────────────────────────────────────
-    const tx = await shippo('/transactions/', {
-      rate: rate.object_id,
-      label_file_type: 'PDF_4x6',
-      async: false,
-    }, token);
-
-    if (!tx.ok || tx.json?.status !== 'SUCCESS') {
-      const msgs = (tx.json?.messages ?? []).map((m: any) => m.text).filter(Boolean).join('; ');
-      return NextResponse.json({ error: `Label purchase failed${msgs ? ': ' + msgs : ''}` }, { status: 502 });
-    }
-
+    // No purchase. The shipment is now in the Shippo dashboard with rates and a
+    // "Buy" button — the team buys the label there. Return the cheapest rate as
+    // a price preview so the agent knows roughly what it will cost.
     return NextResponse.json({
-      tracking_number: tx.json.tracking_number,
-      label_url: tx.json.label_url,
-      tracking_url: tx.json.tracking_url_provider ?? null,
+      shipment_id: shipment.json.object_id,
       carrier: rate.provider,
       servicelevel: rate.servicelevel?.name ?? '',
       amount: rate.amount,
       currency: rate.currency,
+      buy_url: 'https://apps.goshippo.com/orders',
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message ?? 'Internal error' }, { status: 500 });
