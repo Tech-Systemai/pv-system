@@ -49,9 +49,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  // Diagnostic: log the keys GHL actually sends so the field mapping can be
-  // verified from Vercel logs. Safe to remove once the integration is confirmed.
-  console.log('GHL webhook payload keys:', JSON.stringify(Object.keys(body ?? {})));
+  // Diagnostic: log the full payload (keys AND values) so the field mapping can
+  // be verified from Vercel logs. This reveals when GHL sends a key with an
+  // empty/unresolved value (e.g. a custom-field merge token that didn't resolve).
+  // Safe to remove once the integration is confirmed.
+  console.log('GHL webhook payload:', JSON.stringify(body ?? {}));
 
   // ── Map GHL fields → case fields ────────────────────────────────────────────
   const ghlId = pick(body, 'ghl_contact_id', 'contact_id', 'id');
@@ -92,6 +94,18 @@ export async function POST(req: NextRequest) {
     updated_at: new Date().toISOString(),
   };
 
+  // Diagnostic echo: surfaced in the webhook HTTP response so the values the
+  // portal actually received show up directly in GHL's Execution Logs message.
+  // If these come back empty, GHL's merge fields aren't resolving. Safe to
+  // remove once the integration is confirmed.
+  const received = {
+    veneer_set: synced.veneer_set,
+    veneer_shade: synced.veneer_shade,
+    full_price: synced.full_price,
+    amount_collected: synced.amount_collected,
+    special_request: synced.special_request,
+  };
+
   const admin = createAdminClient();
 
   try {
@@ -105,7 +119,7 @@ export async function POST(req: NextRequest) {
     if (existing) {
       const { error } = await admin.from('cx_cases').update(synced).eq('id', existing.id);
       if (error) throw error;
-      return NextResponse.json({ ok: true, action: 'updated', case_id: existing.id });
+      return NextResponse.json({ ok: true, action: 'updated', case_id: existing.id, received });
     }
 
     // New case — add defaults the synced patch doesn't carry.
@@ -118,7 +132,7 @@ export async function POST(req: NextRequest) {
     };
     const { data, error } = await admin.from('cx_cases').insert(insert).select('id').single();
     if (error) throw error;
-    return NextResponse.json({ ok: true, action: 'created', case_id: data.id });
+    return NextResponse.json({ ok: true, action: 'created', case_id: data.id, received });
   } catch (err: any) {
     console.error('GHL webhook error:', err);
     return NextResponse.json({ error: err.message ?? 'Internal error' }, { status: 500 });
