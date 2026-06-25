@@ -1783,6 +1783,7 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
               <div className="pv-fld"><label style={lbl}>NAME</label><input value={to.name} onChange={field('name')} /></div>
               <div className="pv-fld"><label style={lbl}>PHONE</label><input value={to.phone} onChange={field('phone')} /></div>
             </div>
+            <div className="pv-fld" style={{ marginBottom: 10 }}><label style={lbl}>EMAIL</label><input value={to.email} onChange={field('email')} placeholder="customer@example.com" /></div>
             <div className="pv-fld" style={{ marginBottom: 10 }}><label style={lbl}>STREET</label><input value={to.street1} onChange={field('street1')} placeholder="123 Main St" autoFocus /></div>
             <div className="pv-fld" style={{ marginBottom: 10 }}><label style={lbl}>STREET 2 (APT / SUITE)</label><input value={to.street2} onChange={field('street2')} placeholder="Apt 4" /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
