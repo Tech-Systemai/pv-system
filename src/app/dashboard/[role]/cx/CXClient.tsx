@@ -664,12 +664,25 @@ export default function CXClient({
         const paym = PAY_META[c.pay_status] ?? {};
         const border = c.on_hold ? 'oklch(0.60 0 0)' : sColor(c.status);
         const updateDue = needsUpdate(c);
+        const fullPrice = Number(c.full_price) || 0;
+        const collectedAmt = Number(c.amount_collected) || 0;
+        const collectedPct = fullPrice > 0 ? Math.min(100, Math.round((collectedAmt / fullPrice) * 100)) : null;
+        const fullyPaid = fullPrice > 0 && collectedAmt >= fullPrice;
         return (
           <div key={c.id} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}
-            style={{ background: 'white', border: '1px solid var(--line)', borderLeft: `4px solid ${border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow .12s, transform .12s', outline: updateDue ? '1.5px solid oklch(0.80 0.12 80)' : 'none' }}
+            style={{ position: 'relative', background: 'white', border: '1px solid var(--line)', borderLeft: `4px solid ${border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow .12s, transform .12s', outline: updateDue ? '1.5px solid oklch(0.80 0.12 80)' : 'none' }}
             onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = ''; }}>
-            <div style={{ padding: '14px 16px 10px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            {fullyPaid ? (
+              <span style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 10px', borderRadius: 8, color: 'oklch(0.40 0.18 145)', background: 'oklch(0.96 0.05 145)', border: '2px solid oklch(0.55 0.18 145)', transform: 'rotate(4deg)', textTransform: 'uppercase' }}>
+                ✓ Ready to be shipped
+              </span>
+            ) : collectedPct != null && (
+              <span style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, fontSize: 12, fontWeight: 800, padding: '3px 9px', borderRadius: 20, color: 'oklch(0.38 0.16 145)', background: 'oklch(0.95 0.05 145)', border: '1px solid oklch(0.85 0.07 145)' }}>
+                {collectedPct}%
+              </span>
+            )}
+            <div style={{ padding: `14px ${fullyPaid ? 150 : collectedPct != null ? 60 : 16}px 10px 16px`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <div style={{ width: 38, height: 38, borderRadius: '50%', background: `oklch(0.50 0.20 ${STATUS_HUE[c.status] ?? 200})`, color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {initials(c.customer_name)}
               </div>
