@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     order_number: pick(src, 'order_number', 'Order Number') || null,
     veneer_set:   pick(src, 'veneer_set', 'Veneer Set') || null,
     veneer_shade: pick(src, 'veneer_shade', 'Veneer Shade') || null,
+    shipping:     pick(src, 'shipping', 'shipping_notes', 'shipping_note', 'Shipping', 'Shipping Notes') || null,
     special_request: pick(src, 'special_request', 'special_note', 'note', 'Special Request Notes') || null,
     full_price: fullPrice,
     amount_collected: collected,
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
     veneer_shade: synced.veneer_shade,
     full_price: synced.full_price,
     amount_collected: synced.amount_collected,
+    shipping: synced.shipping,
     special_request: synced.special_request,
   };
 
