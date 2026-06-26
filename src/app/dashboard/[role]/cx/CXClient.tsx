@@ -87,7 +87,10 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   },
   imp_kit_delivered: {
     summary: 'Kit delivered. Make sure the customer knows how to take their impression.',
-    steps: ['Confirm the kit arrived', 'Offer a Zoom impression session', 'Send impression instructions'],
+    steps: [
+      'If you did not get a chance to schedule an appointment with the customer, make sure that you schedule the Impression Kit appointment. This is very crucial now that the kit has been delivered',
+      'Review the Impression Kit SOP and make sure you are prepared to do your Impression Kit appointment',
+    ],
   },
   imp_appointment_done: {
     summary: 'Impression appointment complete. Verify the impression looks good before send-back.',
