@@ -200,7 +200,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'>('agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -238,6 +238,17 @@ export default function CXClient({
   const newOrdersCount   = cases.filter(c => isActiveCase(c) && !c.assigned_to).length;
   const agentsCount      = cases.filter(c => isActiveCase(c) && c.assigned_to).length;
   const myCasesCount     = cases.filter(c => c.assigned_to === currentUserId).length;
+
+  // "Labels ready to print" = every Shippo-bought label (a tracking_log entry that
+  // carries a printable label_url). One row per label, newest-unprinted first.
+  const labelItems = cases
+    .flatMap((c: any) => (Array.isArray(c.tracking_log) ? c.tracking_log : [])
+      .filter((e: any) => e?.label_url)
+      .map((e: any) => ({ c, entry: e })))
+    .sort((a, b) => (Number(!!a.entry.printed) - Number(!!b.entry.printed))
+      || String(b.entry.date || '').localeCompare(String(a.entry.date || '')));
+  const labelsToPrint  = labelItems.filter(li => !li.entry.printed);
+  const labelsReadyCount = labelsToPrint.length;
 
   const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !c.unreachable && !todayUpdatedIds.has(c.id);
 
@@ -467,6 +478,37 @@ export default function CXClient({
     patchCase({ [field]: list });
   };
 
+  /* Mark one or more tracking_log labels on a case as printed (or un-printed),
+     persisting in a single write per case so simultaneous marks don't clobber. */
+  const setLabelsPrinted = async (caseId: number, entryIds: string[], printed: boolean) => {
+    const c = cases.find(x => x.id === caseId);
+    if (!c) return;
+    const ids = new Set(entryIds);
+    const log = (Array.isArray(c.tracking_log) ? c.tracking_log : []).map((e: any) =>
+      ids.has(e.id) ? { ...e, printed, printed_at: printed ? new Date().toISOString() : null } : e);
+    const payload = { tracking_log: log, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: caseId });
+    setCases(prev => prev.map(x => x.id === caseId ? { ...x, ...payload } : x));
+    if (selectedCase?.id === caseId) setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
+  /* Open a single label's PDF and check it off. */
+  const printLabel = (li: { c: any; entry: any }) => {
+    if (li.entry.label_url) window.open(li.entry.label_url, '_blank', 'noopener,noreferrer');
+    setLabelsPrinted(li.c.id, [li.entry.id], true);
+  };
+
+  /* Open every unprinted label at once, then check them all off (grouped per
+     case so each case is written once). Note: opening many tabs may trip the
+     browser's popup blocker — the per-row Print button is the reliable fallback. */
+  const printAllLabels = () => {
+    const items = labelsToPrint;
+    items.forEach(li => { if (li.entry.label_url) window.open(li.entry.label_url, '_blank', 'noopener,noreferrer'); });
+    const byCase = new Map<number, string[]>();
+    items.forEach(li => byCase.set(li.c.id, [...(byCase.get(li.c.id) ?? []), li.entry.id]));
+    byCase.forEach((ids, caseId) => setLabelsPrinted(caseId, ids, true));
+  };
+
   const handleRecordPayment = (amount: string) => {
     const add = Number(amount);
     if (!add || add <= 0 || !selectedCase) return;
@@ -613,9 +655,15 @@ export default function CXClient({
   const banner = (
     <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : section === 'new' ? 'linear-gradient(135deg, oklch(0.98 0.02 200), oklch(0.97 0.03 215))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : section === 'new' ? 'oklch(0.38 0.18 200)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : 'AGENTS — ASSIGNED CUSTOMERS'}
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'labels' ? 'LABELS READY TO PRINT' : 'AGENTS — ASSIGNED CUSTOMERS'}
       </div>
-      {section === 'new' ? (
+      {section === 'labels' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {labelsReadyCount === 0
+            ? 'No labels waiting to print. Bought labels show up here the moment Shippo confirms them.'
+            : <><strong style={{ color: 'oklch(0.42 0.14 170)' }}>{labelsReadyCount} label{labelsReadyCount !== 1 ? 's' : ''}</strong> ready to print. Print them individually or all at once — each gets checked off once printed.</>}
+        </div>
+      ) : section === 'new' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
           {newOrdersCount === 0
             ? 'No new orders waiting. Every active customer has been assigned to an agent.'
@@ -683,6 +731,10 @@ export default function CXClient({
           <button onClick={() => setSection('my_cases')} title="Only the cases assigned to you"
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'my_cases' ? 'oklch(0.55 0.16 250)' : 'transparent', color: section === 'my_cases' ? 'white' : 'var(--ink-4)', boxShadow: section === 'my_cases' ? 'var(--sh-1)' : 'none' }}>
             👤 My Cases · {myCasesCount}
+          </button>
+          <button onClick={() => setSection('labels')} title="Shipping labels bought in Shippo and ready to print"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'labels' ? 'oklch(0.55 0.15 170)' : 'transparent', color: section === 'labels' ? 'white' : (labelsReadyCount > 0 ? 'oklch(0.42 0.14 170)' : 'var(--ink-4)'), boxShadow: section === 'labels' ? 'var(--sh-1)' : 'none' }}>
+            🖨 Labels Ready · {labelsReadyCount}
           </button>
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
@@ -1527,13 +1579,64 @@ export default function CXClient({
   );
 
   /* ── Main render ────────────────────────────────────────────── */
+  /* ── Labels-ready-to-print panel ────────────────────────────── */
+  const labelsView = (
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>🖨 Labels Ready to Print</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>
+            {labelsReadyCount === 0
+              ? 'No labels waiting — every bought label has been printed.'
+              : `${labelsReadyCount} label${labelsReadyCount !== 1 ? 's' : ''} ready · hit Print, then it’s checked off.`}
+          </div>
+        </div>
+        {labelsReadyCount > 0 && <button className="btn btn-acc" onClick={printAllLabels}>🖨 Print all ({labelsReadyCount})</button>}
+      </div>
+      <div>
+        {labelItems.length === 0 && (
+          <div style={{ padding: '44px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+            No shipping labels yet. When a label is bought in Shippo, the customer shows up here ready to print.
+          </div>
+        )}
+        {labelItems.map((li, i) => {
+          const printed = !!li.entry.printed;
+          return (
+            <div key={li.entry.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: i < labelItems.length - 1 ? '1px solid var(--line-2)' : 'none', background: printed ? 'oklch(0.98 0.02 145)' : 'white' }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: printed ? 'oklch(0.55 0.15 145)' : sColor(li.c.status), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {printed ? '✓' : initials(li.c.customer_name)}
+              </div>
+              <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(li.c); markCaseRead(li.c.id); }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{li.c.customer_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 1 }}>
+                  {li.c.order_number && <span>Order #{li.c.order_number}</span>}
+                  {li.entry.label && <span>{li.entry.label}</span>}
+                  {li.entry.number && <span style={{ fontFamily: 'monospace' }}>{li.entry.number}</span>}
+                </div>
+              </div>
+              {printed ? (
+                <>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'oklch(0.40 0.15 145)', display: 'flex', alignItems: 'center', gap: 5 }}>✓ Printed</span>
+                  <button className="btn btn-sec btn-sm" onClick={() => printLabel(li)}>Reprint</button>
+                  <button className="btn btn-sec btn-sm" title="Mark as not printed" onClick={() => setLabelsPrinted(li.c.id, [li.entry.id], false)}>↺</button>
+                </>
+              ) : (
+                <button className="btn btn-acc btn-sm" onClick={() => printLabel(li)}>🖨 Print</button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <div className="page-fade">
       {statStrip}
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
-          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : 'No Update Needed'}
+          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'labels' ? 'Labels Ready to Print' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
           {section === 'new'
@@ -1544,13 +1647,19 @@ export default function CXClient({
             ? 'Cases flagged by agents that require management review or action'
             : section === 'unreachable'
             ? 'Customers that could not be reached — click to manage or reactivate'
+            : section === 'labels'
+            ? 'Every shipping label bought in Shippo — print each one (or all at once) and it gets checked off'
+            : section === 'my_cases'
+            ? 'Only the cases assigned to you'
             : 'Customers that do not need a daily update — click to manage or reactivate'}
         </div>
       </div>
       {toolbar}
-      {viewMode === 'overview' && overviewView}
-      {viewMode === 'board'    && boardView}
-      {viewMode === 'table'    && tableView}
+      {section === 'labels' ? labelsView : (<>
+        {viewMode === 'overview' && overviewView}
+        {viewMode === 'board'    && boardView}
+        {viewMode === 'table'    && tableView}
+      </>)}
       {detailModal}
       {formModal}
       {addColModal}
