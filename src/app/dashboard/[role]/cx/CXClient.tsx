@@ -65,7 +65,17 @@ const STAGE_GROUPS = [
 const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   new_order: {
     summary: 'Brand-new order. Confirm the details and welcome the customer.',
-    steps: ['Greet the customer and confirm their order', 'Verify shipping address and contact info', 'Walk them through the journey and timelines', 'Log first contact on file'],
+    steps: [
+      'Claim the case under your name so it appears in your portal under the My Cases tab',
+      'Call the customer with a warm welcome and ask them to reply to your SMS with their shipping address to verify it on file',
+      'Once the address is confirmed, click the Send Shippo button and select 2 Impression Kits',
+      'Open Shippo and verify your current order number and info, then click View Order',
+      'Click Create a Return Label, check the return address box, then click Save',
+      'Select the cheapest USPS option for normal shipping and click Buy (if Fast shipping, check the Fast Shipping SOP)',
+      "Once purchased, locate the tracking number under the customer's card in the portal",
+      'Update the CRM with the tracking number',
+      'Update both the CRM and the portal status to Impression Kit Sent',
+    ],
   },
   imp_kit_sent: {
     summary: 'Impressions kit is on the way. Share the tracking number and let the customer know to watch for it.',
