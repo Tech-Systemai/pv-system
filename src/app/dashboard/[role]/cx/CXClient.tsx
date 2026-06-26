@@ -94,7 +94,12 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   },
   imp_appointment_done: {
     summary: 'Impression appointment complete. Verify the impression looks good before send-back.',
-    steps: ['Review the impression photos', 'Confirm impression quality with the customer', 'Explain the send-back step'],
+    steps: [
+      "Make sure the customer's impression is approved",
+      'Confirm that the customer has the return label to send back the impression kit. If any issue occurs with the return label, the customer can go to any postal office and send it to this address: 35614 Buttonweed Trail, Zephyrhills, FL, 33541',
+      'Remind the customer to send back the impression within 24 hours',
+      'If the second impression kit was not used, it must still be sent back — return all kits, used or unused, to the address',
+    ],
   },
   collect_payment: {
     summary: 'Collect the partial or full payment before the kit goes to the lab.',
