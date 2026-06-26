@@ -152,7 +152,7 @@ function initials(name: string) { return name?.split(' ').map(n => n[0]).join(''
 /* Shippo parcel presets. Dimensions are inches, weight is ounces. */
 const PARCEL_PRESETS = [
   { key: 'imp_kit_1', label: '1 imp. kit',  length: 11, width: 10, height: 3, weight: 0.12 },
-  { key: 'imp_kit_2', label: '2 imp. kits', length: 22, width: 20, height: 6, weight: 0.24 },
+  { key: 'imp_kit_2', label: '2 imp. kits', length: 13, width: 10, height: 3, weight: 10 },
   { key: 'veneers',   label: 'Veneer box',  length: 11, width: 13, height: 3, weight: 0.12 },
   { key: 'custom',    label: 'Custom',      length: 0,  width: 0,  height: 0, weight: 0 },
 ];
