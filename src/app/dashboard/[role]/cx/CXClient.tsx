@@ -498,15 +498,49 @@ export default function CXClient({
     setLabelsPrinted(li.c.id, [li.entry.id], true);
   };
 
-  /* Open every unprinted label at once, then check them all off (grouped per
-     case so each case is written once). Note: opening many tabs may trip the
-     browser's popup blocker — the per-row Print button is the reliable fallback. */
-  const printAllLabels = () => {
+  /* Print every unprinted label at once. Browsers' popup blockers allow only the
+     FIRST window.open() per click, so looping window.open opened just one label.
+     Instead we ask the server to staple all the label PDFs into a single file and
+     open that one tab. The tab is opened synchronously (within the click) so it
+     counts as user-initiated; we then point it at the merged PDF once it's built. */
+  const [printingAll, setPrintingAll] = useState(false);
+  const printAllLabels = async () => {
     const items = labelsToPrint;
-    items.forEach(li => { if (li.entry.label_url) window.open(li.entry.label_url, '_blank', 'noopener,noreferrer'); });
-    const byCase = new Map<number, string[]>();
-    items.forEach(li => byCase.set(li.c.id, [...(byCase.get(li.c.id) ?? []), li.entry.id]));
-    byCase.forEach((ids, caseId) => setLabelsPrinted(caseId, ids, true));
+    const urls = items.map(li => li.entry.label_url).filter(Boolean);
+    if (urls.length === 0 || printingAll) return;
+    const win = window.open('', '_blank'); // sync → not blocked
+    setPrintingAll(true);
+    try {
+      const res = await fetch('/api/shippo/merge-labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        if (win) win.close();
+        alert(`Could not build the print file: ${j.error || `HTTP ${res.status}`}`);
+        return;
+      }
+      const url = URL.createObjectURL(await res.blob());
+      if (win) {
+        win.location.href = url;
+      } else {
+        // The single tab was blocked too — fall back to a download so the app stays put.
+        const a = document.createElement('a');
+        a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.download = 'labels.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+      }
+      // Check them all off, grouped per case so each case is written once.
+      const byCase = new Map<number, string[]>();
+      items.forEach(li => byCase.set(li.c.id, [...(byCase.get(li.c.id) ?? []), li.entry.id]));
+      byCase.forEach((ids, caseId) => setLabelsPrinted(caseId, ids, true));
+    } catch (e: any) {
+      if (win) win.close();
+      alert(`Print all failed: ${e?.message ?? e}`);
+    } finally {
+      setPrintingAll(false);
+    }
   };
 
   const handleRecordPayment = (amount: string) => {
@@ -1591,7 +1625,7 @@ export default function CXClient({
               : `${labelsReadyCount} label${labelsReadyCount !== 1 ? 's' : ''} ready · hit Print, then it’s checked off.`}
           </div>
         </div>
-        {labelsReadyCount > 0 && <button className="btn btn-acc" onClick={printAllLabels}>🖨 Print all ({labelsReadyCount})</button>}
+        {labelsReadyCount > 0 && <button className="btn btn-acc" disabled={printingAll} onClick={printAllLabels}>{printingAll ? 'Building…' : `🖨 Print all (${labelsReadyCount})`}</button>}
       </div>
       <div>
         {labelItems.length === 0 && (
