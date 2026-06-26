@@ -82,6 +82,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     steps: [
       'Click Track within 24–48 hours of shipment to check the estimated delivery date',
       'Call the customer, inform them of their delivery date, and book their Impression Kit appointment directly in the CRM',
+      'Verify the automation informing the customer of their appointment was sent',
     ],
   },
   imp_kit_delivered: {
