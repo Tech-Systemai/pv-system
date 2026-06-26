@@ -79,7 +79,10 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   },
   imp_kit_sent: {
     summary: 'Impressions kit is on the way. Share the tracking number and let the customer know to watch for it.',
-    steps: ['Share the tracking number with the customer', 'Confirm expected delivery window', 'Remind them to watch for the package'],
+    steps: [
+      'Click Track within 24–48 hours of shipment to check the estimated delivery date',
+      'Call the customer, inform them of their delivery date, and book their Impression Kit appointment directly in the CRM',
+    ],
   },
   imp_kit_delivered: {
     summary: 'Kit delivered. Make sure the customer knows how to take their impression.',
