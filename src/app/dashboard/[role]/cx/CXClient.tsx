@@ -136,8 +136,10 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     steps: ['Confirm the kit is in transit to the lab', 'Monitor tracking', 'Notify the customer it is on the way'],
   },
   received_imp_kit_at_lab: {
-    summary: 'Lab has received the kit. Production can be queued.',
-    steps: ['Confirm lab receipt', 'Verify specs (shade, set) with the lab', 'Update the customer'],
+    summary: 'Lab has received the kit. No further steps required.',
+    steps: [
+      'No further steps required — just update the stage in the CRM once the admin marks it as received at the lab',
+    ],
   },
   in_production: {
     summary: 'Veneers are being produced. Keep the customer informed.',
