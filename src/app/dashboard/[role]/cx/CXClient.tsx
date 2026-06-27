@@ -171,6 +171,28 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   },
 };
 
+/* Lab tab. Each button is an independent checkmark (multi-select) stored in
+   cx_cases.lab_steps. Three of them drive the customer's pipeline stage — those
+   stages are lab-controlled and locked on the CX card; the rest are lab-internal. */
+const LAB_BUTTONS = [
+  { key: 'received',      label: 'Received',        hue: 145 },
+  { key: 'scan',          label: 'Scan',            hue: 230 },
+  { key: 'in_production', label: 'In Production',   hue: 300 },
+  { key: 'quality_check', label: 'Quality check',   hue: 80  },
+  { key: 'sent_us',       label: 'Sent to U.S.',    hue: 200 },
+  { key: 'received_us',   label: 'Received in U.S.', hue: 170 },
+];
+// lab step key → pipeline stage key it marks done on the customer card.
+const LAB_STAGE_MAP: Record<string, string> = {
+  received:      'received_imp_kit_at_lab',
+  in_production: 'in_production',
+  quality_check: 'quality_check',
+};
+// Pipeline stages driven only by the Lab tab — agents can't tick these by hand.
+const LAB_LOCKED_STAGES = new Set(Object.values(LAB_STAGE_MAP));
+// Lab takes over from here; the card never regresses below this stage.
+const LAB_FLOOR_STAGE = 'imp_kit_on_way_to_lab';
+
 const EXCEPTION_FLAGS = [
   { key: 'needs_new_imp_kit',               label: 'Needs new impression kit',          hue: 45,  chroma: 0.08 },
   { key: 'veneers_on_hold_failed_payment',  label: 'Veneers on hold — failed payment',  hue: 15,  chroma: 0.08 },
@@ -306,10 +328,10 @@ export default function CXClient({
   const labelsToPrint  = labelItems.filter(li => !li.entry.printed);
   const labelsReadyCount = labelsToPrint.length;
 
-  // "Lab" tab = impression kits in transit: a lab ETA has been set and the kit
-  // hasn't reached production yet. Soonest ETA first.
+  // "Lab" tab = every impression kit with a lab ETA set. Kits stay listed through
+  // production and beyond so the lab keeps tracking them. Soonest ETA first.
   const labCases = cases
-    .filter((c: any) => c.lab_eta_date && !(Array.isArray(c.stages_done) && c.stages_done.includes('in_production')))
+    .filter((c: any) => c.lab_eta_date)
     .sort((a, b) => String(a.lab_eta_date).localeCompare(String(b.lab_eta_date)));
   const labCount = labCases.length;
 
@@ -494,6 +516,8 @@ export default function CXClient({
 
   const handleToggleStage = async (stageKey: string) => {
     if (!selectedCase) return;
+    // These stages are auto-set from the Lab tab — agents can't toggle them by hand.
+    if (LAB_LOCKED_STAGES.has(stageKey)) return;
     const done: string[] = selectedCase.stages_done ?? [];
     const idx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
     const isDone = done.includes(stageKey);
@@ -549,23 +573,23 @@ export default function CXClient({
     if (selectedCase?.id === caseId) setSelectedCase((p: any) => ({ ...p, ...payload }));
   };
 
-  /* Advance a case so every pipeline stage up to and including `stageKey` is
-     marked done — never regresses a case that's already further along. */
-  const advanceCaseToStage = (caseId: number, stageKey: string, extra: Record<string, any> = {}) => {
-    const c = cases.find(x => x.id === caseId);
-    if (!c) return;
-    const idx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
-    if (idx < 0) return;
-    const curCount = Array.isArray(c.stages_done) ? c.stages_done.length : 0;
-    const newDone = PIPELINE_STAGES.slice(0, Math.max(curCount, idx + 1)).map(s => s.key);
-    return patchAnyCase(caseId, { stages_done: newDone, ...extra });
+  /* Toggle one Lab-tab checkmark on/off (multi-select — they're independent).
+     The pipeline-driving steps (Received / In Production / Quality check) recompute
+     the customer's stage to the furthest one ticked, floored at the lab hand-off
+     stage so toggling lab steps never wipes the agent's earlier progress. Scan,
+     Sent to U.S. and Received in U.S. are lab-internal and don't touch the card. */
+  const toggleLabStep = (c: any, stepKey: string) => {
+    const cur: string[] = Array.isArray(c.lab_steps) ? c.lab_steps : [];
+    const next = cur.includes(stepKey) ? cur.filter(s => s !== stepKey) : [...cur, stepKey];
+    const floorIdx = PIPELINE_STAGES.findIndex(s => s.key === LAB_FLOOR_STAGE);
+    const checkedIdxs = next
+      .filter(s => LAB_STAGE_MAP[s])
+      .map(s => PIPELINE_STAGES.findIndex(x => x.key === LAB_STAGE_MAP[s]));
+    const furthest = checkedIdxs.length ? Math.max(...checkedIdxs) : -1;
+    const targetIdx = Math.max(floorIdx, furthest);
+    const newDone = PIPELINE_STAGES.slice(0, targetIdx + 1).map(s => s.key);
+    return patchAnyCase(c.id, { lab_steps: next, stages_done: newDone });
   };
-
-  // Lab-tab actions. Scan is lab-internal (no card change); Received and In
-  // Production advance the customer's pipeline stage so the CX live card updates.
-  const labReceived     = (c: any) => advanceCaseToStage(c.id, 'received_imp_kit_at_lab', { lab_status: 'received' });
-  const labScan         = (c: any) => patchAnyCase(c.id, { lab_status: 'scan' });
-  const labInProduction = (c: any) => advanceCaseToStage(c.id, 'in_production', { lab_status: 'in_production' });
 
   /* Mark one or more tracking_log labels on a case as printed (or un-printed),
      persisting in a single write per case so simultaneous marks don't clobber. */
@@ -1334,6 +1358,19 @@ export default function CXClient({
           const guide = curKey ? STAGE_GUIDE[curKey] : undefined;
           const curLabel = PIPELINE_STAGES.find(s => s.key === curKey)?.label ?? '';
           const checked: number[] = (selectedCase.stage_checklist ?? {})[curKey] ?? [];
+          // Lab-controlled stages show no agent guide — they're ticked from the Lab tab.
+          if (curKey && LAB_LOCKED_STAGES.has(curKey)) {
+            return (
+              <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)', background: 'oklch(0.98 0.02 25)' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: 'oklch(0.48 0.18 25)', marginBottom: 6 }}>
+                  🔒 {curLabel.toUpperCase()} · LAB-CONTROLLED
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+                  This stage is updated automatically from the Lab tab — there are no steps to complete here.
+                </div>
+              </div>
+            );
+          }
           if (!guide) return null;
           return (
             <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)', background: 'oklch(0.985 0.012 255)' }}>
@@ -1469,20 +1506,25 @@ export default function CXClient({
                       const isDone = stagesDone.includes(key);
                       const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === key);
                       const isCurrent = !isDone && stageIdx === stagesDone.length;
+                      // Lab-controlled stages: set automatically from the Lab tab,
+                      // not clickable, shown in red so it's clear they're locked.
+                      const locked = LAB_LOCKED_STAGES.has(key);
+                      const ring = locked ? 'oklch(0.55 0.20 25)' : 'oklch(0.50 0.18 260)';
                       return (
-                        <div key={key} onClick={() => handleToggleStage(key)}
-                          style={{ display: 'flex', alignItems: 'flex-start', gap: 7, cursor: 'pointer', padding: '3px 5px', borderRadius: 6,
-                            background: isCurrent ? 'oklch(0.95 0.03 260)' : 'transparent',
-                            border: `1px solid ${isCurrent ? 'oklch(0.88 0.06 260)' : 'transparent'}` }}>
+                        <div key={key} onClick={locked ? undefined : () => handleToggleStage(key)}
+                          title={locked ? 'Set automatically from the Lab tab' : undefined}
+                          style={{ display: 'flex', alignItems: 'flex-start', gap: 7, cursor: locked ? 'not-allowed' : 'pointer', padding: '3px 5px', borderRadius: 6,
+                            background: isCurrent ? (locked ? 'oklch(0.96 0.03 25)' : 'oklch(0.95 0.03 260)') : 'transparent',
+                            border: `1px solid ${isCurrent ? (locked ? 'oklch(0.85 0.07 25)' : 'oklch(0.88 0.06 260)') : 'transparent'}` }}>
                           <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                            background: isDone ? 'oklch(0.50 0.18 260)' : 'transparent',
-                            border: isDone ? 'none' : `2px solid ${isCurrent ? 'oklch(0.50 0.18 260)' : 'oklch(0.78 0.02 260)'}`,
+                            background: isDone ? ring : 'transparent',
+                            border: isDone ? 'none' : `2px solid ${isCurrent ? ring : (locked ? 'oklch(0.80 0.10 25)' : 'oklch(0.78 0.02 260)')}`,
                             display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {isDone && <span style={{ color: 'white', fontSize: 8, fontWeight: 900, lineHeight: 1 }}>✓</span>}
-                            {isCurrent && <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'oklch(0.50 0.18 260)' }} />}
+                            {isCurrent && <div style={{ width: 5, height: 5, borderRadius: '50%', background: ring }} />}
                           </div>
                           <span style={{ fontSize: 11.5, lineHeight: 1.35,
-                            color: isDone ? 'var(--ink)' : isCurrent ? 'oklch(0.35 0.18 260)' : 'var(--ink-4)',
+                            color: locked ? 'oklch(0.45 0.18 25)' : isDone ? 'var(--ink)' : isCurrent ? 'oklch(0.35 0.18 260)' : 'var(--ink-4)',
                             fontWeight: isCurrent ? 700 : isDone ? 500 : 400 }}>
                             {stage.label}
                           </span>
@@ -1778,10 +1820,10 @@ export default function CXClient({
   );
 
   /* ── Lab intake panel (kits in transit to the lab) ──────────── */
-  const labStatusBtn = (c: any, key: string, label: string, hue: number, onClick: () => void) => {
-    const active = (c.lab_status ?? 'in_transit') === key;
+  const labStepBtn = (c: any, key: string, label: string, hue: number) => {
+    const active = (Array.isArray(c.lab_steps) ? c.lab_steps : []).includes(key);
     return (
-      <button onClick={(e) => { e.stopPropagation(); onClick(); }}
+      <button key={key} onClick={(e) => { e.stopPropagation(); toggleLabStep(c, key); }}
         style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
           border: `1px solid ${active ? `oklch(0.52 0.16 ${hue})` : 'var(--line)'}`,
           background: active ? `oklch(0.52 0.16 ${hue})` : 'white',
@@ -1811,10 +1853,8 @@ export default function CXClient({
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</div>
               <div style={{ fontSize: 12, color: 'oklch(0.44 0.14 300)', fontWeight: 600, marginTop: 1 }}>📅 ETA {fmtEta(c.lab_eta_date)}</div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {labStatusBtn(c, 'received', 'Received', 145, () => labReceived(c))}
-              {labStatusBtn(c, 'scan', 'Scan', 230, () => labScan(c))}
-              {labStatusBtn(c, 'in_production', 'In Production', 300, () => labInProduction(c))}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 420 }}>
+              {LAB_BUTTONS.map(b => labStepBtn(c, b.key, b.label, b.hue))}
             </div>
           </div>
         ))}
