@@ -126,6 +126,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     summary: 'Waiting on the customer to ship the kit back. Get the send-back tracking number.',
     steps: [
       'If the customer is returning it using their own post office, remind them within 24 hours to go to the post office and send us the impression kit',
+      'Encourage the customer to send the impression kit no later than 72 hours — ideally before then',
       "Grab the tracking number they are using if they haven't used our return label",
       'Add that tracking number on the portal and the CRM',
     ],
