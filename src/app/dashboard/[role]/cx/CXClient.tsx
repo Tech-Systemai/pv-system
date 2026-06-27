@@ -40,6 +40,7 @@ const PIPELINE_STAGES = [
   { key: 'new_order',                    label: 'New order' },
   { key: 'imp_kit_sent',                 label: 'Impressions kit sent' },
   { key: 'imp_kit_delivered',            label: 'Impressions kit delivered' },
+  { key: 'pre_imp_appointment',          label: 'Pre impression kit appointment' },
   { key: 'imp_appointment_done',         label: 'Impression appointment done' },
   { key: 'collect_payment',              label: 'Collect partial / full payment' },
   { key: 'waiting_sendback_tracking',    label: 'Awaiting send-back tracking #' },
@@ -54,7 +55,7 @@ const PIPELINE_STAGES = [
   { key: 'referral_upsell',             label: 'Referral / upsell' },
 ];
 const STAGE_GROUPS = [
-  { label: 'IMPRESSIONS',      keys: ['new_order', 'imp_kit_sent', 'imp_kit_delivered', 'imp_appointment_done'] },
+  { label: 'IMPRESSIONS',      keys: ['new_order', 'imp_kit_sent', 'imp_kit_delivered', 'pre_imp_appointment', 'imp_appointment_done'] },
   { label: 'PAYMENT & RETURN', keys: ['collect_payment', 'waiting_sendback_tracking', 'imp_kit_on_way_to_lab', 'received_imp_kit_at_lab'] },
   { label: 'PRODUCTION',       keys: ['in_production', 'quality_check', 'collect_full_payment_veneers'] },
   { label: 'DELIVERY & AFTER', keys: ['veneers_shipped', 'veneers_delivered', 'completed_no_issues', 'referral_upsell'] },
@@ -90,6 +91,15 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     steps: [
       'If you did not get a chance to schedule an appointment with the customer, make sure that you schedule the Impression Kit appointment. This is very crucial now that the kit has been delivered',
       'Review the Impression Kit SOP and make sure you are prepared to do your Impression Kit appointment',
+    ],
+  },
+  pre_imp_appointment: {
+    summary: 'Set up and run the virtual impression appointment with the customer.',
+    steps: [
+      'Go to the website www.cylabs.com, create a meeting, and send it to the customer for your appointment time',
+      'The customer types their name, allows camera and microphone access, and completes the "not a robot" check, then joins the meeting and can communicate',
+      'Keep your camera on so you can visualize everything for the customer',
+      'Customers can send photos during the meeting: there is a message icon on the top right they click, then attach an image from the clip mark at the bottom right — from there they take the impression, get the photo, and send it to us',
     ],
   },
   imp_appointment_done: {
