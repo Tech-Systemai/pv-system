@@ -115,7 +115,13 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   },
   collect_payment: {
     summary: 'Collect the partial or full payment before the kit goes to the lab.',
-    steps: ['Confirm the balance owed', 'Send the payment link', 'Record the payment once collected'],
+    steps: [
+      'Collect the required payment (either partial or full)',
+      'Log the payment in the CRM',
+      'Log the payment in the portal',
+      'Log the payment on the portal card (the Customer Service Live card)',
+      'Ensure these collections are logged to earn your commission',
+    ],
   },
   waiting_sendback_tracking: {
     summary: 'Waiting on the customer to ship the kit back. Get the send-back tracking number.',
