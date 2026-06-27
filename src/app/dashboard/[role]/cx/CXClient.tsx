@@ -100,6 +100,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'The customer types their name, allows camera and microphone access, and completes the "not a robot" check, then joins the meeting and can communicate',
       'Keep your camera on so you can visualize everything for the customer',
       'Customers can send photos during the meeting: there is a message icon on the top right they click, then attach an image from the clip mark at the bottom right — from there they take the impression, get the photo, and send it to us',
+      'Collect the payment right away, in the same meeting, once they finish the Impression Kit appointment. Recommended amount to charge is $199.99 — deliver the best Impression Kit service first, then collect the money that needs to be collected',
     ],
   },
   imp_appointment_done: {
