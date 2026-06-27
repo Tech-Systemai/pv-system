@@ -279,6 +279,8 @@ export default function CXClient({
   const isMgmt         = ['owner', 'admin', 'supervisor'].includes(userRole);
   const isOwner        = userRole === 'owner';
   const isAdminOrOwner = isOwner || userRole === 'admin';
+  // The Lab tab is limited to owners, admins, and dentists.
+  const canViewLab     = ['owner', 'admin', 'dentist'].includes(userRole);
   const today   = todayStr();
 
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));
@@ -863,10 +865,12 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'labels' ? 'oklch(0.55 0.15 170)' : 'transparent', color: section === 'labels' ? 'white' : (labelsReadyCount > 0 ? 'oklch(0.42 0.14 170)' : 'var(--ink-4)'), boxShadow: section === 'labels' ? 'var(--sh-1)' : 'none' }}>
             🖨 Labels Ready · {labelsReadyCount}
           </button>
+          {canViewLab && (
           <button onClick={() => setSection('lab')} title="Impression kits in transit to the lab — receive, scan, mark in production"
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'lab' ? 'oklch(0.52 0.16 300)' : 'transparent', color: section === 'lab' ? 'white' : (labCount > 0 ? 'oklch(0.44 0.15 300)' : 'var(--ink-4)'), boxShadow: section === 'lab' ? 'var(--sh-1)' : 'none' }}>
             🧪 Lab · {labCount}
           </button>
+          )}
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
         {(section === 'agents' || section === 'new') && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
@@ -1845,7 +1849,7 @@ export default function CXClient({
         </div>
       </div>
       {toolbar}
-      {section === 'lab' ? labView : section === 'labels' ? labelsView : (<>
+      {section === 'lab' && canViewLab ? labView : section === 'labels' ? labelsView : (<>
         {viewMode === 'overview' && overviewView}
         {viewMode === 'board'    && boardView}
         {viewMode === 'table'    && tableView}
