@@ -125,7 +125,11 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   },
   waiting_sendback_tracking: {
     summary: 'Waiting on the customer to ship the kit back. Get the send-back tracking number.',
-    steps: ['Ask the customer for the send-back tracking #', 'Log the tracking number', 'Confirm drop-off'],
+    steps: [
+      'If the customer is returning it using their own post office, remind them within 24 hours to go to the post office and send us the impression kit',
+      "Grab the tracking number they are using if they haven't used our return label",
+      'Add that tracking number on the portal and the CRM',
+    ],
   },
   imp_kit_on_way_to_lab: {
     summary: 'Kit is heading to the lab. Track it until it arrives.',
