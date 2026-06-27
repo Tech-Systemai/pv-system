@@ -119,8 +119,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'Collect the required payment (either partial or full)',
       'Log the payment in the CRM',
       'Log the payment in the portal',
-      'Log the payment on the portal card (the Customer Service Live card)',
-      'Ensure these collections are logged to earn your commission',
+      'Log the payment in collection to earn your commission',
     ],
   },
   waiting_sendback_tracking: {
