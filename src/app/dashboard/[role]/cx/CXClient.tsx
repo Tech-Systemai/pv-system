@@ -175,12 +175,12 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
    cx_cases.lab_steps. Three of them drive the customer's pipeline stage — those
    stages are lab-controlled and locked on the CX card; the rest are lab-internal. */
 const LAB_BUTTONS = [
-  { key: 'received',      label: 'Received',        hue: 145 },
-  { key: 'scan',          label: 'Scan',            hue: 230 },
-  { key: 'in_production', label: 'In Production',   hue: 300 },
-  { key: 'quality_check', label: 'Quality check',   hue: 80  },
-  { key: 'sent_us',       label: 'Sent to U.S.',    hue: 200 },
+  { key: 'received',      label: 'Received',         hue: 145 },
+  { key: 'scan',          label: 'Scanned',          hue: 230 },
+  { key: 'in_production', label: 'In Production',    hue: 300 },
+  { key: 'sent_us',       label: 'Sent to U.S.',     hue: 200 },
   { key: 'received_us',   label: 'Received in U.S.', hue: 170 },
+  { key: 'quality_check', label: 'Quality check',    hue: 80  },
 ];
 // lab step key → pipeline stage key it marks done on the customer card.
 const LAB_STAGE_MAP: Record<string, string> = {
@@ -1401,12 +1401,12 @@ export default function CXClient({
               </div>
               {curKey === 'imp_kit_on_way_to_lab' && (
                 <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>When is the estimated time of arrival (ETA)?</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Lab ETA — when will the kit arrive at the lab?</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <input type="date" value={selectedCase.lab_eta_date ?? ''} onChange={e => patchCase({ lab_eta_date: e.target.value || null })}
                       className="fld-input" style={{ height: 34, width: 180, fontSize: 13 }} />
                     {selectedCase.lab_eta_date
-                      ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.44 0.15 300)' }}>📅 {fmtEta(selectedCase.lab_eta_date)} · now in the Lab tab</span>
+                      ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.44 0.15 300)' }}>🧪 {fmtEta(selectedCase.lab_eta_date)} · now in the Lab tab</span>
                       : <span style={{ fontSize: 12, color: 'var(--ink-5)' }}>Pick the date the kit will reach the lab — that adds the customer to the Lab tab</span>}
                   </div>
                 </div>
@@ -1838,26 +1838,42 @@ export default function CXClient({
         <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>🧪 Verify Impression Kit → Lab</div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>
           {labCount === 0
-            ? 'No kits in transit. A customer shows up here once an agent sets the lab ETA on the “IMP kit on the way to lab” stage.'
-            : `${labCount} kit${labCount !== 1 ? 's' : ''} in transit · Received and In Production sync to the customer’s card; Scan is lab-only.`}
+            ? 'No kits in transit. A customer shows up here once an agent sets the Lab ETA on the “IMP kit on the way to lab” stage.'
+            : `${labCount} kit${labCount !== 1 ? 's' : ''} tracked · Received, In Production & Quality check sync to the customer’s card; Scanned, Sent to U.S. & Received in U.S. are lab-only.`}
         </div>
       </div>
       <div>
         {labCases.length === 0 && (
           <div style={{ padding: '44px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Nothing in transit to the lab right now.</div>
         )}
-        {labCases.map((c, i) => (
-          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: i < labCases.length - 1 ? '1px solid var(--line-2)' : 'none' }}>
-            <div style={{ width: 34, height: 34, borderRadius: '50%', background: sColor(c.status), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials(c.customer_name)}</div>
-            <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</div>
-              <div style={{ fontSize: 12, color: 'oklch(0.44 0.14 300)', fontWeight: 600, marginTop: 1 }}>📅 ETA {fmtEta(c.lab_eta_date)}</div>
+        {labCases.map((c, i) => {
+          const sentUs = (Array.isArray(c.lab_steps) ? c.lab_steps : []).includes('sent_us');
+          return (
+          <div key={c.id} style={{ padding: '12px 18px', borderBottom: i < labCases.length - 1 ? '1px solid var(--line-2)' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: sColor(c.status), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials(c.customer_name)}</div>
+              <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 1 }}>
+                  <span style={{ fontSize: 12, color: 'oklch(0.44 0.14 300)', fontWeight: 600 }}>🧪 Lab ETA · {fmtEta(c.lab_eta_date)}</span>
+                  {c.lab_us_eta_date && <span style={{ fontSize: 12, color: 'oklch(0.44 0.16 200)', fontWeight: 600 }}>🇺🇸 US ETA · {fmtEta(c.lab_us_eta_date)}</span>}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 440 }}>
+                {LAB_BUTTONS.map(b => labStepBtn(c, b.key, b.label, b.hue))}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 420 }}>
-              {LAB_BUTTONS.map(b => labStepBtn(c, b.key, b.label, b.hue))}
-            </div>
+            {sentUs && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, paddingLeft: 48, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.44 0.16 200)' }}>🇺🇸 US ETA — when it will be back in the U.S.:</span>
+                <input type="date" value={c.lab_us_eta_date ?? ''} onChange={e => patchAnyCase(c.id, { lab_us_eta_date: e.target.value || null })}
+                  className="fld-input" style={{ height: 30, width: 170, fontSize: 12 }} />
+                {c.lab_us_eta_date && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 600 }}>{fmtEta(c.lab_us_eta_date)}</span>}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
