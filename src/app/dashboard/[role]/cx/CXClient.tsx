@@ -150,8 +150,13 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     steps: ['Confirm QC passed', 'Flag any defects to the lab', 'Prepare the customer for shipping'],
   },
   collect_full_payment_veneers: {
-    summary: 'Collect the full remaining balance before the veneers ship.',
-    steps: ['Confirm remaining balance', 'Send the final payment link', 'Record the payment'],
+    summary: 'Collect 100% of the veneers payment. The veneers can ship once the balance is at least 90% collected — that earns the “Ready to be shipped” stamp.',
+    steps: [
+      'Collect 100% of the veneers payment — that is the goal',
+      'If the customer refuses and the balance is under 90%, you cannot ship the veneers — schedule another day to collect the payment',
+      'At 90%+ the case earns the “Ready to be shipped” stamp and the “Create veneers label” button unlocks',
+      'Once payment is in, click “Create veneers label” to send the veneers to Shippo',
+    ],
   },
   veneers_shipped: {
     summary: 'Veneers shipped. Share the tracking number.',
@@ -675,6 +680,10 @@ export default function CXClient({
 
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [creatingLabel, setCreatingLabel] = useState(false);
+  // Which parcel preset the Shippo modal opens on: 'imp_kit_2' for the impression
+  // kit button, 'veneers' for the veneers button.
+  const [labelPreset, setLabelPreset] = useState('imp_kit_2');
+  const openLabel = (presetKey: string) => { setLabelPreset(presetKey); setShowLabelModal(true); };
   /* Push the confirmed to-address + parcel to Shippo as an ORDER. This does NOT
      buy a label — it makes the order appear in the Shippo "Orders" tab with
      rates and a "Buy" button, where the team purchases it. */
@@ -1176,6 +1185,13 @@ export default function CXClient({
   const stagesDone: string[]     = selectedCase?.stages_done     ?? [];
   const exceptionFlags: string[] = selectedCase?.exception_flags ?? [];
 
+  // Veneers can ship once ≥90% of the balance is collected — that earns the
+  // "Ready to be shipped" stamp and unlocks the "Create veneers label" button.
+  const vFull      = Number(selectedCase?.full_price) || 0;
+  const vCollected = Number(selectedCase?.amount_collected) || 0;
+  const veneersPct = vFull > 0 ? (vCollected / vFull) * 100 : 0;
+  const veneersReady = veneersPct >= 90;
+
   const detailModal = selectedCase && (
     <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); } }}>
       <div className="md" style={{ width: 820, maxHeight: '95vh', overflowY: 'auto', padding: 0 }}>
@@ -1216,9 +1232,14 @@ export default function CXClient({
                   : { display: 'flex', alignItems: 'center', gap: 5 }}>
                 {pushing ? 'Pushing…' : selectedCase.pushed_to_customer_at ? '✓ Pushed — update customer' : '↗ Push to customer'}
               </button>
-              <button className="btn btn-acc btn-sm" onClick={() => setShowLabelModal(true)} disabled={creatingLabel}
-                style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                {creatingLabel ? 'Sending…' : '🏷 Send to Shippo'}
+              <button className="btn btn-acc btn-sm" onClick={() => openLabel('imp_kit_2')} disabled={creatingLabel}
+                title="Send the impression kit to Shippo" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                {creatingLabel ? 'Sending…' : '🏷 Impression kit label'}
+              </button>
+              <button className="btn btn-acc btn-sm" onClick={() => openLabel('veneers')} disabled={creatingLabel || !veneersReady}
+                title={veneersReady ? 'Send the veneers to Shippo' : 'Collect at least 90% of the veneers payment first'}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, opacity: veneersReady ? 1 : 0.55 }}>
+                {creatingLabel ? 'Sending…' : '🦷 Create veneers label'}
               </button>
             </div>
             {showReferralAdd && (
@@ -1425,10 +1446,17 @@ export default function CXClient({
           const accent = complete ? 145 : 25;
           return (
             <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', color: `oklch(0.45 0.18 ${accent})`, display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: `oklch(0.55 0.20 ${accent})` }} />
-                  PAYMENT — {complete ? 'PAID IN FULL' : 'COLLECTION INCOMPLETE'}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', color: `oklch(0.45 0.18 ${accent})`, display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: `oklch(0.55 0.20 ${accent})` }} />
+                    PAYMENT — {complete ? 'PAID IN FULL' : 'COLLECTION INCOMPLETE'}
+                  </div>
+                  {full > 0 && pct >= 90 && (
+                    <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 12px', borderRadius: 999, background: 'oklch(0.93 0.06 145)', color: 'oklch(0.34 0.16 145)', border: '1.5px solid oklch(0.78 0.10 145)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      ✓ READY TO BE SHIPPED
+                    </span>
+                  )}
                 </div>
                 {full > 0 && !complete && (
                   <span style={{ fontSize: 12, fontWeight: 800, padding: '3px 11px', borderRadius: 999, background: 'oklch(0.55 0.20 25)', color: 'white' }}>
@@ -1668,7 +1696,7 @@ export default function CXClient({
 
       {/* Create-label confirm dialog */}
       {showLabelModal && (
-        <CreateLabelModal caseData={selectedCase} creating={creatingLabel}
+        <CreateLabelModal caseData={selectedCase} creating={creatingLabel} defaultPresetKey={labelPreset}
           onCreate={handleCreateLabel} onClose={() => setShowLabelModal(false)} />
       )}
     </div>
@@ -2085,10 +2113,11 @@ function AddColumnModal({ onConfirm, onClose }: { onConfirm: (name: string) => v
 }
 
 /* ── Create shipping label modal (Shippo) ───────────────────────── */
-function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
+function CreateLabelModal({ caseData, creating, onCreate, onClose, defaultPresetKey }: {
   caseData: any; creating: boolean;
   onCreate: (to: Record<string, any>, parcel: Record<string, number>) => Promise<any>;
   onClose: () => void;
+  defaultPresetKey?: string;
 }) {
   const parsed = parseUsAddress(caseData?.address ?? '');
   const [to, setTo] = useState({
@@ -2098,7 +2127,8 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose }: {
     street1: parsed.street1, street2: parsed.street2,
     city: parsed.city, state: parsed.state, zip: parsed.zip, country: 'US',
   });
-  const [presetKey, setPresetKey] = useState(PARCEL_PRESETS[0].key);
+  const [presetKey, setPresetKey] = useState(
+    PARCEL_PRESETS.find(p => p.key === defaultPresetKey)?.key ?? PARCEL_PRESETS[0].key);
   const preset = PARCEL_PRESETS.find(p => p.key === presetKey) ?? PARCEL_PRESETS[0];
   const [parcel, setParcel] = useState({ length: preset.length, width: preset.width, height: preset.height, weight: preset.weight });
   const [done, setDone] = useState<any>(null);
