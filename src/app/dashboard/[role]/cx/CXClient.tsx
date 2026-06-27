@@ -110,6 +110,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'Confirm that the customer has the return label to send back the impression kit. If any issue occurs with the return label, the customer can go to any postal office and send it to this address: 35614 Buttonweed Trail, Zephyrhills, FL, 33541',
       'Remind the customer to send back the impression within 24 hours',
       'If the second impression kit was not used, it must still be sent back — return all kits, used or unused, to the address',
+      'Again, do not forget to collect the required payment — recommended amount is $199.99',
     ],
   },
   collect_payment: {
