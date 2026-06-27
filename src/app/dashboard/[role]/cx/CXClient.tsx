@@ -132,8 +132,8 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     ],
   },
   imp_kit_on_way_to_lab: {
-    summary: 'Kit is heading to the lab. Track it until it arrives.',
-    steps: ['Confirm the kit is in transit to the lab', 'Monitor tracking', 'Notify the customer it is on the way'],
+    summary: 'Kit is heading to the lab. Confirm it is in transit and set the ETA below — that surfaces the customer in the Lab tab.',
+    steps: ['Confirm that the kit is on its way to the lab'],
   },
   received_imp_kit_at_lab: {
     summary: 'Lab has received the kit. No further steps required.',
@@ -193,6 +193,14 @@ function sBg(status: string, alpha = 0.12) {
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 function daysOpen(iso: string) { return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)); }
 function fmtDate(iso: string) { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+/* Format a plain yyyy-mm-dd (date-picker / DATE column) as "Monday, June 29, 2026".
+   Parsed as local time so the weekday never slips a day from a UTC midnight. */
+function fmtEta(iso: string) {
+  if (!iso) return '';
+  const [y, m, d] = String(iso).split('-').map(Number);
+  if (!y || !m || !d) return String(iso);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
 function initials(name: string) { return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'; }
 
 /* Shippo parcel presets. Dimensions are inches, weight is ounces. */
@@ -246,7 +254,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'>('agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'|'lab'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -295,6 +303,13 @@ export default function CXClient({
       || String(b.entry.date || '').localeCompare(String(a.entry.date || '')));
   const labelsToPrint  = labelItems.filter(li => !li.entry.printed);
   const labelsReadyCount = labelsToPrint.length;
+
+  // "Lab" tab = impression kits in transit: a lab ETA has been set and the kit
+  // hasn't reached production yet. Soonest ETA first.
+  const labCases = cases
+    .filter((c: any) => c.lab_eta_date && !(Array.isArray(c.stages_done) && c.stages_done.includes('in_production')))
+    .sort((a, b) => String(a.lab_eta_date).localeCompare(String(b.lab_eta_date)));
+  const labCount = labCases.length;
 
   const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !c.unreachable && !todayUpdatedIds.has(c.id);
 
@@ -524,6 +539,32 @@ export default function CXClient({
     patchCase({ [field]: list });
   };
 
+  /* Patch any case (not just the open one) and keep the list + open modal in sync. */
+  const patchAnyCase = async (caseId: number, patch: Record<string, any>) => {
+    const payload = { ...patch, updated_at: new Date().toISOString() };
+    await dbOp('cx_cases', 'update', payload, { id: caseId });
+    setCases(prev => prev.map(c => c.id === caseId ? { ...c, ...payload } : c));
+    if (selectedCase?.id === caseId) setSelectedCase((p: any) => ({ ...p, ...payload }));
+  };
+
+  /* Advance a case so every pipeline stage up to and including `stageKey` is
+     marked done — never regresses a case that's already further along. */
+  const advanceCaseToStage = (caseId: number, stageKey: string, extra: Record<string, any> = {}) => {
+    const c = cases.find(x => x.id === caseId);
+    if (!c) return;
+    const idx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
+    if (idx < 0) return;
+    const curCount = Array.isArray(c.stages_done) ? c.stages_done.length : 0;
+    const newDone = PIPELINE_STAGES.slice(0, Math.max(curCount, idx + 1)).map(s => s.key);
+    return patchAnyCase(caseId, { stages_done: newDone, ...extra });
+  };
+
+  // Lab-tab actions. Scan is lab-internal (no card change); Received and In
+  // Production advance the customer's pipeline stage so the CX live card updates.
+  const labReceived     = (c: any) => advanceCaseToStage(c.id, 'received_imp_kit_at_lab', { lab_status: 'received' });
+  const labScan         = (c: any) => patchAnyCase(c.id, { lab_status: 'scan' });
+  const labInProduction = (c: any) => advanceCaseToStage(c.id, 'in_production', { lab_status: 'in_production' });
+
   /* Mark one or more tracking_log labels on a case as printed (or un-printed),
      persisting in a single write per case so simultaneous marks don't clobber. */
   const setLabelsPrinted = async (caseId: number, entryIds: string[], printed: boolean) => {
@@ -735,9 +776,15 @@ export default function CXClient({
   const banner = (
     <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : section === 'new' ? 'linear-gradient(135deg, oklch(0.98 0.02 200), oklch(0.97 0.03 215))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : section === 'new' ? 'oklch(0.38 0.18 200)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'labels' ? 'LABELS READY TO PRINT' : 'AGENTS — ASSIGNED CUSTOMERS'}
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'labels' ? 'LABELS READY TO PRINT' : section === 'lab' ? 'VERIFY IMPRESSION KIT → LAB' : 'AGENTS — ASSIGNED CUSTOMERS'}
       </div>
-      {section === 'labels' ? (
+      {section === 'lab' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {labCount === 0
+            ? 'No impression kits in transit. A customer lands here once an agent sets the lab ETA on the “IMP kit on the way to lab” stage.'
+            : <><strong style={{ color: 'oklch(0.44 0.15 300)' }}>{labCount} kit{labCount !== 1 ? 's' : ''}</strong> in transit to the lab. Mark each one Received, Scan, or In Production — Received and In Production update the customer’s card automatically.</>}
+        </div>
+      ) : section === 'labels' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
           {labelsReadyCount === 0
             ? 'No labels waiting to print. Bought labels show up here the moment Shippo confirms them.'
@@ -815,6 +862,10 @@ export default function CXClient({
           <button onClick={() => setSection('labels')} title="Shipping labels bought in Shippo and ready to print"
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'labels' ? 'oklch(0.55 0.15 170)' : 'transparent', color: section === 'labels' ? 'white' : (labelsReadyCount > 0 ? 'oklch(0.42 0.14 170)' : 'var(--ink-4)'), boxShadow: section === 'labels' ? 'var(--sh-1)' : 'none' }}>
             🖨 Labels Ready · {labelsReadyCount}
+          </button>
+          <button onClick={() => setSection('lab')} title="Impression kits in transit to the lab — receive, scan, mark in production"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'lab' ? 'oklch(0.52 0.16 300)' : 'transparent', color: section === 'lab' ? 'white' : (labCount > 0 ? 'oklch(0.44 0.15 300)' : 'var(--ink-4)'), boxShadow: section === 'lab' ? 'var(--sh-1)' : 'none' }}>
+            🧪 Lab · {labCount}
           </button>
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
@@ -1307,6 +1358,18 @@ export default function CXClient({
                   );
                 })}
               </div>
+              {curKey === 'imp_kit_on_way_to_lab' && (
+                <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>When is the estimated time of arrival (ETA)?</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <input type="date" value={selectedCase.lab_eta_date ?? ''} onChange={e => patchCase({ lab_eta_date: e.target.value || null })}
+                      className="fld-input" style={{ height: 34, width: 180, fontSize: 13 }} />
+                    {selectedCase.lab_eta_date
+                      ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.44 0.15 300)' }}>📅 {fmtEta(selectedCase.lab_eta_date)} · now in the Lab tab</span>
+                      : <span style={{ fontSize: 12, color: 'var(--ink-5)' }}>Pick the date the kit will reach the lab — that adds the customer to the Lab tab</span>}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -1710,13 +1773,58 @@ export default function CXClient({
     </div>
   );
 
+  /* ── Lab intake panel (kits in transit to the lab) ──────────── */
+  const labStatusBtn = (c: any, key: string, label: string, hue: number, onClick: () => void) => {
+    const active = (c.lab_status ?? 'in_transit') === key;
+    return (
+      <button onClick={(e) => { e.stopPropagation(); onClick(); }}
+        style={{ padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+          border: `1px solid ${active ? `oklch(0.52 0.16 ${hue})` : 'var(--line)'}`,
+          background: active ? `oklch(0.52 0.16 ${hue})` : 'white',
+          color: active ? 'white' : 'var(--ink-3)' }}>
+        {active ? '✓ ' : ''}{label}
+      </button>
+    );
+  };
+  const labView = (
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>🧪 Verify Impression Kit → Lab</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 2 }}>
+          {labCount === 0
+            ? 'No kits in transit. A customer shows up here once an agent sets the lab ETA on the “IMP kit on the way to lab” stage.'
+            : `${labCount} kit${labCount !== 1 ? 's' : ''} in transit · Received and In Production sync to the customer’s card; Scan is lab-only.`}
+        </div>
+      </div>
+      <div>
+        {labCases.length === 0 && (
+          <div style={{ padding: '44px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>Nothing in transit to the lab right now.</div>
+        )}
+        {labCases.map((c, i) => (
+          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: i < labCases.length - 1 ? '1px solid var(--line-2)' : 'none' }}>
+            <div style={{ width: 34, height: 34, borderRadius: '50%', background: sColor(c.status), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials(c.customer_name)}</div>
+            <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</div>
+              <div style={{ fontSize: 12, color: 'oklch(0.44 0.14 300)', fontWeight: 600, marginTop: 1 }}>📅 ETA {fmtEta(c.lab_eta_date)}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {labStatusBtn(c, 'received', 'Received', 145, () => labReceived(c))}
+              {labStatusBtn(c, 'scan', 'Scan', 230, () => labScan(c))}
+              {labStatusBtn(c, 'in_production', 'In Production', 300, () => labInProduction(c))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="page-fade">
       {statStrip}
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
-          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'labels' ? 'Labels Ready to Print' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
+          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'labels' ? 'Labels Ready to Print' : section === 'lab' ? 'Verify Impression Kit → Lab' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
           {section === 'new'
@@ -1729,13 +1837,15 @@ export default function CXClient({
             ? 'Customers that could not be reached — click to manage or reactivate'
             : section === 'labels'
             ? 'Every shipping label bought in Shippo — print each one (or all at once) and it gets checked off'
+            : section === 'lab'
+            ? 'Impression kits in transit to the lab — mark Received, Scan, or In Production; Received & In Production sync to the customer card'
             : section === 'my_cases'
             ? 'Only the cases assigned to you'
             : 'Customers that do not need a daily update — click to manage or reactivate'}
         </div>
       </div>
       {toolbar}
-      {section === 'labels' ? labelsView : (<>
+      {section === 'lab' ? labView : section === 'labels' ? labelsView : (<>
         {viewMode === 'overview' && overviewView}
         {viewMode === 'board'    && boardView}
         {viewMode === 'table'    && tableView}
