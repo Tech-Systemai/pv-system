@@ -16,7 +16,7 @@ export default async function PersonalFilesPage() {
   }
 
   const [{ data: employees }, { data: entries }] = await Promise.all([
-    admin.from('profiles').select('id, name, role, department').order('name'),
+    admin.from('profiles').select('id, name, role, department').in('role', ['sales', 'cx', 'supervisor']).order('name'),
     admin.from('personal_file_entries').select('*').order('date', { ascending: false }),
   ]);
 
