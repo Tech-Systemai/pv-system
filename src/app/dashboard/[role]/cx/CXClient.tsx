@@ -51,14 +51,13 @@ const PIPELINE_STAGES = [
   { key: 'collect_full_payment_veneers', label: 'Collect full payment for veneers' },
   { key: 'veneers_shipped',             label: 'Veneers shipped' },
   { key: 'veneers_delivered',           label: 'Veneers delivered' },
-  { key: 'completed_no_issues',         label: 'Completed — no issues' },
-  { key: 'referral_upsell',             label: 'Referral / upsell' },
+  { key: 'completed_no_issues',         label: 'Completed' },
 ];
 const STAGE_GROUPS = [
   { label: 'IMPRESSIONS',      keys: ['new_order', 'imp_kit_sent', 'imp_kit_delivered', 'pre_imp_appointment', 'imp_appointment_done'] },
   { label: 'PAYMENT & RETURN', keys: ['collect_payment', 'waiting_sendback_tracking', 'imp_kit_on_way_to_lab', 'received_imp_kit_at_lab'] },
   { label: 'PRODUCTION',       keys: ['in_production', 'quality_check', 'collect_full_payment_veneers'] },
-  { label: 'DELIVERY & AFTER', keys: ['veneers_shipped', 'veneers_delivered', 'completed_no_issues', 'referral_upsell'] },
+  { label: 'DELIVERY & AFTER', keys: ['veneers_shipped', 'veneers_delivered', 'completed_no_issues'] },
 ];
 /* Per-stage agent guide. `summary` is the blue banner blurb; `steps` are the
    checklist items an agent ticks off ("mark yes") as they complete each one.
@@ -176,12 +175,8 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     ],
   },
   completed_no_issues: {
-    summary: 'Order complete with no issues. Wrap up.',
-    steps: ['Confirm the customer is satisfied', 'Close out the case', 'Note any outstanding balance'],
-  },
-  referral_upsell: {
-    summary: 'Happy customer — ask for a review and a referral.',
-    steps: ['Request a Google / Trustpilot review', 'Ask for a referral', 'Log any referral leads'],
+    summary: 'Final step. Answer whether there are any issues with the veneers, then mark the order 100% complete — the profile moves to Issues or Completed Success based on your answer.',
+    steps: ['Confirm the customer received the veneers and is settled'],
   },
 };
 
@@ -310,7 +305,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'|'lab'>('agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'|'lab'|'issues'|'completed_success'>('agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -345,11 +340,18 @@ export default function CXClient({
   const escalatedCount   = cases.filter(c => c.escalated).length;
   const noUpdateCount    = cases.filter(c => c.no_update_needed && !c.escalated).length;
   const unreachableCount = cases.filter(c => c.unreachable && !c.escalated).length;
+  // A case is "resolved" once it reaches the Completed stage AND an outcome was
+  // chosen (issues vs success). Resolved cases leave the active views and live in
+  // the Issues / Completed Success tabs instead.
+  const isResolved = (c: any) =>
+    Array.isArray(c.stages_done) && c.stages_done.includes('completed_no_issues') && !!c.completed_outcome;
   // "New orders" = active, unassigned cases. They move to "Agents" the moment they get an assignee.
-  const isActiveCase     = (c: any) => !c.escalated && !c.no_update_needed && !c.unreachable;
+  const isActiveCase     = (c: any) => !c.escalated && !c.no_update_needed && !c.unreachable && !isResolved(c);
   const newOrdersCount   = cases.filter(c => isActiveCase(c) && !c.assigned_to).length;
   const agentsCount      = cases.filter(c => isActiveCase(c) && c.assigned_to).length;
-  const myCasesCount     = cases.filter(c => c.assigned_to === currentUserId).length;
+  const myCasesCount     = cases.filter(c => c.assigned_to === currentUserId && !isResolved(c)).length;
+  const issuesCount      = cases.filter(c => isResolved(c) && c.completed_outcome === 'issues').length;
+  const completedSuccessCount = cases.filter(c => isResolved(c) && c.completed_outcome === 'success').length;
 
   // "Labels ready to print" = every Shippo-bought label (a tracking_log entry that
   // carries a printable label_url). One row per label, newest-unprinted first.
@@ -371,7 +373,18 @@ export default function CXClient({
 
   const needsUpdate = (c: any) => !c.on_hold && !c.no_update_needed && !c.unreachable && !todayUpdatedIds.has(c.id);
 
+  const matchesSearch = (c: any) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return c.customer_name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.issue?.toLowerCase().includes(q);
+  };
+
   const filtered = cases.filter(c => {
+    // Issues / Completed Success tabs show only resolved cases of that outcome.
+    if (section === 'issues')            return (isResolved(c) && c.completed_outcome === 'issues')  && matchesSearch(c);
+    if (section === 'completed_success') return (isResolved(c) && c.completed_outcome === 'success') && matchesSearch(c);
+    // Resolved cases have moved out of every other view.
+    if (isResolved(c)) return false;
     if (section === 'my_cases'    && c.assigned_to !== currentUserId)                 return false;
     if (section === 'admin'       && !c.escalated)                                    return false;
     if (section === 'new'         && (!isActiveCase(c) || c.assigned_to))             return false;
@@ -844,9 +857,21 @@ export default function CXClient({
   const banner = (
     <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : section === 'new' ? 'linear-gradient(135deg, oklch(0.98 0.02 200), oklch(0.97 0.03 215))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : section === 'new' ? 'oklch(0.38 0.18 200)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'labels' ? 'LABELS READY TO PRINT' : section === 'lab' ? 'VERIFY IMPRESSION KIT → LAB' : 'AGENTS — ASSIGNED CUSTOMERS'}
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'labels' ? 'LABELS READY TO PRINT' : section === 'lab' ? 'VERIFY IMPRESSION KIT → LAB' : section === 'issues' ? 'ISSUES' : section === 'completed_success' ? 'COMPLETED SUCCESS' : 'AGENTS — ASSIGNED CUSTOMERS'}
       </div>
-      {section === 'lab' ? (
+      {section === 'issues' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {issuesCount === 0
+            ? 'No completed orders with issues. Cases land here when an order is marked complete with issues flagged.'
+            : <><strong style={{ color: 'oklch(0.45 0.18 25)' }}>{issuesCount} completed order{issuesCount !== 1 ? 's' : ''}</strong> with issues flagged. Full history is preserved — click any to review.</>}
+        </div>
+      ) : section === 'completed_success' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {completedSuccessCount === 0
+            ? 'No completed orders yet. Cases land here when an order is marked complete with no issues.'
+            : <><strong style={{ color: 'oklch(0.40 0.15 145)' }}>{completedSuccessCount} completed order{completedSuccessCount !== 1 ? 's' : ''}</strong> with no issues. Full history is preserved — click any to review.</>}
+        </div>
+      ) : section === 'lab' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
           {labCount === 0
             ? 'No impression kits in transit. A customer lands here once an agent sets the lab ETA on the “IMP kit on the way to lab” stage.'
@@ -937,6 +962,14 @@ export default function CXClient({
             🧪 Lab · {labCount}
           </button>
           )}
+          <button onClick={() => setSection('issues')} title="Completed orders the customer flagged issues on"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'issues' ? 'oklch(0.55 0.18 25)' : 'transparent', color: section === 'issues' ? 'white' : (issuesCount > 0 ? 'oklch(0.45 0.18 25)' : 'var(--ink-4)'), boxShadow: section === 'issues' ? 'var(--sh-1)' : 'none' }}>
+            ⚠ Issues · {issuesCount}
+          </button>
+          <button onClick={() => setSection('completed_success')} title="Completed orders with no issues"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'completed_success' ? 'oklch(0.50 0.16 145)' : 'transparent', color: section === 'completed_success' ? 'white' : (completedSuccessCount > 0 ? 'oklch(0.40 0.15 145)' : 'var(--ink-4)'), boxShadow: section === 'completed_success' ? 'var(--sh-1)' : 'none' }}>
+            ✓ Completed Success · {completedSuccessCount}
+          </button>
         </div>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
         {(section === 'agents' || section === 'new') && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
@@ -962,7 +995,7 @@ export default function CXClient({
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          {section === 'my_cases' ? 'No cases are assigned to you right now.' : section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : 'No customer cases found.'}
+          {section === 'my_cases' ? 'No cases are assigned to you right now.' : section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : section === 'issues' ? 'No completed orders with issues.' : section === 'completed_success' ? 'No completed orders yet.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
@@ -1480,6 +1513,37 @@ export default function CXClient({
                   </div>
                 </div>
               )}
+              {curKey === 'completed_no_issues' && (() => {
+                const outcome = selectedCase.completed_outcome;
+                return (
+                  <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Are there any issues with the veneers?</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <button onClick={() => patchCase({ completed_outcome: 'issues' })}
+                        style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                          border: `1.5px solid ${outcome === 'issues' ? 'oklch(0.55 0.18 25)' : 'var(--line)'}`,
+                          background: outcome === 'issues' ? 'oklch(0.55 0.18 25)' : 'white',
+                          color: outcome === 'issues' ? 'white' : 'var(--ink-3)' }}>
+                        {outcome === 'issues' ? '✓ ' : ''}Yes — there are issues
+                      </button>
+                      <button onClick={() => patchCase({ completed_outcome: 'success' })}
+                        style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                          border: `1.5px solid ${outcome === 'success' ? 'oklch(0.50 0.16 145)' : 'var(--line)'}`,
+                          background: outcome === 'success' ? 'oklch(0.50 0.16 145)' : 'white',
+                          color: outcome === 'success' ? 'white' : 'var(--ink-3)' }}>
+                        {outcome === 'success' ? '✓ ' : ''}No — all good
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-5)', marginTop: 8 }}>
+                      {outcome === 'issues'
+                        ? 'On completing the stage below, this profile moves to the Issues tab (full history kept).'
+                        : outcome === 'success'
+                        ? 'On completing the stage below, this profile moves to the Completed Success tab (full history kept).'
+                        : 'Pick an answer, then check the Completed stage below to file the order — the profile moves automatically.'}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
@@ -1960,7 +2024,7 @@ export default function CXClient({
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
-          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'labels' ? 'Labels Ready to Print' : section === 'lab' ? 'Verify Impression Kit → Lab' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
+          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'labels' ? 'Labels Ready to Print' : section === 'lab' ? 'Verify Impression Kit → Lab' : section === 'issues' ? 'Issues' : section === 'completed_success' ? 'Completed Success' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
           {section === 'new'
@@ -1975,6 +2039,10 @@ export default function CXClient({
             ? 'Every shipping label bought in Shippo — print each one (or all at once) and it gets checked off'
             : section === 'lab'
             ? 'Impression kits in transit to the lab — mark Received, Scan, or In Production; Received & In Production sync to the customer card'
+            : section === 'issues'
+            ? 'Completed orders the customer flagged issues on — full history preserved · click any to review'
+            : section === 'completed_success'
+            ? 'Completed orders with no issues — full history preserved · click any to review'
             : section === 'my_cases'
             ? 'Only the cases assigned to you'
             : 'Customers that do not need a daily update — click to manage or reactivate'}
