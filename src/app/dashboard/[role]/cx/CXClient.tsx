@@ -251,6 +251,18 @@ function fmtEta(iso: string) {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+/* Deep-link to a contact inside GoHighLevel. The location (sub-account) id — and
+   an optional white-label base domain — come from public env vars set in Vercel:
+   NEXT_PUBLIC_GHL_LOCATION_ID and NEXT_PUBLIC_GHL_BASE_URL. */
+const GHL_BASE = process.env.NEXT_PUBLIC_GHL_BASE_URL || 'https://app.gohighlevel.com';
+const GHL_LOCATION_ID = process.env.NEXT_PUBLIC_GHL_LOCATION_ID || '';
+function ghlContactUrl(contactId: string) {
+  if (!contactId) return '';
+  return GHL_LOCATION_ID
+    ? `${GHL_BASE}/v2/location/${GHL_LOCATION_ID}/contacts/detail/${contactId}`
+    : `${GHL_BASE}/contacts/detail/${contactId}`;
+}
+
 /* Shipping/delivery stamp shown on the card + in the modal. Flips Ready (>=90%
    collected) → Shipped (Veneers shipped stage) → Delivered (on/after the ETA). */
 function shipStampFor(c: any): 'READY TO BE SHIPPED' | 'VENEERS SHIPPED' | 'DELIVERED' | null {
@@ -1404,6 +1416,13 @@ export default function CXClient({
             </div>
             {/* Referral / Push-to-customer actions */}
             <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {selectedCase.ghl_contact_id && (
+                <a href={ghlContactUrl(selectedCase.ghl_contact_id)} target="_blank" rel="noopener noreferrer"
+                  className="btn btn-sec btn-sm" title="Open this contact in GoHighLevel"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+                  🔗 Go to CRM
+                </a>
+              )}
               <button className="btn btn-sec btn-sm" onClick={() => setShowReferralAdd(v => !v)}
                 style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 ★ Referral{(selectedCase.referrals?.length ?? 0) > 0 ? ` · ${selectedCase.referrals.length}` : ''}
