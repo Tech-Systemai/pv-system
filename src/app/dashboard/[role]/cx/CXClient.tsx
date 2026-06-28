@@ -1699,11 +1699,19 @@ export default function CXClient({
                     </span>
                   )}
                 </div>
-                {full > 0 && !complete && (
-                  <span style={{ fontSize: 12, fontWeight: 800, padding: '3px 11px', borderRadius: 999, background: 'oklch(0.55 0.20 25)', color: 'white' }}>
-                    ${left.toLocaleString('en-US', { minimumFractionDigits: 0 })} still owed
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {full > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                      <span style={{ fontSize: 26, fontWeight: 900, color: `oklch(0.45 0.18 ${accent})`, lineHeight: 1 }}>{pct}%</span>
+                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.07em', color: 'var(--ink-4)' }}>COLLECTED</span>
+                    </div>
+                  )}
+                  {full > 0 && !complete && (
+                    <span style={{ fontSize: 12, fontWeight: 800, padding: '3px 11px', borderRadius: 999, background: 'oklch(0.55 0.20 25)', color: 'white' }}>
+                      ${left.toLocaleString('en-US', { minimumFractionDigits: 0 })} still owed
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 12 }}>
                 <div>
