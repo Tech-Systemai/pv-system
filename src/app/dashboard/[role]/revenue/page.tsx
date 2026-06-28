@@ -26,6 +26,7 @@ export default async function RevenuePage() {
       { data: collectionLogs },
       { data: settingsRow },
       { data: allSalesLogs },
+      { data: allCollectionLogs },
     ] = await Promise.all([
       admin.from('profiles').select('id, name, role').eq('role', 'sales').order('name'),
       admin.from('profiles').select('id, name, role').eq('role', 'cx').order('name'),
@@ -37,6 +38,10 @@ export default async function RevenuePage() {
       // Owner/Admin: every sale log this period (all statuses) for review/approval/deletion.
       canManageLogs
         ? admin.from('sales_logs').select('*, profiles!sales_logs_user_id_fkey(name)').eq('type', 'Sale').gte('created_at', startOfMonth.toISOString()).order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] as any[] }),
+      // Owner/Admin: every collection log this period (all statuses) for verify/decline/delete.
+      canManageLogs
+        ? admin.from('sales_logs').select('*, profiles!sales_logs_user_id_fkey(name)').eq('type', 'Collection').gte('created_at', startOfMonth.toISOString()).order('created_at', { ascending: false })
         : Promise.resolve({ data: [] as any[] }),
     ]);
 
@@ -54,6 +59,7 @@ export default async function RevenuePage() {
         salesLogs={salesLogs ?? []}
         collectionLogs={collectionLogs ?? []}
         allSalesLogs={allSalesLogs ?? []}
+        allCollectionLogs={allCollectionLogs ?? []}
         period={period}
         cxBonus={cxBonus}
       />

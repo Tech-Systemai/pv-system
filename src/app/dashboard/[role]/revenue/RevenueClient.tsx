@@ -14,14 +14,14 @@ function barColor(pct: number) {
 // ---------- Management view ----------
 
 function MgmtRevenueView({
-  salesAgents, cxAgents, targets: initTargets, salesLogs, collectionLogs, allSalesLogs, canManageLogs, period, cxBonus: initBonus,
+  salesAgents, cxAgents, targets: initTargets, salesLogs, collectionLogs, allSalesLogs, allCollectionLogs, canManageLogs, period, cxBonus: initBonus,
 }: {
   salesAgents: Agent[]; cxAgents: Agent[];
   targets: Target[]; salesLogs: any[]; collectionLogs: any[];
-  allSalesLogs: any[]; canManageLogs: boolean;
+  allSalesLogs: any[]; allCollectionLogs: any[]; canManageLogs: boolean;
   period: string; cxBonus: CxBonus;
 }) {
-  const [tab, setTab] = useState<'sales' | 'cx' | 'logs'>('sales');
+  const [tab, setTab] = useState<'sales' | 'cx' | 'logs' | 'collogs'>('sales');
   const [targets, setTargets] = useState<Target[]>(initTargets);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editField, setEditField] = useState<'sales' | 'cx'>('sales');
@@ -49,6 +49,25 @@ function MgmtRevenueView({
     await dbOp('sales_logs', 'delete', undefined, { id });
     setLogs(prev => prev.filter(l => l.id !== id));
     setBusyLog(null);
+  };
+
+  // Owner/Admin collection-log review (auto-logged from CX live-card payments)
+  const [collLogs, setCollLogs] = useState<any[]>(allCollectionLogs);
+  const [busyColl, setBusyColl] = useState<string | null>(null);
+
+  const setCollStatus = async (id: string, status: 'Verified' | 'Declined') => {
+    setBusyColl(id);
+    await dbOp('sales_logs', 'update', { status }, { id });
+    setCollLogs(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+    setBusyColl(null);
+  };
+
+  const deleteColl = async (id: string) => {
+    if (!window.confirm('Delete this collection log permanently? This cannot be undone.')) return;
+    setBusyColl(id);
+    await dbOp('sales_logs', 'delete', undefined, { id });
+    setCollLogs(prev => prev.filter(l => l.id !== id));
+    setBusyColl(null);
   };
 
   const getTarget = (userId: string) => targets.find(t => t.user_id === userId);
@@ -158,8 +177,12 @@ function MgmtRevenueView({
 
       {/* Tab selector */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['sales', 'cx', ...(canManageLogs ? ['logs'] as const : [])] as const).map(t => {
-          const pendingCount = t === 'logs' ? logs.filter(l => (l.status ?? 'Pending') === 'Pending').length : 0;
+        {(['sales', 'cx', ...(canManageLogs ? ['logs', 'collogs'] as const : [])] as const).map(t => {
+          const pendingCount = t === 'logs'
+            ? logs.filter(l => (l.status ?? 'Pending') === 'Pending').length
+            : t === 'collogs'
+            ? collLogs.filter(l => (l.status ?? 'Pending') === 'Pending').length
+            : 0;
           return (
             <button
               key={t}
@@ -171,7 +194,7 @@ function MgmtRevenueView({
                 transition: 'all .2s',
               }}
             >
-              {t === 'sales' ? '📈 Sales Targets' : t === 'cx' ? '📋 CX Collection Targets' : `🧾 All Sales Logs${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
+              {t === 'sales' ? '📈 Sales Targets' : t === 'cx' ? '📋 CX Collection Targets' : t === 'logs' ? `🧾 All Sales Logs${pendingCount > 0 ? ` (${pendingCount})` : ''}` : `💰 All Collections${pendingCount > 0 ? ` (${pendingCount})` : ''}`}
             </button>
           );
         })}
@@ -415,6 +438,85 @@ function MgmtRevenueView({
           )}
         </div>
       )}
+
+      {/* All collections — owner/admin verify, decline & delete */}
+      {tab === 'collogs' && canManageLogs && (
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <div className="card-hdr">
+            <div>
+              <div className="card-title">All Collections</div>
+              <div className="card-sub">Auto-logged from payments agents record on the live card · Only verified collections count toward commission · {period}</div>
+            </div>
+          </div>
+          {collLogs.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
+              No collections logged this period.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Customer</th>
+                    <th>Type</th>
+                    <th>Date / Time</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {collLogs.map(l => {
+                    const status = l.status ?? 'Pending';
+                    return (
+                      <tr key={l.id}>
+                        <td style={{ fontWeight: 600, fontSize: 13 }}>{l.profiles?.name ?? '—'}</td>
+                        <td>
+                          <div style={{ fontSize: 13 }}>{l.customer_name || l.customer_email || '—'}</div>
+                          {l.customer_phone && (
+                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{l.customer_phone}</div>
+                          )}
+                        </td>
+                        <td>{l.collection_type ? <span className="bdg bdg-acc">{l.collection_type}</span> : '—'}</td>
+                        <td style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-4)' }}>
+                          {new Date(l.created_at).toLocaleString()}
+                        </td>
+                        <td style={{ fontWeight: 700, color: 'var(--ok)', fontSize: 14 }}>
+                          ${Number(l.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </td>
+                        <td>
+                          <span className={status === 'Verified' ? 'bdg bdg-ok' : status === 'Declined' ? 'bdg bdg-err' : 'bdg bdg-warn'}>{status}</span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            {status !== 'Verified' && (
+                              <button className="btn btn-sm" style={{ background: 'oklch(0.96 0.05 145)', color: 'var(--ok)', border: '1px solid oklch(0.88 0.07 145)' }}
+                                disabled={busyColl === l.id} onClick={() => setCollStatus(l.id, 'Verified')}>
+                                {busyColl === l.id ? '…' : '✓ Verify'}
+                              </button>
+                            )}
+                            {status === 'Pending' && (
+                              <button className="btn btn-sm btn-sec"
+                                disabled={busyColl === l.id} onClick={() => setCollStatus(l.id, 'Declined')}>
+                                ✕ Decline
+                              </button>
+                            )}
+                            <button className="btn btn-sm" style={{ background: 'oklch(0.97 0.03 25)', color: 'var(--err)', border: '1px solid oklch(0.90 0.06 25)' }}
+                              disabled={busyColl === l.id} onClick={() => deleteColl(l.id)}>
+                              🗑 Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -601,6 +703,7 @@ export default function RevenueClient({
   salesLogs,
   collectionLogs,
   allSalesLogs,
+  allCollectionLogs,
   period,
   cxBonus,
 }: {
@@ -614,6 +717,7 @@ export default function RevenueClient({
   salesLogs?: any[];
   collectionLogs?: any[];
   allSalesLogs?: any[];
+  allCollectionLogs?: any[];
   period?: string;
   cxBonus?: CxBonus;
 }) {
@@ -626,6 +730,7 @@ export default function RevenueClient({
         salesLogs={salesLogs ?? []}
         collectionLogs={collectionLogs ?? []}
         allSalesLogs={allSalesLogs ?? []}
+        allCollectionLogs={allCollectionLogs ?? []}
         canManageLogs={canManageLogs}
         period={period ?? ''}
         cxBonus={cxBonus ?? { amount: 3, threshold: 600 }}
