@@ -159,8 +159,14 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     ],
   },
   veneers_shipped: {
-    summary: 'Veneers shipped. Share the tracking number.',
-    steps: ['Share the shipping tracking number', 'Confirm delivery window', 'Remind the customer to watch for it'],
+    summary: 'Buy the veneers label in Shippo, then paste the tracking number into the CRM — that auto-sends the shipped notification to the customer.',
+    steps: [
+      'In Shippo, go to Orders and select “Buy the label”',
+      'Make sure the label includes a return address',
+      'Choose the cheapest USPS option',
+      'The tracking number shows up in the portal — copy it and paste it into the CRM',
+      'Pasting the tracking number automatically sends the “veneers shipped” notification to the customer — no manual message needed',
+    ],
   },
   veneers_delivered: {
     summary: 'Veneers delivered. Confirm fit and satisfaction.',
