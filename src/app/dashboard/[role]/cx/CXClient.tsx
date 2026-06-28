@@ -794,6 +794,25 @@ export default function CXClient({
     setUnreadCounts(counts);
   }, []);
 
+  // Auto-advance shipped veneers to "Veneers delivered" once the delivery ETA
+  // arrives. Runs whenever cases load/change; the !already-delivered guard makes
+  // each case advance exactly once, so it converges (no update loop).
+  useEffect(() => {
+    const today = todayStr();
+    const idx = PIPELINE_STAGES.findIndex(s => s.key === 'veneers_delivered');
+    const newDone = PIPELINE_STAGES.slice(0, idx + 1).map(s => s.key);
+    cases.forEach(c => {
+      const done: string[] = Array.isArray(c.stages_done) ? c.stages_done : [];
+      if (c.veneers_eta_date && today >= c.veneers_eta_date
+          && done.includes('veneers_shipped') && !done.includes('veneers_delivered')) {
+        const payload = { stages_done: newDone, updated_at: new Date().toISOString() };
+        dbOp('cx_cases', 'update', payload, { id: c.id });
+        setCases(prev => prev.map(x => x.id === c.id ? { ...x, ...payload } : x));
+        if (selectedCase?.id === c.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
+      }
+    });
+  }, [cases]);
+
   /* ── Status stat strip ─────────────────────────────────────── */
   const statStrip = (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, marginBottom: 16 }}>
@@ -1198,6 +1217,23 @@ export default function CXClient({
   const veneersPct = vFull > 0 ? (vCollected / vFull) * 100 : 0;
   const veneersReady = veneersPct >= 90;
 
+  // Shipping → delivery stamp lifecycle. The stamp flips Ready → Shipped once the
+  // case reaches the Veneers shipped stage, then → Delivered on/after the entered
+  // delivery ETA (a background effect also moves the case to Veneers delivered).
+  const veneersEta       = selectedCase?.veneers_eta_date || null;
+  const veneersShipped   = stagesDone.includes('veneers_shipped');
+  const veneersDelivered = stagesDone.includes('veneers_delivered')
+    || (veneersShipped && !!veneersEta && todayStr() >= veneersEta);
+  const shipStamp = veneersDelivered ? 'DELIVERED'
+    : veneersShipped ? 'VENEERS SHIPPED'
+    : veneersReady ? 'READY TO BE SHIPPED'
+    : null;
+  const STAMP_STYLE: Record<string, { bg: string; color: string; border: string }> = {
+    'READY TO BE SHIPPED': { bg: 'oklch(0.93 0.06 145)', color: 'oklch(0.34 0.16 145)', border: 'oklch(0.78 0.10 145)' },
+    'VENEERS SHIPPED':     { bg: 'oklch(0.93 0.06 230)', color: 'oklch(0.36 0.16 230)', border: 'oklch(0.78 0.10 230)' },
+    'DELIVERED':           { bg: 'oklch(0.90 0.11 145)', color: 'oklch(0.30 0.18 145)', border: 'oklch(0.70 0.15 145)' },
+  };
+
   const detailModal = selectedCase && (
     <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); } }}>
       <div className="md" style={{ width: 820, maxHeight: '95vh', overflowY: 'auto', padding: 0 }}>
@@ -1438,6 +1474,18 @@ export default function CXClient({
                   </div>
                 </div>
               )}
+              {(curKey === 'veneers_shipped' || curKey === 'veneers_delivered') && (
+                <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Delivery ETA — when will the veneers arrive?</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <input type="date" value={selectedCase.veneers_eta_date ?? ''} onChange={e => patchCase({ veneers_eta_date: e.target.value || null })}
+                      className="fld-input" style={{ height: 34, width: 180, fontSize: 13 }} />
+                    {selectedCase.veneers_eta_date
+                      ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.40 0.16 145)' }}>📦 {fmtEta(selectedCase.veneers_eta_date)} · auto-marks Delivered on this date</span>
+                      : <span style={{ fontSize: 12, color: 'var(--ink-5)' }}>Pick the expected delivery date — the case moves to Veneers delivered automatically when it arrives</span>}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
@@ -1458,9 +1506,9 @@ export default function CXClient({
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: `oklch(0.55 0.20 ${accent})` }} />
                     PAYMENT — {complete ? 'PAID IN FULL' : 'COLLECTION INCOMPLETE'}
                   </div>
-                  {full > 0 && pct >= 90 && (
-                    <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 12px', borderRadius: 999, background: 'oklch(0.93 0.06 145)', color: 'oklch(0.34 0.16 145)', border: '1.5px solid oklch(0.78 0.10 145)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                      ✓ READY TO BE SHIPPED
+                  {shipStamp && (
+                    <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 12px', borderRadius: 999, background: STAMP_STYLE[shipStamp].bg, color: STAMP_STYLE[shipStamp].color, border: `1.5px solid ${STAMP_STYLE[shipStamp].border}`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {shipStamp === 'DELIVERED' ? '📦 ' : shipStamp === 'VENEERS SHIPPED' ? '🚚 ' : '✓ '}{shipStamp}
                     </span>
                   )}
                 </div>
