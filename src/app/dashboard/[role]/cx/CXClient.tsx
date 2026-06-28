@@ -254,8 +254,8 @@ function fmtEta(iso: string) {
 /* Deep-link to a contact inside GoHighLevel. The location (sub-account) id — and
    an optional white-label base domain — come from public env vars set in Vercel:
    NEXT_PUBLIC_GHL_LOCATION_ID and NEXT_PUBLIC_GHL_BASE_URL. */
-const GHL_BASE = process.env.NEXT_PUBLIC_GHL_BASE_URL || 'https://app.gohighlevel.com';
-const GHL_LOCATION_ID = process.env.NEXT_PUBLIC_GHL_LOCATION_ID || '';
+const GHL_BASE = process.env.NEXT_PUBLIC_GHL_BASE_URL || 'https://crm.pioneersveneers.com';
+const GHL_LOCATION_ID = process.env.NEXT_PUBLIC_GHL_LOCATION_ID || 'fH6o0jS2R6uCTUpJ6e7p';
 function ghlContactUrl(contactId: string, locationId?: string) {
   if (!contactId) return '';
   const loc = locationId || GHL_LOCATION_ID;
