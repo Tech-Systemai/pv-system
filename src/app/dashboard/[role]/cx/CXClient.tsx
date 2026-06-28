@@ -806,14 +806,28 @@ export default function CXClient({
     }
   };
 
-  const handleRecordPayment = (amount: string) => {
+  const handleRecordPayment = async (amount: string) => {
     const add = Number(amount);
     if (!add || add <= 0 || !selectedCase) return;
     const full = Number(selectedCase.full_price) || 0;
     const collected = (Number(selectedCase.amount_collected) || 0) + add;
     const left = full > 0 ? Math.max(0, full - collected) : selectedCase.payment_left;
     const pay_status = full > 0 ? (collected >= full ? 'Paid' : collected > 0 ? 'Partial' : 'Defaulted') : selectedCase.pay_status;
-    patchCase({ amount_collected: collected, payment_left: left, pay_status });
+    await patchCase({ amount_collected: collected, payment_left: left, pay_status });
+    // Recording a payment here automatically logs a collection for the agent so it
+    // counts toward their commission — no manual entry in the Collections section.
+    await dbOp('sales_logs', 'insert', {
+      user_id:         currentUserId,
+      type:            'Collection',
+      status:          'Pending',
+      customer_name:   selectedCase.customer_name ?? '',
+      customer_phone:  selectedCase.phone ?? '',
+      customer_email:  selectedCase.email ?? '',
+      amount:          add,
+      collection_type: 'CRM',
+      collection_date: today,
+      customer_id:     selectedCase.customer_name ?? '',
+    });
   };
 
   const handleToggleGuideStep = (stageKey: string, idx: number) => {
