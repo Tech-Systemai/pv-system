@@ -120,7 +120,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'Collect the required payment (either partial or full)',
       'Log the payment in the CRM',
       'Log the payment in the portal',
-      'Log the payment in collection to earn your commission',
+      'Log the payment in the collecting payments section to earn your commission',
     ],
   },
   waiting_sendback_tracking: {
@@ -152,6 +152,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'Call the customer and let them know their veneers are now in production',
       'Update the CRM to reflect that the order is in production',
       'Collect another $199.99 payment (partial or full)',
+      'Log the payment in the collecting payments section to earn your commission',
     ],
   },
   quality_check: {
@@ -162,6 +163,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     summary: 'Collect 100% of the veneers payment. The veneers can ship once the balance is at least 90% collected — that earns the “Ready to be shipped” stamp.',
     steps: [
       'Collect 100% of the veneers payment — that is the goal',
+      'Log the payment in the collecting payments section to earn your commission',
       'If the customer refuses and the balance is under 90%, you cannot ship the veneers — schedule another day to collect the payment',
       'At 90%+ the case earns the “Ready to be shipped” stamp and the “Create veneers label” button unlocks',
       'Once payment is in, click “Create veneers label” to send the veneers to Shippo',
