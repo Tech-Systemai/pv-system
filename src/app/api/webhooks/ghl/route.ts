@@ -74,6 +74,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing ghl_contact_id' }, { status: 400 });
   }
 
+  // GHL includes the sub-account (location) id in the payload. Capture it so the
+  // portal can deep-link "Go to CRM" to the right location without any manual env
+  // config — it's the same for every contact, so we just keep the latest.
+  const ghlLocationId = pick(
+    src, 'location_id', 'locationId',
+  ) || pick(typeof body?.location === 'object' ? body.location : {}, 'id', 'location_id', 'locationId');
+
   const first = pick(src, 'first_name', 'firstName', 'First Name');
   const last  = pick(src, 'last_name', 'lastName', 'Last Name');
   const customerName = [first, last].filter(Boolean).join(' ').trim()
@@ -122,6 +129,18 @@ export async function POST(req: NextRequest) {
   };
 
   const admin = createAdminClient();
+
+  // Persist the location id (best-effort) so the "Go to CRM" deep-link works.
+  if (ghlLocationId) {
+    try {
+      await admin.from('global_settings').upsert(
+        { key: 'ghl_location_id', value: { id: ghlLocationId } },
+        { onConflict: 'key' },
+      );
+    } catch (e) {
+      console.warn('Could not store ghl_location_id:', e);
+    }
+  }
 
   try {
     const { data: existing, error: selErr } = await admin

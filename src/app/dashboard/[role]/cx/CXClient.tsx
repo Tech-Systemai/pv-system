@@ -256,10 +256,11 @@ function fmtEta(iso: string) {
    NEXT_PUBLIC_GHL_LOCATION_ID and NEXT_PUBLIC_GHL_BASE_URL. */
 const GHL_BASE = process.env.NEXT_PUBLIC_GHL_BASE_URL || 'https://app.gohighlevel.com';
 const GHL_LOCATION_ID = process.env.NEXT_PUBLIC_GHL_LOCATION_ID || '';
-function ghlContactUrl(contactId: string) {
+function ghlContactUrl(contactId: string, locationId?: string) {
   if (!contactId) return '';
-  return GHL_LOCATION_ID
-    ? `${GHL_BASE}/v2/location/${GHL_LOCATION_ID}/contacts/detail/${contactId}`
+  const loc = locationId || GHL_LOCATION_ID;
+  return loc
+    ? `${GHL_BASE}/v2/location/${loc}/contacts/detail/${contactId}`
     : `${GHL_BASE}/contacts/detail/${contactId}`;
 }
 
@@ -344,11 +345,12 @@ const EMPTY_FORM = {
 /* ── Component ───────────────────────────────────────────────── */
 export default function CXClient({
   initialCases, initialUpdates, allProfiles,
-  userRole, currentUserId, currentUserName, savedPipelineStages,
+  userRole, currentUserId, currentUserName, savedPipelineStages, ghlLocationId = '',
 }: {
   initialCases: any[]; initialUpdates: any[]; allProfiles: any[];
   userRole: string; currentUserId: string; currentUserName: string;
   savedPipelineStages: string[] | null;
+  ghlLocationId?: string;
 }) {
   const [cases,   setCases]   = useState(initialCases);
   const [updates, setUpdates] = useState(initialUpdates);
@@ -1417,7 +1419,7 @@ export default function CXClient({
             {/* Referral / Push-to-customer actions */}
             <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               {selectedCase.ghl_contact_id && (
-                <a href={ghlContactUrl(selectedCase.ghl_contact_id)} target="_blank" rel="noopener noreferrer"
+                <a href={ghlContactUrl(selectedCase.ghl_contact_id, ghlLocationId)} target="_blank" rel="noopener noreferrer"
                   className="btn btn-sec btn-sm" title="Open this contact in GoHighLevel"
                   style={{ display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
                   🔗 Go to CRM
