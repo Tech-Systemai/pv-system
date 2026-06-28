@@ -1465,6 +1465,18 @@ export default function CXClient({
                   );
                 })}
               </div>
+              {curKey === 'imp_kit_sent' && (
+                <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Impression Kit ETA — when will the kit arrive at the customer?</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <input type="date" value={selectedCase.imp_kit_eta_date ?? ''} onChange={e => patchCase({ imp_kit_eta_date: e.target.value || null })}
+                      className="fld-input" style={{ height: 34, width: 180, fontSize: 13 }} />
+                    {selectedCase.imp_kit_eta_date
+                      ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.44 0.15 200)' }}>📬 {fmtEta(selectedCase.imp_kit_eta_date)}</span>
+                      : <span style={{ fontSize: 12, color: 'var(--ink-5)' }}>Enter the estimated delivery date — the day of the week fills in automatically</span>}
+                  </div>
+                </div>
+              )}
               {curKey === 'imp_kit_on_way_to_lab' && (
                 <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Lab ETA — when will the kit arrive at the lab?</div>
