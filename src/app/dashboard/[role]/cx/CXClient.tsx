@@ -170,6 +170,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   shipping_veneers: {
     summary: 'Buy the veneers label in Shippo and get the tracking number ready.',
     steps: [
+      'Create the veneers label — click the “Create veneers label” button below',
       'In Shippo, go to Orders and select “Buy the label”',
       'The label does not need a return address',
       'Choose the cheapest USPS option',
@@ -1634,6 +1635,17 @@ export default function CXClient({
                       ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.44 0.15 300)' }}>🧪 {fmtEta(selectedCase.lab_eta_date)} · now in the Lab tab</span>
                       : <span style={{ fontSize: 12, color: 'var(--ink-5)' }}>Pick the date the kit will reach the lab — that adds the customer to the Lab tab</span>}
                   </div>
+                </div>
+              )}
+              {curKey === 'shipping_veneers' && (
+                <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Create the veneers label</div>
+                  <button className="btn btn-acc btn-sm" onClick={() => openLabel('veneers')} disabled={creatingLabel || !veneersReady}
+                    title={veneersReady ? 'Send the veneers to Shippo' : 'Collect at least 90% of the veneers payment first'}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, opacity: veneersReady ? 1 : 0.55 }}>
+                    {creatingLabel ? 'Sending…' : '🦷 Create veneers label'}
+                  </button>
+                  {!veneersReady && <span style={{ fontSize: 12, color: 'var(--ink-5)', marginLeft: 10 }}>Collect at least 90% of the veneers payment first to unlock this.</span>}
                 </div>
               )}
               {(curKey === 'veneers_shipped' || curKey === 'veneers_delivered') && (
