@@ -37,6 +37,7 @@ const PIPELINE_STAGES = [
   { key: 'imp_kit_on_way_to_lab',        label: 'IMP kit on the way to lab' },
   { key: 'received_imp_kit_at_lab',      label: 'Received IMP kit at lab' },
   { key: 'in_production',               label: 'In production' },
+  { key: 'collect_payment_production',  label: 'Collect partial / full payment' },
   { key: 'quality_check',               label: 'Quality check' },
   { key: 'collect_full_payment_veneers', label: 'Collect full payment for veneers' },
   { key: 'veneers_shipped',             label: 'Veneers shipped' },
@@ -46,7 +47,7 @@ const PIPELINE_STAGES = [
 const STAGE_GROUPS = [
   { label: 'IMPRESSIONS',      keys: ['new_order', 'imp_kit_sent', 'imp_kit_delivered', 'pre_imp_appointment', 'imp_appointment_done'] },
   { label: 'PAYMENT & RETURN', keys: ['collect_payment', 'waiting_sendback_tracking', 'imp_kit_on_way_to_lab', 'received_imp_kit_at_lab'] },
-  { label: 'PRODUCTION',       keys: ['in_production', 'quality_check', 'collect_full_payment_veneers'] },
+  { label: 'PRODUCTION',       keys: ['in_production', 'collect_payment_production', 'quality_check', 'collect_full_payment_veneers'] },
   { label: 'DELIVERY & AFTER', keys: ['veneers_shipped', 'veneers_delivered', 'completed_no_issues'] },
 ];
 /* Per-stage agent guide. `summary` is the blue banner blurb; `steps` are the
@@ -143,6 +144,14 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   in_production: {
     summary: 'Veneers are being produced. Keep the customer informed.',
     steps: ['Confirm production has started', 'Give the customer a production timeline', 'Set a mid-production follow-up'],
+  },
+  collect_payment_production: {
+    summary: 'Veneers are in production — let the customer know, update the CRM, and collect another $199.99 payment.',
+    steps: [
+      'Call the customer and let them know their veneers are now in production',
+      'Update the CRM to reflect that the order is in production',
+      'Collect another $199.99 payment (partial or full)',
+    ],
   },
   quality_check: {
     summary: 'Quality check in progress before shipping.',
@@ -600,7 +609,13 @@ export default function CXClient({
       const keep = new Set(PIPELINE_STAGES.slice(0, idx).map(s => s.key));
       newDone = done.filter(k => keep.has(k));
     } else {
-      newDone = PIPELINE_STAGES.slice(0, idx + 1).map(s => s.key);
+      // Completing an agent stage also releases any lab steps already checked that
+      // were gated behind it (e.g. Quality check marked while the card was held at
+      // the mid-production payment stage), keeping stages_done a contiguous prefix.
+      const labSteps: string[] = Array.isArray(selectedCase.lab_steps) ? selectedCase.lab_steps : [];
+      const labIdxs = labSteps.filter(s => LAB_STAGE_MAP[s]).map(s => PIPELINE_STAGES.findIndex(x => x.key === LAB_STAGE_MAP[s]));
+      const upto = Math.max(idx, ...(labIdxs.length ? labIdxs : [-1]));
+      newDone = PIPELINE_STAGES.slice(0, upto + 1).map(s => s.key);
     }
     const payload = { stages_done: newDone, updated_at: new Date().toISOString() };
     await dbOp('cx_cases', 'update', payload, { id: selectedCase.id });
@@ -700,7 +715,17 @@ export default function CXClient({
       .filter(s => LAB_STAGE_MAP[s])
       .map(s => PIPELINE_STAGES.findIndex(x => x.key === LAB_STAGE_MAP[s]));
     const furthest = checkedIdxs.length ? Math.max(...checkedIdxs) : -1;
-    const targetIdx = Math.max(floorIdx, furthest);
+    let targetIdx = Math.max(floorIdx, furthest);
+    // collect_payment_production is an agent-driven payment stage that sits between
+    // In production and Quality check. The lab must NOT jump the card past it: until
+    // the agent has collected that payment, cap lab progress just before it. The lab
+    // checkmarks are still recorded in lab_steps, so completing the payment later
+    // releases them (see handleToggleStage, which extends to the lab's furthest step).
+    const prevDone: string[] = Array.isArray(c.stages_done) ? c.stages_done : [];
+    const payIdx = PIPELINE_STAGES.findIndex(s => s.key === 'collect_payment_production');
+    if (payIdx !== -1 && targetIdx >= payIdx && !prevDone.includes('collect_payment_production')) {
+      targetIdx = payIdx - 1;
+    }
     const newDone = PIPELINE_STAGES.slice(0, targetIdx + 1).map(s => s.key);
     return patchAnyCase(c.id, { lab_steps: next, stages_done: newDone });
   };
