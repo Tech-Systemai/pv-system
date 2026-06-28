@@ -40,6 +40,7 @@ const PIPELINE_STAGES = [
   { key: 'collect_payment_production',  label: 'Collect partial / full payment' },
   { key: 'quality_check',               label: 'Quality check' },
   { key: 'collect_full_payment_veneers', label: 'Collect full payment for veneers' },
+  { key: 'shipping_veneers',            label: 'Shipping the Veneers' },
   { key: 'veneers_shipped',             label: 'Veneers shipped' },
   { key: 'veneers_delivered',           label: 'Veneers delivered' },
   { key: 'completed_no_issues',         label: 'Completed' },
@@ -48,7 +49,7 @@ const STAGE_GROUPS = [
   { label: 'IMPRESSIONS',      keys: ['new_order', 'imp_kit_sent', 'imp_kit_delivered', 'pre_imp_appointment', 'imp_appointment_done'] },
   { label: 'PAYMENT & RETURN', keys: ['collect_payment', 'waiting_sendback_tracking', 'imp_kit_on_way_to_lab', 'received_imp_kit_at_lab'] },
   { label: 'PRODUCTION',       keys: ['in_production', 'collect_payment_production', 'quality_check', 'collect_full_payment_veneers'] },
-  { label: 'DELIVERY & AFTER', keys: ['veneers_shipped', 'veneers_delivered', 'completed_no_issues'] },
+  { label: 'DELIVERY & AFTER', keys: ['shipping_veneers', 'veneers_shipped', 'veneers_delivered', 'completed_no_issues'] },
 ];
 /* Per-stage agent guide. `summary` is the blue banner blurb; `steps` are the
    checklist items an agent ticks off ("mark yes") as they complete each one.
@@ -166,14 +167,19 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'Once payment is in, click “Create veneers label” to send the veneers to Shippo',
     ],
   },
-  veneers_shipped: {
-    summary: 'Buy the veneers label in Shippo, then paste the tracking number into the CRM — that auto-sends the shipped notification to the customer.',
+  shipping_veneers: {
+    summary: 'Buy the veneers label in Shippo and get the tracking number ready.',
     steps: [
       'In Shippo, go to Orders and select “Buy the label”',
       'The label does not need a return address',
       'Choose the cheapest USPS option',
-      'The tracking number shows up in the portal — copy it and paste it into the CRM',
-      'Pasting the tracking number automatically sends the “veneers shipped” notification to the customer — no manual message needed',
+      'The tracking number shows up in the portal — copy it',
+    ],
+  },
+  veneers_shipped: {
+    summary: 'Mark the veneers as shipped in the CRM and record the tracking number.',
+    steps: [
+      'Update the CRM to “Veneers shipped” and update the tracking number for the veneers — pasting the tracking number automatically sends the “veneers shipped” notification to the customer, no manual message needed',
     ],
   },
   veneers_delivered: {
