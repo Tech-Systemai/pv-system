@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
   const from = fromAddress();
   if ('error' in from) return NextResponse.json({ error: from.error }, { status: 500 });
 
-  let body: { to?: Address; parcel?: Parcel; order_number?: string; item_title?: string; case_id?: string };
+  let body: { to?: Address; parcel?: Parcel; order_number?: string; item_title?: string; case_id?: string; kind?: string };
   try {
     body = await req.json();
   } catch {
@@ -104,7 +104,11 @@ export async function POST(req: NextRequest) {
   const itemTitle = String(body.item_title || '').trim() || 'Pioneers Veneers order';
   // Stamp the case id into metadata so the webhook can match the purchased
   // label back to this exact case (Shippo echoes metadata into the transaction).
+  // Also tag the label kind (imp_kit / veneers) so the portal can split the
+  // "Labels Ready" tab by type.
+  const kind = ['imp_kit', 'veneers'].includes(String(body.kind)) ? String(body.kind) : '';
   const caseTag = body.case_id ? `cx_case:${body.case_id}` : '';
+  const metaTag = [caseTag, kind ? `kind:${kind}` : ''].filter(Boolean).join(' ');
 
   try {
     // Create a Shippo ORDER (not a bare shipment) so it shows in the "Orders"
@@ -133,8 +137,8 @@ export async function POST(req: NextRequest) {
       shipping_cost: '0.00',
       shipping_cost_currency: 'USD',
       total_tax: '0.00',
-      metadata: caseTag || undefined,
-      notes: `${caseTag ? caseTag + ' · ' : ''}Parcel: ${parcel.length} x ${parcel.width} x ${parcel.height} in, ${parcel.weight} oz`,
+      metadata: metaTag || undefined,
+      notes: `${metaTag ? metaTag + ' · ' : ''}Parcel: ${parcel.length} x ${parcel.width} x ${parcel.height} in, ${parcel.weight} oz`,
     }, token);
 
     if (!order.ok || !order.json?.object_id) {

@@ -320,6 +320,8 @@ export default function CXClient({
   const [showReferralAdd, setShowReferralAdd] = useState(false);
   const [referralDraft, setReferralDraft] = useState({ name: '', phone: '' });
   const [paymentInput, setPaymentInput] = useState('');
+  // Labels Ready category filter: all / impression kit / veneers.
+  const [labelKind, setLabelKind] = useState<'all' | 'imp_kit' | 'veneers'>('all');
 
   const [form,      setForm]      = useState({ ...EMPTY_FORM });
   const [updateText, setUpdateText] = useState('');
@@ -729,7 +731,7 @@ export default function CXClient({
   /* Push the confirmed to-address + parcel to Shippo as an ORDER. This does NOT
      buy a label — it makes the order appear in the Shippo "Orders" tab with
      rates and a "Buy" button, where the team purchases it. */
-  const handleCreateLabel = async (to: Record<string, any>, parcel: Record<string, number>) => {
+  const handleCreateLabel = async (to: Record<string, any>, parcel: Record<string, number>, kind?: string) => {
     if (!selectedCase) return null;
     setCreatingLabel(true);
     try {
@@ -737,10 +739,10 @@ export default function CXClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to, parcel,
+          to, parcel, kind,
           case_id: selectedCase.id,
           order_number: selectedCase.order_number || `CX-${selectedCase.id}`,
-          item_title: selectedCase.veneer_set ? `Veneers — ${selectedCase.veneer_set}` : 'Impression kit',
+          item_title: kind === 'veneers' ? (selectedCase.veneer_set ? `Veneers — ${selectedCase.veneer_set}` : 'Veneers') : 'Impression kit',
         }),
       });
       const json = await res.json();
@@ -1909,6 +1911,17 @@ export default function CXClient({
 
   /* ── Main render ────────────────────────────────────────────── */
   /* ── Labels-ready-to-print panel ────────────────────────────── */
+  // Split labels by what's being shipped. Untagged (legacy/manual) labels fall
+  // under Impression kit so nothing is hidden.
+  const labelKindOf = (e: any) => (e?.kind === 'veneers' ? 'veneers' : 'imp_kit');
+  const impLabelCount = labelItems.filter(li => labelKindOf(li.entry) === 'imp_kit').length;
+  const venLabelCount = labelItems.filter(li => labelKindOf(li.entry) === 'veneers').length;
+  const shownLabels = labelItems.filter(li => labelKind === 'all' || labelKindOf(li.entry) === labelKind);
+  const labelTabs: { key: 'all' | 'imp_kit' | 'veneers'; label: string; count: number }[] = [
+    { key: 'all',     label: 'All',                count: labelItems.length },
+    { key: 'imp_kit', label: '🦷 Impression kit',  count: impLabelCount },
+    { key: 'veneers', label: '😁 Veneers',         count: venLabelCount },
+  ];
   const labelsView = (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
@@ -1922,25 +1935,44 @@ export default function CXClient({
         </div>
         {labelsReadyCount > 0 && <button className="btn btn-acc" disabled={printingAll} onClick={printAllLabels}>{printingAll ? 'Building…' : `🖨 Print all (${labelsReadyCount})`}</button>}
       </div>
+      {/* Category filter */}
+      <div style={{ display: 'flex', gap: 6, padding: '10px 18px', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}>
+        {labelTabs.map(t => (
+          <button key={t.key} onClick={() => setLabelKind(t.key)}
+            style={{ padding: '5px 13px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              border: `1px solid ${labelKind === t.key ? 'oklch(0.50 0.15 170)' : 'var(--line)'}`,
+              background: labelKind === t.key ? 'oklch(0.50 0.15 170)' : 'white',
+              color: labelKind === t.key ? 'white' : 'var(--ink-3)' }}>
+            {t.label} · {t.count}
+          </button>
+        ))}
+      </div>
       <div>
-        {labelItems.length === 0 && (
+        {shownLabels.length === 0 && (
           <div style={{ padding: '44px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-            No shipping labels yet. When a label is bought in Shippo, the customer shows up here ready to print.
+            {labelItems.length === 0
+              ? 'No shipping labels yet. When a label is bought in Shippo, the customer shows up here ready to print.'
+              : `No ${labelKind === 'veneers' ? 'veneers' : labelKind === 'imp_kit' ? 'impression kit' : ''} labels in this category.`}
           </div>
         )}
-        {labelItems.map((li, i) => {
+        {shownLabels.map((li, i) => {
           const printed = !!li.entry.printed;
           return (
-            <div key={li.entry.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: i < labelItems.length - 1 ? '1px solid var(--line-2)' : 'none', background: printed ? 'oklch(0.98 0.02 145)' : 'white' }}>
+            <div key={li.entry.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: i < shownLabels.length - 1 ? '1px solid var(--line-2)' : 'none', background: printed ? 'oklch(0.98 0.02 145)' : 'white' }}>
               <div style={{ width: 34, height: 34, borderRadius: '50%', background: printed ? 'oklch(0.55 0.15 145)' : sColor(li.c.status), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {printed ? '✓' : initials(li.c.customer_name)}
               </div>
               <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(li.c); markCaseRead(li.c.id); }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{li.c.customer_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-4)', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 1 }}>
-                  {li.c.order_number && <span>Order #{li.c.order_number}</span>}
-                  {li.entry.label && <span>{li.entry.label}</span>}
-                  {li.entry.number && <span style={{ fontFamily: 'monospace' }}>{li.entry.number}</span>}
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {li.c.customer_name}
+                  <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 7px', borderRadius: 20, background: labelKindOf(li.entry) === 'veneers' ? 'oklch(0.93 0.05 80)' : 'oklch(0.93 0.05 200)', color: labelKindOf(li.entry) === 'veneers' ? 'oklch(0.40 0.15 80)' : 'oklch(0.40 0.14 200)' }}>
+                    {labelKindOf(li.entry) === 'veneers' ? 'Veneers' : 'Imp. kit'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-4)', display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                  <span>📦 Order #{li.c.order_number || '—'}</span>
+                  <span>📞 {li.c.phone || '—'}</span>
+                  {li.entry.number && <span style={{ fontFamily: 'monospace' }}>🚚 {li.entry.number}</span>}
                 </div>
               </div>
               {printed ? (
@@ -2231,7 +2263,7 @@ function AddColumnModal({ onConfirm, onClose }: { onConfirm: (name: string) => v
 /* ── Create shipping label modal (Shippo) ───────────────────────── */
 function CreateLabelModal({ caseData, creating, onCreate, onClose, defaultPresetKey }: {
   caseData: any; creating: boolean;
-  onCreate: (to: Record<string, any>, parcel: Record<string, number>) => Promise<any>;
+  onCreate: (to: Record<string, any>, parcel: Record<string, number>, kind?: string) => Promise<any>;
   onClose: () => void;
   defaultPresetKey?: string;
 }) {
@@ -2261,8 +2293,11 @@ function CreateLabelModal({ caseData, creating, onCreate, onClose, defaultPreset
   const canSubmit = to.street1.trim() && to.city.trim() && to.state.trim() && to.zip.trim()
     && parcel.length > 0 && parcel.width > 0 && parcel.height > 0 && parcel.weight > 0;
 
+  // Tag the label by what's being shipped so the Labels Ready tab can split them.
+  const kind = presetKey === 'veneers' ? 'veneers' : presetKey.startsWith('imp_kit') ? 'imp_kit' : undefined;
+
   const submit = async () => {
-    const res = await onCreate(to, parcel);
+    const res = await onCreate(to, parcel, kind);
     if (res) setDone(res);
   };
 

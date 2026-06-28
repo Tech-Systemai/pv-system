@@ -102,6 +102,10 @@ export async function POST(req: NextRequest) {
 
   const caseIdMatch = metadata.match(/cx_case:(\S+)/);
   const caseId = caseIdMatch ? caseIdMatch[1] : '';
+  // Label kind (imp_kit / veneers) stamped at order creation — lets the portal
+  // split the "Labels Ready" tab by type.
+  const kindMatch = metadata.match(/kind:(\w+)/);
+  const kind = kindMatch ? kindMatch[1] : '';
 
   const admin = createAdminClient();
   try {
@@ -134,6 +138,7 @@ export async function POST(req: NextRequest) {
       number: trackingNumber,
       label_url: labelUrl,
       tracking_url: trackingUrl,
+      kind: kind || null,
       auto: true,
     };
     const { error } = await admin
