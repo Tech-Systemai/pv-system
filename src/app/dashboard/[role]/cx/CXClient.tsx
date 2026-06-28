@@ -247,6 +247,26 @@ function shipStampFor(c: any): 'READY TO BE SHIPPED' | 'VENEERS SHIPPED' | 'DELI
   const shipped = done.includes('veneers_shipped') || !!eta;
   return delivered ? 'DELIVERED' : shipped ? 'VENEERS SHIPPED' : pct >= 90 ? 'READY TO BE SHIPPED' : null;
 }
+/* Human label for a tracking_log entry. `label_type` (set by hand) wins; otherwise
+   we derive from the Shippo tags (kind + is_return); legacy entries fall back to
+   the carrier text. */
+const TRACK_TYPE_LABEL: Record<string, string> = {
+  imp_send:   'Impression kit: send to customer label',
+  imp_return: 'Impression kit: return label',
+  veneers:    'Veneers label',
+};
+const TRACK_TYPE_OPTIONS = [
+  { key: 'imp_send',   short: 'Imp → customer' },
+  { key: 'imp_return', short: 'Imp return' },
+  { key: 'veneers',    short: 'Veneers' },
+];
+function trackingLabel(e: any): string {
+  if (e?.label_type && TRACK_TYPE_LABEL[e.label_type]) return TRACK_TYPE_LABEL[e.label_type];
+  if (e?.kind === 'veneers') return TRACK_TYPE_LABEL.veneers;
+  if (e?.kind === 'imp_kit') return e?.is_return ? TRACK_TYPE_LABEL.imp_return : TRACK_TYPE_LABEL.imp_send;
+  return e?.label || 'Shipping label';
+}
+
 const STAMP_STYLE: Record<string, { bg: string; color: string; border: string; icon: string }> = {
   'READY TO BE SHIPPED': { bg: 'oklch(0.93 0.06 145)', color: 'oklch(0.34 0.16 145)', border: 'oklch(0.78 0.10 145)', icon: '✓' },
   'VENEERS SHIPPED':     { bg: 'oklch(0.93 0.06 230)', color: 'oklch(0.36 0.16 230)', border: 'oklch(0.78 0.10 230)', icon: '🚚' },
@@ -613,6 +633,11 @@ export default function CXClient({
     const list = (selectedCase?.[field] ?? []).filter((e: any) => e.id !== id);
     patchCase({ [field]: list });
   };
+  // Set/clear a tracking entry's type (send-to-customer / return / veneers).
+  const setTrackingType = (id: string, type: string | null) => {
+    const list = (selectedCase?.tracking_log ?? []).map((e: any) => e.id === id ? { ...e, label_type: type } : e);
+    patchCase({ tracking_log: list });
+  };
 
   /* Patch any case (not just the open one) and keep the list + open modal in sync. */
   const patchAnyCase = async (caseId: number, patch: Record<string, any>) => {
@@ -666,8 +691,7 @@ export default function CXClient({
      open that one tab. The tab is opened synchronously (within the click) so it
      counts as user-initiated; we then point it at the merged PDF once it's built. */
   const [printingAll, setPrintingAll] = useState(false);
-  const printAllLabels = async () => {
-    const items = labelsToPrint;
+  const printAllLabels = async (items: typeof labelsToPrint = labelsToPrint) => {
     const urls = items.map(li => li.entry.label_url).filter(Boolean);
     if (urls.length === 0 || printingAll) return;
     const win = window.open('', '_blank'); // sync → not blocked
@@ -1715,7 +1739,8 @@ export default function CXClient({
               placeholder="Internal lab / production note…" addLabel="Add"
               onAdd={text => addLogEntry('lab_notes_log', { text })} onRemove={id => removeLogEntry('lab_notes_log', id)} />
             <TrackingCard entries={selectedCase.tracking_log ?? []} nameMap={nameMap}
-              onAdd={(label, number) => addLogEntry('tracking_log', { label, number })} onRemove={id => removeLogEntry('tracking_log', id)} />
+              onAdd={(label, number) => addLogEntry('tracking_log', { label, number })} onRemove={id => removeLogEntry('tracking_log', id)}
+              onSetType={setTrackingType} />
             <LogCard title="Remakes" icon="↻" hue={300} entries={selectedCase.remakes_log ?? []} nameMap={nameMap}
               placeholder="Reason for the remake…" addLabel="Log remake"
               onAdd={text => addLogEntry('remakes_log', { text })} onRemove={id => removeLogEntry('remakes_log', id)} />
@@ -1917,6 +1942,8 @@ export default function CXClient({
   const impLabelCount = labelItems.filter(li => labelKindOf(li.entry) === 'imp_kit').length;
   const venLabelCount = labelItems.filter(li => labelKindOf(li.entry) === 'veneers').length;
   const shownLabels = labelItems.filter(li => labelKind === 'all' || labelKindOf(li.entry) === labelKind);
+  const shownToPrint = shownLabels.filter(li => !li.entry.printed);
+  const printAllLabel = labelKind === 'imp_kit' ? 'Print All Impression Kit' : labelKind === 'veneers' ? 'Print All Veneers' : 'Print All';
   const labelTabs: { key: 'all' | 'imp_kit' | 'veneers'; label: string; count: number }[] = [
     { key: 'all',     label: 'All',                count: labelItems.length },
     { key: 'imp_kit', label: '🦷 Impression kit',  count: impLabelCount },
@@ -1933,7 +1960,7 @@ export default function CXClient({
               : `${labelsReadyCount} label${labelsReadyCount !== 1 ? 's' : ''} ready · hit Print, then it’s checked off.`}
           </div>
         </div>
-        {labelsReadyCount > 0 && <button className="btn btn-acc" disabled={printingAll} onClick={printAllLabels}>{printingAll ? 'Building…' : `🖨 Print all (${labelsReadyCount})`}</button>}
+        {shownToPrint.length > 0 && <button className="btn btn-acc" disabled={printingAll} onClick={() => printAllLabels(shownToPrint)}>{printingAll ? 'Building…' : `🖨 ${printAllLabel} (${shownToPrint.length})`}</button>}
       </div>
       {/* Category filter */}
       <div style={{ display: 'flex', gap: 6, padding: '10px 18px', borderBottom: '1px solid var(--line)', background: 'var(--surface-2)' }}>
@@ -2191,9 +2218,10 @@ function LogCard({ title, icon, hue, entries, nameMap, placeholder, addLabel, on
 }
 
 /* ── Tracking log card (label + number) ─────────────────────────── */
-function TrackingCard({ entries, nameMap, onAdd, onRemove, onCreateLabel }: {
+function TrackingCard({ entries, nameMap, onAdd, onRemove, onCreateLabel, onSetType }: {
   entries: any[]; nameMap: Record<string, string>; onAdd: (label: string, number: string) => void; onRemove: (id: string) => void;
   onCreateLabel?: () => void;
+  onSetType?: (id: string, type: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
@@ -2228,7 +2256,7 @@ function TrackingCard({ entries, nameMap, onAdd, onRemove, onCreateLabel }: {
         {entries.map((e: any) => (
           <div key={e.id} style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 8, marginTop: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'white', border: '1px solid var(--line)', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{e.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'white', border: '1px solid var(--line)', color: 'var(--ink-3)' }}>{trackingLabel(e)}</span>
               <span style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--ink)' }}>{e.number}</span>
               <button onClick={() => onRemove(e.id)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--ink-5)', cursor: 'pointer', fontSize: 12 }}>✕</button>
             </div>
@@ -2238,6 +2266,26 @@ function TrackingCard({ entries, nameMap, onAdd, onRemove, onCreateLabel }: {
                 {e.tracking_url && <a href={e.tracking_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.50 0.16 145)' }}>📦 Track</a>}
               </div>
             )}
+            {onSetType && (() => {
+              const eff = e.label_type || (e.kind === 'veneers' ? 'veneers' : e.kind === 'imp_kit' ? (e.is_return ? 'imp_return' : 'imp_send') : null);
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 10, color: 'var(--ink-5)', marginRight: 2 }}>Type:</span>
+                  {TRACK_TYPE_OPTIONS.map(opt => {
+                    const active = eff === opt.key;
+                    return (
+                      <button key={opt.key} onClick={() => onSetType(e.id, active ? null : opt.key)} title={TRACK_TYPE_LABEL[opt.key]}
+                        style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, cursor: 'pointer',
+                          border: `1px solid ${active ? 'oklch(0.50 0.16 220)' : 'var(--line)'}`,
+                          background: active ? 'oklch(0.50 0.16 220)' : 'white',
+                          color: active ? 'white' : 'var(--ink-4)' }}>
+                        {opt.short}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
             <div style={{ fontSize: 10, color: 'var(--ink-5)', marginTop: 4 }}>{e.date} · {nameMap[e.by]?.split(' ')[0] ?? 'Unknown'}</div>
           </div>
         ))}
