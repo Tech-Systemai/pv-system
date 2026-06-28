@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { dbOp } from '@/utils/db';
+import { createClient } from '@/utils/supabase/client';
 
 /* ── Constants ───────────────────────────────────────────────── */
 // The pipeline stage select lists every stage a case moves through, in order —
@@ -98,6 +99,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'Keep your camera on so you can visualize everything for the customer',
       'Customers can send photos during the meeting: there is a message icon on the top right they click, then attach an image from the clip mark at the bottom right — from there they take the impression, get the photo, and send it to us',
       'Collect the payment right away, in the same meeting, once they finish the Impression Kit appointment. Recommended amount to charge is $199.99 — deliver the best Impression Kit service first, then collect the money that needs to be collected',
+      'Once you are done with the appointment, upload the recording in the Recording Upload section below (owners and admins can review every recording under Recording Uploads)',
     ],
   },
   imp_appointment_done: {
@@ -353,6 +355,7 @@ export default function CXClient({
   // The Lab tab is limited to owners, admins, and dentists.
   const canViewLab     = ['owner', 'admin', 'dentist'].includes(userRole);
   const today   = todayStr();
+  const supabase = createClient();
 
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));
   const todayUpdatedIds = new Set(updates.filter((u: any) => u.update_date === today).map((u: any) => u.case_id));
@@ -620,6 +623,30 @@ export default function CXClient({
 
   const newEntryId = () =>
     (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.round(Math.random() * 1e6);
+
+  /* Upload an appointment recording → Supabase storage, then append it to the
+     case's recording_uploads array (owners/admins see them in Recording Uploads). */
+  const recInputRef = useRef<HTMLInputElement>(null);
+  const [recUploading, setRecUploading] = useState(false);
+  const handleRecordingSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCase) return;
+    setRecUploading(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'mp4';
+      const path = `cx-recordings/${selectedCase.id}/${newEntryId()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('employee-docs').upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from('employee-docs').getPublicUrl(path);
+      const list = selectedCase.recording_uploads ?? [];
+      await patchCase({ recording_uploads: [{ id: newEntryId(), url: publicUrl, file_name: file.name, by: currentUserId, date: today }, ...list] });
+    } catch (err: any) {
+      alert('Upload failed: ' + (err?.message ?? 'Unknown error'));
+    } finally {
+      setRecUploading(false);
+      if (recInputRef.current) recInputRef.current.value = '';
+    }
+  };
 
   const addLogEntry = (field: string, entry: Record<string, any>) => {
     const list = selectedCase?.[field] ?? [];
@@ -1481,6 +1508,26 @@ export default function CXClient({
                       textDecoration: 'none', cursor: 'pointer', background: 'oklch(0.50 0.16 260)', color: 'white', border: 'none' }}>
                     🎥 Create meeting
                   </a>
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Recording Upload — upload the appointment recording when you finish</div>
+                    <input ref={recInputRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleRecordingSelected} />
+                    <button onClick={() => recInputRef.current?.click()} disabled={recUploading}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                        cursor: recUploading ? 'default' : 'pointer', background: recUploading ? 'var(--line)' : 'oklch(0.50 0.16 200)', color: 'white', border: 'none' }}>
+                      {recUploading ? 'Uploading…' : '⬆ Upload recording'}
+                    </button>
+                    {(selectedCase.recording_uploads ?? []).length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                        {(selectedCase.recording_uploads ?? []).map((r: any) => (
+                          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                            <span>🎬</span>
+                            <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: 'oklch(0.45 0.16 200)', fontWeight: 600, textDecoration: 'none' }}>{r.file_name || 'Recording'}</a>
+                            <span style={{ color: 'var(--ink-5)' }}>· {nameMap[r.by] || 'Agent'} · {r.date}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {curKey === 'imp_kit_sent' && (
