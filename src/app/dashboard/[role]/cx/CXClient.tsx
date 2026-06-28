@@ -599,6 +599,9 @@ export default function CXClient({
 
   const handleToggleStage = async (stageKey: string) => {
     if (!selectedCase) return;
+    // Only admins/owners may move stages by hand (jump ahead or step back). CX agents
+    // progress strictly by answering every guide step — the case then auto-advances.
+    if (!isAdminOrOwner) return;
     // These stages are auto-set from the Lab tab — agents can't toggle them by hand.
     if (LAB_LOCKED_STAGES.has(stageKey)) return;
     const done: string[] = selectedCase.stages_done ?? [];
@@ -805,10 +808,32 @@ export default function CXClient({
   };
 
   const handleToggleGuideStep = (stageKey: string, idx: number) => {
-    const cl: Record<string, number[]> = selectedCase?.stage_checklist ?? {};
+    if (!selectedCase) return;
+    const cl: Record<string, number[]> = selectedCase.stage_checklist ?? {};
     const done = new Set(cl[stageKey] ?? []);
     if (done.has(idx)) done.delete(idx); else done.add(idx);
-    patchCase({ stage_checklist: { ...cl, [stageKey]: [...done] } });
+    const newChecklist = { ...cl, [stageKey]: [...done] };
+
+    // Auto-advance: once every guide step for the CURRENT stage is answered "yes",
+    // the case moves to the next stage on its own. This is the only way CX agents
+    // progress — they can't jump ahead or skip stages, and can't step back.
+    const guide = STAGE_GUIDE[stageKey];
+    const stagesDoneArr: string[] = Array.isArray(selectedCase.stages_done) ? selectedCase.stages_done : [];
+    const isCurrent = PIPELINE_STAGES[stagesDoneArr.length]?.key === stageKey;
+    const allAnswered = !!guide && guide.steps.length > 0 && guide.steps.every((_, i) => done.has(i));
+
+    if (isCurrent && allAnswered && !LAB_LOCKED_STAGES.has(stageKey)) {
+      // Advance, extending to any lab steps already checked so stages_done stays a
+      // contiguous prefix (mirrors handleToggleStage).
+      const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
+      const labSteps: string[] = Array.isArray(selectedCase.lab_steps) ? selectedCase.lab_steps : [];
+      const labIdxs = labSteps.filter(s => LAB_STAGE_MAP[s]).map(s => PIPELINE_STAGES.findIndex(x => x.key === LAB_STAGE_MAP[s]));
+      const upto = Math.max(stageIdx, ...(labIdxs.length ? labIdxs : [-1]));
+      const newDone = PIPELINE_STAGES.slice(0, upto + 1).map(s => s.key);
+      patchCase({ stage_checklist: newChecklist, stages_done: newDone });
+    } else {
+      patchCase({ stage_checklist: newChecklist });
+    }
   };
 
   const [showLabelModal, setShowLabelModal] = useState(false);
@@ -1548,6 +1573,9 @@ export default function CXClient({
                   );
                 })}
               </div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-5)', marginTop: 8 }}>
+                ↑ Answer every step <strong>Yes</strong> and the case moves to the next stage automatically.
+              </div>
               {curKey === 'pre_imp_appointment' && (
                 <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Virtual appointment — create the meeting and send the link to the customer</div>
@@ -1750,11 +1778,14 @@ export default function CXClient({
                       // Lab-controlled stages: set automatically from the Lab tab,
                       // not clickable, shown in red so it's clear they're locked.
                       const locked = LAB_LOCKED_STAGES.has(key);
+                      // CX agents can't move stages by hand — they advance by answering
+                      // the guide. Only admins/owners can jump ahead or step back.
+                      const clickable = isAdminOrOwner && !locked;
                       const ring = locked ? 'oklch(0.55 0.20 25)' : 'oklch(0.50 0.18 260)';
                       return (
-                        <div key={key} onClick={locked ? undefined : () => handleToggleStage(key)}
-                          title={locked ? 'Set automatically from the Lab tab' : undefined}
-                          style={{ display: 'flex', alignItems: 'flex-start', gap: 7, cursor: locked ? 'not-allowed' : 'pointer', padding: '3px 5px', borderRadius: 6,
+                        <div key={key} onClick={clickable ? () => handleToggleStage(key) : undefined}
+                          title={locked ? 'Set automatically from the Lab tab' : !isAdminOrOwner ? 'Stages advance automatically as you complete the guide — only admins/owners can move them manually' : undefined}
+                          style={{ display: 'flex', alignItems: 'flex-start', gap: 7, cursor: clickable ? 'pointer' : 'not-allowed', padding: '3px 5px', borderRadius: 6,
                             background: isCurrent ? (locked ? 'oklch(0.96 0.03 25)' : 'oklch(0.95 0.03 260)') : 'transparent',
                             border: `1px solid ${isCurrent ? (locked ? 'oklch(0.85 0.07 25)' : 'oklch(0.88 0.06 260)') : 'transparent'}` }}>
                           <div style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, marginTop: 1,
