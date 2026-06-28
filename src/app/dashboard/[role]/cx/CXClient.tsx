@@ -234,6 +234,23 @@ function fmtEta(iso: string) {
   if (!y || !m || !d) return String(iso);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 }
+
+/* Shipping/delivery stamp shown on the card + in the modal. Flips Ready (>=90%
+   collected) → Shipped (Veneers shipped stage) → Delivered (on/after the ETA). */
+function shipStampFor(c: any): 'READY TO BE SHIPPED' | 'VENEERS SHIPPED' | 'DELIVERED' | null {
+  const full = Number(c?.full_price) || 0;
+  const collected = Number(c?.amount_collected) || 0;
+  const pct = full > 0 ? (collected / full) * 100 : 0;
+  const done: string[] = Array.isArray(c?.stages_done) ? c.stages_done : [];
+  const shipped = done.includes('veneers_shipped');
+  const delivered = done.includes('veneers_delivered') || (shipped && !!c?.veneers_eta_date && todayStr() >= c.veneers_eta_date);
+  return delivered ? 'DELIVERED' : shipped ? 'VENEERS SHIPPED' : pct >= 90 ? 'READY TO BE SHIPPED' : null;
+}
+const STAMP_STYLE: Record<string, { bg: string; color: string; border: string; icon: string }> = {
+  'READY TO BE SHIPPED': { bg: 'oklch(0.93 0.06 145)', color: 'oklch(0.34 0.16 145)', border: 'oklch(0.78 0.10 145)', icon: '✓' },
+  'VENEERS SHIPPED':     { bg: 'oklch(0.93 0.06 230)', color: 'oklch(0.36 0.16 230)', border: 'oklch(0.78 0.10 230)', icon: '🚚' },
+  'DELIVERED':           { bg: 'oklch(0.90 0.11 145)', color: 'oklch(0.30 0.18 145)', border: 'oklch(0.70 0.15 145)', icon: '📦' },
+};
 function initials(name: string) { return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'; }
 
 /* Shippo parcel presets. Dimensions are inches, weight is ounces. */
@@ -967,7 +984,7 @@ export default function CXClient({
         const fullPrice = Number(c.full_price) || 0;
         const collectedAmt = Number(c.amount_collected) || 0;
         const collectedPct = fullPrice > 0 ? Math.min(100, Math.round((collectedAmt / fullPrice) * 100)) : null;
-        const fullyPaid = fullPrice > 0 && collectedAmt >= fullPrice;
+        const stamp = shipStampFor(c);
         const stagesDoneCount = Array.isArray(c.stages_done) ? c.stages_done.length : 0;
         const stagePct = Math.round((stagesDoneCount / PIPELINE_STAGES.length) * 100);
         return (
@@ -976,9 +993,9 @@ export default function CXClient({
             onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = ''; }}>
             <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-              {fullyPaid ? (
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 10px', borderRadius: 8, color: 'oklch(0.40 0.18 145)', background: 'oklch(0.96 0.05 145)', border: '2px solid oklch(0.55 0.18 145)', transform: 'rotate(4deg)', textTransform: 'uppercase' }}>
-                  ✓ Ready to be shipped
+              {stamp ? (
+                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 10px', borderRadius: 8, color: STAMP_STYLE[stamp].color, background: STAMP_STYLE[stamp].bg, border: `2px solid ${STAMP_STYLE[stamp].color}`, transform: 'rotate(4deg)', textTransform: 'uppercase' }}>
+                  {STAMP_STYLE[stamp].icon} {stamp}
                 </span>
               ) : collectedPct != null && (
                 <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, color: 'oklch(0.38 0.16 145)', background: 'oklch(0.95 0.05 145)', border: '1px solid oklch(0.85 0.07 145)' }}>
@@ -989,7 +1006,7 @@ export default function CXClient({
                 {stagePct}% stage
               </span>
             </div>
-            <div style={{ padding: `14px ${fullyPaid ? 150 : 86}px 10px 16px`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ padding: `14px ${stamp ? 170 : 86}px 10px 16px`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <div style={{ width: 38, height: 38, borderRadius: '50%', background: `oklch(0.50 0.20 ${STATUS_HUE[c.status] ?? 200})`, color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {initials(c.customer_name)}
               </div>
@@ -1217,22 +1234,8 @@ export default function CXClient({
   const veneersPct = vFull > 0 ? (vCollected / vFull) * 100 : 0;
   const veneersReady = veneersPct >= 90;
 
-  // Shipping → delivery stamp lifecycle. The stamp flips Ready → Shipped once the
-  // case reaches the Veneers shipped stage, then → Delivered on/after the entered
-  // delivery ETA (a background effect also moves the case to Veneers delivered).
-  const veneersEta       = selectedCase?.veneers_eta_date || null;
-  const veneersShipped   = stagesDone.includes('veneers_shipped');
-  const veneersDelivered = stagesDone.includes('veneers_delivered')
-    || (veneersShipped && !!veneersEta && todayStr() >= veneersEta);
-  const shipStamp = veneersDelivered ? 'DELIVERED'
-    : veneersShipped ? 'VENEERS SHIPPED'
-    : veneersReady ? 'READY TO BE SHIPPED'
-    : null;
-  const STAMP_STYLE: Record<string, { bg: string; color: string; border: string }> = {
-    'READY TO BE SHIPPED': { bg: 'oklch(0.93 0.06 145)', color: 'oklch(0.34 0.16 145)', border: 'oklch(0.78 0.10 145)' },
-    'VENEERS SHIPPED':     { bg: 'oklch(0.93 0.06 230)', color: 'oklch(0.36 0.16 230)', border: 'oklch(0.78 0.10 230)' },
-    'DELIVERED':           { bg: 'oklch(0.90 0.11 145)', color: 'oklch(0.30 0.18 145)', border: 'oklch(0.70 0.15 145)' },
-  };
+  // Shipping → delivery stamp lifecycle (shared with the outer card).
+  const shipStamp = shipStampFor(selectedCase);
 
   const detailModal = selectedCase && (
     <div className="mb" onClick={e => { if (e.target === e.currentTarget) { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); } }}>
