@@ -63,7 +63,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
       'Select the cheapest USPS option for normal shipping and click Buy (if Fast shipping, check the Fast Shipping SOP)',
       "Once purchased, locate the tracking number under the customer's card in the portal",
       "Click Print under the tracking log and check the name: if it is the customer's name, identify it as Imp to Customer; if it is Pioneers Veneers, identify it as Imp Return",
-      'Update the CRM with the tracking number',
+      'Update the CRM with the tracking number of the Impression Kit sent to the customer, and hold onto the return label until you finish the appointment',
       'Update both the CRM and the portal status to Impression Kit Sent',
     ],
   },
