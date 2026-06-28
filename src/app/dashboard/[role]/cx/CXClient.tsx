@@ -814,23 +814,9 @@ export default function CXClient({
     setUnreadCounts(counts);
   }, []);
 
-  // Auto-advance shipped veneers to "Veneers delivered" once the delivery ETA
-  // arrives. Runs whenever cases load/change; the !already-delivered guard makes
-  // each case advance exactly once, so it converges (no update loop).
-  useEffect(() => {
-    const today = todayStr();
-    const idx = PIPELINE_STAGES.findIndex(s => s.key === 'veneers_delivered');
-    const newDone = PIPELINE_STAGES.slice(0, idx + 1).map(s => s.key);
-    cases.forEach(c => {
-      const done: string[] = Array.isArray(c.stages_done) ? c.stages_done : [];
-      if (c.veneers_eta_date && today >= c.veneers_eta_date && !done.includes('veneers_delivered')) {
-        const payload = { stages_done: newDone, updated_at: new Date().toISOString() };
-        dbOp('cx_cases', 'update', payload, { id: c.id });
-        setCases(prev => prev.map(x => x.id === c.id ? { ...x, ...payload } : x));
-        if (selectedCase?.id === c.id) setSelectedCase((p: any) => ({ ...p, ...payload }));
-      }
-    });
-  }, [cases]);
+  // NOTE: the delivery ETA only drives the *stamp* (see shipStampFor) — it does
+  // NOT auto-check the "Veneers delivered" stage. Agents read that stage's guide
+  // and check it off themselves, and can freely step back to earlier stages.
 
   /* ── Status stat strip ─────────────────────────────────────── */
   const statStrip = (
@@ -1486,8 +1472,8 @@ export default function CXClient({
                     <input type="date" value={selectedCase.veneers_eta_date ?? ''} onChange={e => patchCase({ veneers_eta_date: e.target.value || null })}
                       className="fld-input" style={{ height: 34, width: 180, fontSize: 13 }} />
                     {selectedCase.veneers_eta_date
-                      ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.40 0.16 145)' }}>📦 {fmtEta(selectedCase.veneers_eta_date)} · auto-marks Delivered on this date</span>
-                      : <span style={{ fontSize: 12, color: 'var(--ink-5)' }}>Pick the expected delivery date — the case moves to Veneers delivered automatically when it arrives</span>}
+                      ? <span style={{ fontSize: 13, fontWeight: 700, color: 'oklch(0.40 0.16 145)' }}>📦 {fmtEta(selectedCase.veneers_eta_date)} · stamp flips to Delivered on this date</span>
+                      : <span style={{ fontSize: 12, color: 'var(--ink-5)' }}>Pick the expected delivery date — the stamp flips to Delivered when it arrives (you still check the stage off after reading the guide)</span>}
                   </div>
                 </div>
               )}

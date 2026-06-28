@@ -1,8 +1,9 @@
 -- v77: Veneers delivery ETA.
 --
 -- After the veneers ship, the agent enters the expected delivery date in the
--- "Veneers shipped" stage. When that date arrives the portal auto-advances the
--- case to "Veneers delivered" and the card stamp flips to "Delivered".
+-- "Veneers shipped" stage. When that date arrives the card stamp flips to
+-- "Delivered". (The "Veneers delivered" stage is NOT auto-checked — the agent
+-- reads that stage's guide and checks it off themselves.)
 --
 --   veneers_eta_date — expected delivery date (DATE).
 --
