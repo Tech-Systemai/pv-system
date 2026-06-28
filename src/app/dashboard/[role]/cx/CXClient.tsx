@@ -2223,11 +2223,18 @@ export default function CXClient({
               </div>
             </div>
             {sentUs && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, paddingLeft: 48, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.44 0.16 200)' }}>🇺🇸 US ETA — when it will be back in the U.S.:</span>
-                <input type="date" value={c.lab_us_eta_date ?? ''} onChange={e => patchAnyCase(c.id, { lab_us_eta_date: e.target.value || null })}
-                  className="fld-input" style={{ height: 30, width: 170, fontSize: 12 }} />
-                {c.lab_us_eta_date && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 600 }}>{fmtEta(c.lab_us_eta_date)}</span>}
+              <div style={{ marginTop: 8, paddingLeft: 48, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.44 0.16 200)' }}>🇺🇸 US ETA — when it will be back in the U.S.:</span>
+                  <input type="date" value={c.lab_us_eta_date ?? ''} onChange={e => patchAnyCase(c.id, { lab_us_eta_date: e.target.value || null })}
+                    className="fld-input" style={{ height: 30, width: 170, fontSize: 12 }} />
+                  {c.lab_us_eta_date && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 600 }}>{fmtEta(c.lab_us_eta_date)}</span>}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.44 0.16 200)' }}>🚚 Tracking number:</span>
+                  <input type="text" value={c.lab_us_tracking ?? ''} onChange={e => patchAnyCase(c.id, { lab_us_tracking: e.target.value || null })}
+                    placeholder="Enter tracking #" className="fld-input" style={{ height: 30, width: 220, fontSize: 12, fontFamily: 'var(--mono)' }} />
+                </div>
               </div>
             )}
             {/* Lab notes — written here flow straight onto the customer's live card. */}
