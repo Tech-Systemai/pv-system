@@ -242,8 +242,11 @@ function shipStampFor(c: any): 'READY TO BE SHIPPED' | 'VENEERS SHIPPED' | 'DELI
   const collected = Number(c?.amount_collected) || 0;
   const pct = full > 0 ? (collected / full) * 100 : 0;
   const done: string[] = Array.isArray(c?.stages_done) ? c.stages_done : [];
-  const shipped = done.includes('veneers_shipped');
-  const delivered = done.includes('veneers_delivered') || (shipped && !!c?.veneers_eta_date && todayStr() >= c.veneers_eta_date);
+  const eta = c?.veneers_eta_date;
+  // Setting a delivery ETA means the veneers have shipped; on/after that date the
+  // stamp flips to Delivered — driven purely by the date, no extra clicks needed.
+  const delivered = done.includes('veneers_delivered') || (!!eta && todayStr() >= eta);
+  const shipped = done.includes('veneers_shipped') || !!eta;
   return delivered ? 'DELIVERED' : shipped ? 'VENEERS SHIPPED' : pct >= 90 ? 'READY TO BE SHIPPED' : null;
 }
 const STAMP_STYLE: Record<string, { bg: string; color: string; border: string; icon: string }> = {
@@ -820,8 +823,7 @@ export default function CXClient({
     const newDone = PIPELINE_STAGES.slice(0, idx + 1).map(s => s.key);
     cases.forEach(c => {
       const done: string[] = Array.isArray(c.stages_done) ? c.stages_done : [];
-      if (c.veneers_eta_date && today >= c.veneers_eta_date
-          && done.includes('veneers_shipped') && !done.includes('veneers_delivered')) {
+      if (c.veneers_eta_date && today >= c.veneers_eta_date && !done.includes('veneers_delivered')) {
         const payload = { stages_done: newDone, updated_at: new Date().toISOString() };
         dbOp('cx_cases', 'update', payload, { id: c.id });
         setCases(prev => prev.map(x => x.id === c.id ? { ...x, ...payload } : x));
