@@ -184,9 +184,9 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     ],
   },
   veneers_delivered: {
-    summary: 'Veneers delivered. Update the tracking and confirm the customer was notified.',
+    summary: 'Veneers delivered. Update the CRM and confirm the customer was notified.',
     steps: [
-      'Update the CRM with the new tracking number of the delivery',
+      'Update the CRM to “Veneers delivered”',
       'Verify that the automated message is sent on the CRM',
     ],
   },
