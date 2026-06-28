@@ -85,7 +85,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   pre_imp_appointment: {
     summary: 'Set up and run the virtual impression appointment with the customer.',
     steps: [
-      'Go to the website www.cylabs.com, create a meeting, and send it to the customer for your appointment time',
+      'Use the Create meeting button below to open Sylaps, create a meeting, and send it to the customer for your appointment time',
       'The customer types their name, allows camera and microphone access, and completes the "not a robot" check, then joins the meeting and can communicate',
       'Keep your camera on so you can visualize everything for the customer',
       'Customers can send photos during the meeting: there is a message icon on the top right they click, then attach an image from the clip mark at the bottom right — from there they take the impression, get the photo, and send it to us',
@@ -1465,6 +1465,16 @@ export default function CXClient({
                   );
                 })}
               </div>
+              {curKey === 'pre_imp_appointment' && (
+                <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Virtual appointment — create the meeting and send the link to the customer</div>
+                  <a href="https://www.sylaps.com" target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                      textDecoration: 'none', cursor: 'pointer', background: 'oklch(0.50 0.16 260)', color: 'white', border: 'none' }}>
+                    🎥 Create meeting
+                  </a>
+                </div>
+              )}
               {curKey === 'imp_kit_sent' && (
                 <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Impression Kit ETA — when will the kit arrive at the customer?</div>
