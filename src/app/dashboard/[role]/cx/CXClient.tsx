@@ -4,31 +4,20 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { dbOp } from '@/utils/db';
 
 /* ── Constants ───────────────────────────────────────────────── */
+// The pipeline stage select lists every stage a case moves through, in order —
+// the order/impression stages plus the veneer/delivery ones. Labels say plainly
+// what the stage is. Kept in sync with the detailed PIPELINE_STAGES checklist.
 const DEFAULT_PIPELINE_STAGES = [
-  'IMP KIT SENT', 'IMP KIT DEL', 'VENEERS SENT', 'VENEERS DEL', 'POST-CARE',
+  'New order',
+  'Impression kit sent',
+  'Impression kit delivered',
+  'Pre-impression kit appointment',
+  'Impression appointment done',
+  'Impression kit on the way to the lab',
+  'Veneers sent',
+  'Veneers delivered',
+  'Complete',
 ];
-
-const STATUS_OPTIONS = [
-  'New CX', 'Took action & CX answered', 'Take action', 'No action taken',
-  'Veneers delivered', 'Delivered & interested', 'Charged, expecting a call', 'Failed money',
-];
-
-const STATUS_HUE: Record<string, number> = {
-  'New CX':                    145,
-  'Took action & CX answered': 200,
-  'Take action':               25,
-  'No action taken':           10,
-  'Veneers delivered':         55,
-  'Delivered & interested':    145,
-  'Charged, expecting a call': 80,
-  'Failed money':              10,
-};
-
-const PRIORITY_META: Record<string, { bg: string; color: string }> = {
-  HIGH:   { bg: 'oklch(0.92 0.06 25)',  color: 'oklch(0.40 0.20 25)'  },
-  MEDIUM: { bg: 'oklch(0.94 0.06 75)',  color: 'oklch(0.40 0.18 75)'  },
-  LOW:    { bg: 'oklch(0.93 0.05 145)', color: 'oklch(0.36 0.15 145)' },
-};
 
 const PAY_META: Record<string, { bg: string; color: string }> = {
   'Paid':      { bg: 'oklch(0.93 0.05 145)', color: 'oklch(0.36 0.15 145)' },
@@ -212,13 +201,13 @@ const EXCEPTION_FLAGS = [
   { key: 'unsatisfied_defaulted',           label: 'Unsatisfied / defaulted',           hue: 15,  chroma: 0.08 },
 ];
 
-function sColor(status: string) {
-  const h = STATUS_HUE[status] ?? 200;
-  return `oklch(0.50 0.20 ${h})`;
+// Avatars and accent borders use a single brand color now that case status
+// (which used to drive the hue) has been removed.
+function sColor(_?: string) {
+  return 'oklch(0.50 0.20 200)';
 }
-function sBg(status: string, alpha = 0.12) {
-  const h = STATUS_HUE[status] ?? 200;
-  return `oklch(0.50 0.20 ${h} / ${alpha})`;
+function sBg(_?: string, alpha = 0.12) {
+  return `oklch(0.50 0.20 200 / ${alpha})`;
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0]; }
@@ -305,8 +294,8 @@ function parseUsAddress(raw: string) {
 const EMPTY_FORM = {
   customer_name: '', phone: '', email: '', address: '', order_number: '',
   veneer_set: '', veneer_shade: '', shipping: '', special_request: '',
-  pipeline_stage: 'IMP KIT SENT', status: 'New CX',
-  priority: 'HIGH', issue: '', action_taken: '', customer_words: '', lab_notes: '',
+  pipeline_stage: 'New order',
+  issue: '', action_taken: '', customer_words: '', lab_notes: '',
   full_price: '', amount_collected: '', payment_left: '', pay_status: 'Paid',
   assigned_to: '', on_hold: false, hold_reason: '',
 };
@@ -428,7 +417,7 @@ export default function CXClient({
   /* ── Handlers ──────────────────────────────────────────────── */
   const openAdd = (prefillStage?: string) => {
     setEditingCase(null);
-    setForm({ ...EMPTY_FORM, pipeline_stage: prefillStage ?? 'IMP KIT SENT' });
+    setForm({ ...EMPTY_FORM, pipeline_stage: prefillStage ?? 'New order' });
     setShowForm(true);
   };
 
@@ -439,8 +428,8 @@ export default function CXClient({
       email: c.email ?? '', address: c.address ?? '', order_number: c.order_number ?? '',
       veneer_set: c.veneer_set ?? '', veneer_shade: c.veneer_shade ?? '',
       shipping: c.shipping ?? '', special_request: c.special_request ?? '',
-      pipeline_stage: c.pipeline_stage ?? 'IMP KIT SENT', status: c.status ?? 'New CX',
-      priority: c.priority ?? 'HIGH', issue: c.issue ?? '',
+      pipeline_stage: c.pipeline_stage ?? 'New order',
+      issue: c.issue ?? '',
       action_taken: c.action_taken ?? '', customer_words: c.customer_words ?? '',
       lab_notes: c.lab_notes ?? '',
       full_price: c.full_price ?? '', amount_collected: c.amount_collected ?? '',
@@ -474,8 +463,6 @@ export default function CXClient({
       shipping: form.shipping.trim() || null,
       special_request: form.special_request.trim() || null,
       pipeline_stage: form.pipeline_stage,
-      status: form.status,
-      priority: form.priority,
       issue: form.issue.trim(),
       action_taken: form.action_taken.trim(),
       customer_words: form.customer_words.trim(),
@@ -799,7 +786,6 @@ export default function CXClient({
       phone: phoneKey,
       customer_name: sc.customer_name ?? null,
       order_number: sc.order_number ?? null,
-      status: sc.status ?? null,
       stage_label: curStage?.label ?? null,
       stage_pct: Math.round((done.length / PIPELINE_STAGES.length) * 100),
       next_step_summary: guide?.summary ?? null,
@@ -827,8 +813,8 @@ export default function CXClient({
 
   const exportCSV = () => {
     const rows = [
-      ['Name','Phone','Stage','Status','Priority','Issue','Payment Left','Pay Status'],
-      ...filtered.map(c => [c.customer_name,c.phone,c.pipeline_stage,c.status,c.priority,c.issue,c.payment_left??'',c.pay_status??'']),
+      ['Name','Phone','Stage','Issue','Payment Left','Pay Status'],
+      ...filtered.map(c => [c.customer_name,c.phone,c.pipeline_stage,c.issue,c.payment_left??'',c.pay_status??'']),
     ];
     const csv = rows.map(r => r.map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
@@ -859,25 +845,6 @@ export default function CXClient({
   // NOTE: the delivery ETA only drives the *stamp* (see shipStampFor) — it does
   // NOT auto-check the "Veneers delivered" stage. Agents read that stage's guide
   // and check it off themselves, and can freely step back to earlier stages.
-
-  /* ── Status stat strip ─────────────────────────────────────── */
-  const statStrip = (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, marginBottom: 16 }}>
-      {STATUS_OPTIONS.map(s => {
-        const cnt = cases.filter(c => c.status === s).length;
-        const h = STATUS_HUE[s] ?? 200;
-        return (
-          <div key={s} style={{ background: 'white', border: `1px solid var(--line)`, borderLeft: `4px solid oklch(0.50 0.20 ${h})`, borderRadius: 10, padding: '10px 14px', cursor: 'pointer', transition: 'box-shadow .12s' }}
-            onClick={() => setSearchQuery(s)}
-            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'}
-            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = ''}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: `oklch(0.50 0.20 ${h})`, marginBottom: 4 }}>{s}</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)' }}>{cnt}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
 
   /* ── Owner quick-look banner ────────────────────────────────── */
   const banner = (
@@ -1027,9 +994,7 @@ export default function CXClient({
       {filtered.map(c => {
         const upds = caseUpdates(c.id);
         const latest = upds[0];
-        const pm = PRIORITY_META[c.priority] ?? PRIORITY_META.MEDIUM;
-        const paym = PAY_META[c.pay_status] ?? {};
-        const border = c.on_hold ? 'oklch(0.60 0 0)' : sColor(c.status);
+        const border = c.on_hold ? 'oklch(0.60 0 0)' : sColor();
         const updateDue = needsUpdate(c);
         const fullPrice = Number(c.full_price) || 0;
         const collectedAmt = Number(c.amount_collected) || 0;
@@ -1057,13 +1022,12 @@ export default function CXClient({
               </span>
             </div>
             <div style={{ padding: `14px ${stamp ? 170 : 86}px 10px 16px`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: '50%', background: `oklch(0.50 0.20 ${STATUS_HUE[c.status] ?? 200})`, color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'oklch(0.50 0.20 200)', color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {initials(c.customer_name)}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: pm.bg, color: pm.color }}>{c.priority}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
                     background: c.source === 'Shopify' ? 'oklch(0.93 0.08 150)' : 'oklch(0.93 0.04 250)',
                     color: c.source === 'Shopify' ? 'oklch(0.40 0.14 150)' : 'oklch(0.40 0.12 250)' }}>
@@ -1129,7 +1093,6 @@ export default function CXClient({
               </div>
             </div>
             <div style={{ padding: '0 16px 10px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: sBg(c.status, 0.12), color: sColor(c.status), border: `1px solid ${sBg(c.status, 0.3)}` }}>{c.status.toUpperCase()}</span>
               <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: 'var(--surface-2)', color: 'var(--ink-4)', border: '1px solid var(--line)' }}>{c.pipeline_stage}</span>
             </div>
             {c.issue && (
@@ -1189,14 +1152,13 @@ export default function CXClient({
               {cols.length === 0 && <div style={{ padding: '18px 14px', textAlign: 'center', color: 'var(--ink-5)', fontSize: 12 }}>—</div>}
               {cols.map((c, i) => (
                 <div key={c.id} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}
-                  style={{ padding: '12px 14px', borderBottom: i < cols.length - 1 ? '1px solid var(--line-2)' : 'none', cursor: 'pointer', borderLeft: `3px solid ${c.on_hold ? 'oklch(0.60 0 0)' : sColor(c.status)}`, background: 'white', transition: 'background .1s' }}
+                  style={{ padding: '12px 14px', borderBottom: i < cols.length - 1 ? '1px solid var(--line-2)' : 'none', cursor: 'pointer', borderLeft: `3px solid ${c.on_hold ? 'oklch(0.60 0 0)' : sColor()}`, background: 'white', transition: 'background .1s' }}
                   onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-2)'}
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'white'}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>{c.customer_name}</div>
                   <div style={{ fontSize: 11, color: 'var(--ink-5)', marginBottom: 6 }}>{c.phone}</div>
                   {c.issue && <div style={{ fontSize: 12, color: 'var(--ink-4)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.45 }}>{c.issue}</div>}
                   <div style={{ marginTop: 8, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: (PRIORITY_META[c.priority]??PRIORITY_META.MEDIUM).bg, color: (PRIORITY_META[c.priority]??PRIORITY_META.MEDIUM).color }}>{c.priority}</span>
                     {c.on_hold && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'oklch(0.92 0 0)', color: 'oklch(0.45 0 0)' }}>ON HOLD</span>}
                     {needsUpdate(c) && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'oklch(0.94 0.06 80)', color: 'oklch(0.40 0.18 80)' }}>⚠</span>}
                     {unreadCounts[c.id] > 0 && (
@@ -1221,7 +1183,7 @@ export default function CXClient({
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--line)' }}>
-              {['Customer','Phone','Stage','Status','Priority','Issue','Payment Left','Pay Status','Latest Update'].map(h => (
+              {['Customer','Phone','Stage','Issue','Payment Left','Pay Status','Latest Update'].map(h => (
                 <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--ink-4)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -1229,11 +1191,10 @@ export default function CXClient({
           <tbody>
             {filtered.map((c, i) => {
               const latest = caseUpdates(c.id)[0];
-              const pm = PRIORITY_META[c.priority] ?? PRIORITY_META.MEDIUM;
               const paym = PAY_META[c.pay_status] ?? {};
               return (
                 <tr key={c.id} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}
-                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--line-2)' : 'none', cursor: 'pointer', borderLeft: `3px solid ${c.on_hold ? 'oklch(0.60 0 0)' : sColor(c.status)}` }}
+                  style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--line-2)' : 'none', cursor: 'pointer', borderLeft: `3px solid ${c.on_hold ? 'oklch(0.60 0 0)' : sColor()}` }}
                   onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = 'var(--surface-2)'}
                   onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = ''}>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
@@ -1248,12 +1209,6 @@ export default function CXClient({
                   <td style={{ padding: '10px 14px', color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>{c.phone}</td>
                   <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--surface-2)', border: '1px solid var(--line)', color: 'var(--ink-4)' }}>{c.pipeline_stage}</span>
-                  </td>
-                  <td style={{ padding: '10px 14px', whiteSpace: 'nowrap' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: sBg(c.status, 0.12), color: sColor(c.status) }}>{c.status}</span>
-                  </td>
-                  <td style={{ padding: '10px 14px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: pm.bg, color: pm.color }}>{c.priority}</span>
                   </td>
                   <td style={{ padding: '10px 14px', color: 'var(--ink-3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.issue}</td>
                   <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{c.payment_left != null ? `$${Number(c.payment_left).toLocaleString('en-US',{minimumFractionDigits:2})}` : '—'}</td>
@@ -1292,7 +1247,7 @@ export default function CXClient({
       <div className="md" style={{ width: 820, maxHeight: '95vh', overflowY: 'auto', padding: 0 }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: '50%', background: sColor(selectedCase.status), color: 'white', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 44, height: 44, borderRadius: '50%', background: sColor(), color: 'white', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {initials(selectedCase.customer_name)}
           </div>
           <div style={{ flex: 1 }}>
@@ -1405,26 +1360,20 @@ export default function CXClient({
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            <div style={{ padding: '4px 12px', borderRadius: 8, border: `1.5px solid ${sColor(selectedCase.status)}`, background: sBg(selectedCase.status, 0.08), fontSize: 11, fontWeight: 700, color: sColor(selectedCase.status) }}>
-              CURRENT STATUS<br />
-              <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)' }}>{selectedCase.status}</span>
-            </div>
             <button onClick={() => { setSelectedCase(null); setShowHoldInput(false); setReassigningCaseId(null); setReassignValue(''); }} style={{ background: 'none', border: 'none', color: 'var(--ink-4)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>✕</button>
           </div>
         </div>
 
         {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid var(--line)' }}>
           {[
-            { label: 'PRIORITY', value: selectedCase.priority, sub: ['Take action','No action taken'].includes(selectedCase.status) ? 'Needs action today' : selectedCase.on_hold ? 'On hold' : 'Monitoring', valueColor: (PRIORITY_META[selectedCase.priority]??PRIORITY_META.MEDIUM).color },
             { label: 'PAYMENT', value: selectedCase.pay_status ?? '—', sub: selectedCase.payment_left != null ? `$${Number(selectedCase.payment_left).toFixed(2)} left` : 'No balance', valueColor: (PAY_META[selectedCase.pay_status]??{}).color ?? 'var(--ink)' },
             { label: 'DAYS OPEN', value: String(daysOpen(selectedCase.created_at)), sub: 'Since first update', valueColor: 'var(--ink)' },
             { label: 'UPDATES', value: String(caseUpdates(selectedCase.id).length), sub: 'Logged on file', valueColor: 'var(--ink)' },
           ].map((st, i) => (
-            <div key={st.label} style={{ padding: '14px 18px', borderRight: i < 3 ? '1px solid var(--line)' : 'none' }}>
+            <div key={st.label} style={{ padding: '14px 18px', borderRight: i < 2 ? '1px solid var(--line)' : 'none' }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', color: 'var(--ink-4)', marginBottom: 4 }}>{st.label}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: st.valueColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-                {st.label === 'PRIORITY' && <span style={{ width: 8, height: 8, borderRadius: '50%', background: (PRIORITY_META[selectedCase.priority]??PRIORITY_META.MEDIUM).color, display: 'inline-block' }} />}
                 {st.value}
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-5)', marginTop: 2 }}>{st.sub}</div>
@@ -1862,25 +1811,11 @@ export default function CXClient({
           <div className="pv-fld"><label>Shipping</label><input value={form.shipping} onChange={e => setForm(p => ({ ...p, shipping: e.target.value }))} placeholder="e.g. Standard" /></div>
         </div>
         <div className="pv-fld"><label>Special Request Notes</label><textarea rows={2} value={form.special_request} onChange={e => setForm(p => ({ ...p, special_request: e.target.value }))} placeholder="Any special requests for this order…" /></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <div className="pv-fld">
-            <label>Pipeline Stage</label>
-            <select value={form.pipeline_stage} onChange={e => setForm(p => ({ ...p, pipeline_stage: e.target.value }))}>
-              {stages.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="pv-fld">
-            <label>Status</label>
-            <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
-              {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="pv-fld">
-            <label>Priority</label>
-            <select value={form.priority} onChange={e => setForm(p => ({ ...p, priority: e.target.value }))}>
-              <option>HIGH</option><option>MEDIUM</option><option>LOW</option>
-            </select>
-          </div>
+        <div className="pv-fld">
+          <label>Pipeline Stage</label>
+          <select value={form.pipeline_stage} onChange={e => setForm(p => ({ ...p, pipeline_stage: e.target.value }))}>
+            {stages.map(s => <option key={s}>{s}</option>)}
+          </select>
         </div>
         <div className="pv-fld"><label>Issue</label><textarea rows={2} value={form.issue} onChange={e => setForm(p => ({ ...p, issue: e.target.value }))} placeholder="Brief description of the customer's issue…" /></div>
         <div className="pv-fld"><label>Action Taken</label><textarea rows={2} value={form.action_taken} onChange={e => setForm(p => ({ ...p, action_taken: e.target.value }))} placeholder="What has been done so far…" /></div>
@@ -1986,7 +1921,7 @@ export default function CXClient({
           const printed = !!li.entry.printed;
           return (
             <div key={li.entry.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: i < shownLabels.length - 1 ? '1px solid var(--line-2)' : 'none', background: printed ? 'oklch(0.98 0.02 145)' : 'white' }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: printed ? 'oklch(0.55 0.15 145)' : sColor(li.c.status), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: printed ? 'oklch(0.55 0.15 145)' : sColor(), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {printed ? '✓' : initials(li.c.customer_name)}
               </div>
               <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(li.c); markCaseRead(li.c.id); }}>
@@ -2050,7 +1985,7 @@ export default function CXClient({
           return (
           <div key={c.id} style={{ padding: '12px 18px', borderBottom: i < labCases.length - 1 ? '1px solid var(--line-2)' : 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: sColor(c.status), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials(c.customer_name)}</div>
+              <div style={{ width: 34, height: 34, borderRadius: '50%', background: sColor(), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials(c.customer_name)}</div>
               <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</div>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 1 }}>
@@ -2079,7 +2014,6 @@ export default function CXClient({
 
   return (
     <div className="page-fade">
-      {statStrip}
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
