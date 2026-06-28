@@ -325,7 +325,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'|'lab'|'issues'|'completed_success'>('agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'|'lab'|'issues'|'completed_success'>(userRole === 'dentist' ? 'lab' : 'agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -342,6 +342,8 @@ export default function CXClient({
   const [paymentInput, setPaymentInput] = useState('');
   // Labels Ready category filter: all / impression kit / veneers.
   const [labelKind, setLabelKind] = useState<'all' | 'imp_kit' | 'veneers'>('all');
+  // Per-case draft text for the Lab tab's "add lab note" inputs.
+  const [labNoteDrafts, setLabNoteDrafts] = useState<Record<number, string>>({});
 
   const [form,      setForm]      = useState({ ...EMPTY_FORM });
   const [updateText, setUpdateText] = useState('');
@@ -354,8 +356,12 @@ export default function CXClient({
   const isAdminOrOwner = isOwner || userRole === 'admin';
   // The Lab tab is limited to owners, admins, and dentists.
   const canViewLab     = ['owner', 'admin', 'dentist'].includes(userRole);
+  // Dentists only ever see the Lab section of the live CX board.
+  const labOnly        = userRole === 'dentist';
   const today   = todayStr();
   const supabase = createClient();
+  // Dentists are locked to the Lab section — bounce any other section back.
+  useEffect(() => { if (labOnly && section !== 'lab') setSection('lab'); }, [labOnly, section]);
 
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));
   const todayUpdatedIds = new Set(updates.filter((u: any) => u.update_date === today).map((u: any) => u.case_id));
@@ -670,6 +676,17 @@ export default function CXClient({
     if (selectedCase?.id === caseId) setSelectedCase((p: any) => ({ ...p, ...payload }));
   };
 
+  /* Add a lab note from the Lab tab. It writes to the same lab_notes_log the
+     customer's live card reads, so the note shows up on the CX card too. */
+  const addLabNote = (caseId: number, text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    const c = cases.find(x => x.id === caseId);
+    const list = Array.isArray(c?.lab_notes_log) ? c.lab_notes_log : [];
+    patchAnyCase(caseId, { lab_notes_log: [{ id: newEntryId(), by: currentUserId, date: today, text: t }, ...list] });
+    setLabNoteDrafts(p => ({ ...p, [caseId]: '' }));
+  };
+
   /* Toggle one Lab-tab checkmark on/off (multi-select — they're independent).
      The pipeline-driving steps (Received / In Production / Quality check) recompute
      the customer's stage to the furthest one ticked, floored at the lab hand-off
@@ -957,6 +974,7 @@ export default function CXClient({
       <div style={{ padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         {/* Section tabs */}
         <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 3, gap: 2 }}>
+          {!labOnly && (<>
           <button onClick={() => setSection('agents')}
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'agents' ? 'white' : 'transparent', color: section === 'agents' ? 'var(--ink)' : 'var(--ink-4)', boxShadow: section === 'agents' ? 'var(--sh-1)' : 'none' }}>
             Agents · {agentsCount}
@@ -985,12 +1003,14 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'labels' ? 'oklch(0.55 0.15 170)' : 'transparent', color: section === 'labels' ? 'white' : (labelsReadyCount > 0 ? 'oklch(0.42 0.14 170)' : 'var(--ink-4)'), boxShadow: section === 'labels' ? 'var(--sh-1)' : 'none' }}>
             🖨 Labels Ready · {labelsReadyCount}
           </button>
+          </>)}
           {canViewLab && (
           <button onClick={() => setSection('lab')} title="Impression kits in transit to the lab — receive, scan, mark in production"
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'lab' ? 'oklch(0.52 0.16 300)' : 'transparent', color: section === 'lab' ? 'white' : (labCount > 0 ? 'oklch(0.44 0.15 300)' : 'var(--ink-4)'), boxShadow: section === 'lab' ? 'var(--sh-1)' : 'none' }}>
             🧪 Lab · {labCount}
           </button>
           )}
+          {!labOnly && (<>
           <button onClick={() => setSection('issues')} title="Completed orders the customer flagged issues on"
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'issues' ? 'oklch(0.55 0.18 25)' : 'transparent', color: section === 'issues' ? 'white' : (issuesCount > 0 ? 'oklch(0.45 0.18 25)' : 'var(--ink-4)'), boxShadow: section === 'issues' ? 'var(--sh-1)' : 'none' }}>
             ⚠ Issues · {issuesCount}
@@ -999,7 +1019,9 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'completed_success' ? 'oklch(0.50 0.16 145)' : 'transparent', color: section === 'completed_success' ? 'white' : (completedSuccessCount > 0 ? 'oklch(0.40 0.15 145)' : 'var(--ink-4)'), boxShadow: section === 'completed_success' ? 'var(--sh-1)' : 'none' }}>
             ✓ Completed Success · {completedSuccessCount}
           </button>
+          </>)}
         </div>
+        {!labOnly && (<>
         <div style={{ width: 1, height: 22, background: 'var(--line)', margin: '0 2px' }} />
         {(section === 'agents' || section === 'new') && <button className="btn btn-acc btn-sm" onClick={() => openAdd()}>+ Add customer</button>}
         {isOwner && section === 'agents' && <button className="btn btn-sec btn-sm" onClick={() => setShowAddCol(true)}>+ Add column</button>}
@@ -1015,6 +1037,7 @@ export default function CXClient({
             </button>
           ))}
         </div>
+        </>)}
       </div>
     </div>
   );
@@ -2066,7 +2089,12 @@ export default function CXClient({
               <div style={{ width: 34, height: 34, borderRadius: '50%', background: sColor(), color: 'white', fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{initials(c.customer_name)}</div>
               <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => { setSelectedCase(c); markCaseRead(c.id); }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{c.customer_name}</div>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 1 }}>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 2, color: 'var(--ink-4)', fontSize: 12 }}>
+                  <span>📦 Order #{c.order_number || '—'}</span>
+                  <span>📞 {c.phone || '—'}</span>
+                  <span>✉ {c.email || '—'}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 2 }}>
                   <span style={{ fontSize: 12, color: 'oklch(0.44 0.14 300)', fontWeight: 600 }}>🧪 Lab ETA · {fmtEta(c.lab_eta_date)}</span>
                   {c.lab_us_eta_date && <span style={{ fontSize: 12, color: 'oklch(0.44 0.16 200)', fontWeight: 600 }}>🇺🇸 US ETA · {fmtEta(c.lab_us_eta_date)}</span>}
                 </div>
@@ -2083,6 +2111,26 @@ export default function CXClient({
                 {c.lab_us_eta_date && <span style={{ fontSize: 12, color: 'var(--ink-3)', fontWeight: 600 }}>{fmtEta(c.lab_us_eta_date)}</span>}
               </div>
             )}
+            {/* Lab notes — written here flow straight onto the customer's live card. */}
+            <div style={{ marginTop: 10, paddingLeft: 48 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'oklch(0.42 0.10 260)', marginBottom: 6 }}>⚙ Lab notes — these appear on the customer’s live card</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input value={labNoteDrafts[c.id] ?? ''} onChange={e => setLabNoteDrafts(p => ({ ...p, [c.id]: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter') addLabNote(c.id, labNoteDrafts[c.id] ?? ''); }}
+                  placeholder="Add a lab / production note…" className="fld-input" style={{ height: 32, flex: 1, minWidth: 220, fontSize: 12 }} />
+                <button className="btn btn-sec btn-sm" disabled={!(labNoteDrafts[c.id] ?? '').trim()} onClick={() => addLabNote(c.id, labNoteDrafts[c.id] ?? '')}>Add note</button>
+              </div>
+              {Array.isArray(c.lab_notes_log) && c.lab_notes_log.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                  {c.lab_notes_log.slice(0, 4).map((n: any) => (
+                    <div key={n.id} style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                      <span style={{ color: 'var(--ink)' }}>{n.text}</span>
+                      <span style={{ color: 'var(--ink-5)' }}> · {nameMap[n.by] || 'Lab'}{n.date ? ` · ${n.date}` : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           );
         })}

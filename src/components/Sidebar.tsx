@@ -249,6 +249,7 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'notes',       label: 'Personal Notes',    icon: '📝' },
     ]},
     { head: 'Clinical', items: [
+      { id: 'cx',                 label: 'Lab Cases',          icon: '🧪', badge: 'LIVE', badgeType: 'live' },
       { id: 'condition-approval', label: 'Condition Approval', icon: '✔', badge: 'LIVE', badgeType: 'live' },
       { id: 'impression-kit',     label: 'Impression Kit',     icon: '📦', badge: 'LIVE', badgeType: 'live' },
       { id: 'remake-requests',    label: 'Remake Requests',    icon: '↺',  badge: 'LIVE', badgeType: 'live' },
