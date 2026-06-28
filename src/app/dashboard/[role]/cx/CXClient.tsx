@@ -60,7 +60,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     steps: [
       'Claim the case under your name so it appears in your portal under the My Cases tab',
       'Call the customer with a warm welcome and ask them to reply to your SMS with their shipping address to verify it on file',
-      'Once the address is confirmed, click the Send Shippo button and select 2 Impression Kits',
+      'Once the address is confirmed, click the Impression Kit Label button and select one impression kit to create one impression kit for the customer',
       'Open Shippo and verify your current order number and info, then click View Order',
       'Click Create a Return Label, check the return address box, then click Save',
       'Select the cheapest USPS option for normal shipping and click Buy (if Fast shipping, check the Fast Shipping SOP)',
