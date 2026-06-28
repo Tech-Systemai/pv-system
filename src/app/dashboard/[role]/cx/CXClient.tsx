@@ -162,15 +162,18 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     summary: 'Buy the veneers label in Shippo, then paste the tracking number into the CRM — that auto-sends the shipped notification to the customer.',
     steps: [
       'In Shippo, go to Orders and select “Buy the label”',
-      'Make sure the label includes a return address',
+      'The label does not need a return address',
       'Choose the cheapest USPS option',
       'The tracking number shows up in the portal — copy it and paste it into the CRM',
       'Pasting the tracking number automatically sends the “veneers shipped” notification to the customer — no manual message needed',
     ],
   },
   veneers_delivered: {
-    summary: 'Veneers delivered. Confirm fit and satisfaction.',
-    steps: ['Confirm the veneers arrived', 'Check fit and look', 'Offer adhesive / support if needed'],
+    summary: 'Veneers delivered. Update the tracking and confirm the customer was notified.',
+    steps: [
+      'Update the CRM with the new tracking number of the delivery',
+      'Verify that the automated message is sent on the CRM',
+    ],
   },
   completed_no_issues: {
     summary: 'Order complete with no issues. Wrap up.',
