@@ -414,15 +414,18 @@ export default function CXClient({
   const issuesCount      = cases.filter(c => isResolved(c) && c.completed_outcome === 'issues').length;
   const completedSuccessCount = cases.filter(c => isResolved(c) && c.completed_outcome === 'success').length;
 
-  // "Labels ready to print" = every Shippo-bought label (a tracking_log entry that
-  // carries a printable label_url). One row per label, newest-unprinted first.
+  // Labels section = every Shippo-bought label (carries a printable label_url) PLUS
+  // any hand-tagged tracking entry (label_type set by the team) so manually-added
+  // labels surface here too, identified as Imp. kit / Veneers. One row per entry,
+  // newest-unprinted first.
   const labelItems = cases
     .flatMap((c: any) => (Array.isArray(c.tracking_log) ? c.tracking_log : [])
-      .filter((e: any) => e?.label_url)
+      .filter((e: any) => e?.label_url || e?.label_type)
       .map((e: any) => ({ c, entry: e })))
     .sort((a, b) => (Number(!!a.entry.printed) - Number(!!b.entry.printed))
       || String(b.entry.date || '').localeCompare(String(a.entry.date || '')));
-  const labelsToPrint  = labelItems.filter(li => !li.entry.printed);
+  // "Ready to print" counts only real printable labels — manual entries have no file.
+  const labelsToPrint  = labelItems.filter(li => li.entry.label_url && !li.entry.printed);
   const labelsReadyCount = labelsToPrint.length;
 
   // "Lab" tab = every impression kit with a lab ETA set. Kits stay listed through
@@ -2091,13 +2094,14 @@ export default function CXClient({
 
   /* ── Main render ────────────────────────────────────────────── */
   /* ── Labels-ready-to-print panel ────────────────────────────── */
-  // Split labels by what's being shipped. Untagged (legacy/manual) labels fall
-  // under Impression kit so nothing is hidden.
-  const labelKindOf = (e: any) => (e?.kind === 'veneers' ? 'veneers' : 'imp_kit');
+  // Split labels by what's being shipped. The hand-set tag (label_type) wins, then
+  // the Shippo kind; untagged (legacy) labels fall under Impression kit.
+  const labelKindOf = (e: any) =>
+    (e?.label_type === 'veneers' || e?.kind === 'veneers') ? 'veneers' : 'imp_kit';
   const impLabelCount = labelItems.filter(li => labelKindOf(li.entry) === 'imp_kit').length;
   const venLabelCount = labelItems.filter(li => labelKindOf(li.entry) === 'veneers').length;
   const shownLabels = labelItems.filter(li => labelKind === 'all' || labelKindOf(li.entry) === labelKind);
-  const shownToPrint = shownLabels.filter(li => !li.entry.printed);
+  const shownToPrint = shownLabels.filter(li => li.entry.label_url && !li.entry.printed);
   const printAllLabel = labelKind === 'imp_kit' ? 'Print All Impression Kit' : labelKind === 'veneers' ? 'Print All Veneers' : 'Print All';
   const labelTabs: { key: 'all' | 'imp_kit' | 'veneers'; label: string; count: number }[] = [
     { key: 'all',     label: 'All',                count: labelItems.length },
@@ -2157,7 +2161,9 @@ export default function CXClient({
                   {li.entry.number && <span style={{ fontFamily: 'monospace' }}>🚚 {li.entry.number}</span>}
                 </div>
               </div>
-              {printed ? (
+              {!li.entry.label_url ? (
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-4)', whiteSpace: 'nowrap' }}>✎ Manual · no file to print</span>
+              ) : printed ? (
                 <>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'oklch(0.40 0.15 145)', display: 'flex', alignItems: 'center', gap: 5 }}>✓ Printed</span>
                   <button className="btn btn-sec btn-sm" onClick={() => printLabel(li)}>Reprint</button>
