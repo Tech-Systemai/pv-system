@@ -1494,11 +1494,6 @@ export default function CXClient({
                 style={{ display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none', background: 'oklch(0.50 0.16 260)', color: 'white', border: 'none' }}>
                 🎥 Create meeting
               </a>
-              <a href="https://www.sylaps.com" target="_blank" rel="noopener noreferrer"
-                className="btn btn-sm" title="Create another meeting if you need a second one"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none', background: 'oklch(0.50 0.16 260)', color: 'white', border: 'none' }}>
-                🎥 Create another meeting
-              </a>
               <button onClick={() => recInputRef.current?.click()} disabled={recUploading}
                 className="btn btn-sm" title="Upload the impression-kit appointment recording"
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: recUploading ? 'var(--line)' : 'oklch(0.50 0.16 200)', color: 'white', border: 'none', cursor: recUploading ? 'default' : 'pointer' }}>
