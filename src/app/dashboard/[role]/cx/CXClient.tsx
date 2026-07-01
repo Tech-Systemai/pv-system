@@ -865,31 +865,35 @@ export default function CXClient({
 
   const handleToggleGuideStep = (stageKey: string, idx: number) => {
     if (!selectedCase) return;
+    // Just answer the step. Advancing to the next stage is a separate, deliberate
+    // click on the "Done" button — so the case never jumps before the agent has
+    // read everything.
     const cl: Record<string, number[]> = selectedCase.stage_checklist ?? {};
     const done = new Set(cl[stageKey] ?? []);
     if (done.has(idx)) done.delete(idx); else done.add(idx);
-    const newChecklist = { ...cl, [stageKey]: [...done] };
+    patchCase({ stage_checklist: { ...cl, [stageKey]: [...done] } });
+  };
 
-    // Auto-advance: once every guide step for the CURRENT stage is answered "yes",
-    // the case moves to the next stage on its own. This is the only way CX agents
-    // progress — they can't jump ahead or skip stages, and can't step back.
+  // Advance to the next stage — only fires when the agent clicks "Done" and every
+  // step for the current stage is answered "yes". This is the only way CX agents
+  // progress; they can't jump ahead or step back.
+  const handleDoneStage = (stageKey: string) => {
+    if (!selectedCase || LAB_LOCKED_STAGES.has(stageKey)) return;
     const guide = STAGE_GUIDE[stageKey];
+    const cl: Record<string, number[]> = selectedCase.stage_checklist ?? {};
+    const done = new Set(cl[stageKey] ?? []);
+    const allAnswered = !!guide && guide.steps.length > 0 && guide.steps.every((_, i) => done.has(i));
     const stagesDoneArr: string[] = Array.isArray(selectedCase.stages_done) ? selectedCase.stages_done : [];
     const isCurrent = PIPELINE_STAGES[stagesDoneArr.length]?.key === stageKey;
-    const allAnswered = !!guide && guide.steps.length > 0 && guide.steps.every((_, i) => done.has(i));
-
-    if (isCurrent && allAnswered && !LAB_LOCKED_STAGES.has(stageKey)) {
-      // Advance, extending to any lab steps already checked so stages_done stays a
-      // contiguous prefix (mirrors handleToggleStage).
-      const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
-      const labSteps: string[] = Array.isArray(selectedCase.lab_steps) ? selectedCase.lab_steps : [];
-      const labIdxs = labSteps.filter(s => LAB_STAGE_MAP[s]).map(s => PIPELINE_STAGES.findIndex(x => x.key === LAB_STAGE_MAP[s]));
-      const upto = Math.max(stageIdx, ...(labIdxs.length ? labIdxs : [-1]));
-      const newDone = PIPELINE_STAGES.slice(0, upto + 1).map(s => s.key);
-      patchCase({ stage_checklist: newChecklist, stages_done: newDone });
-    } else {
-      patchCase({ stage_checklist: newChecklist });
-    }
+    if (!isCurrent || !allAnswered) return;
+    // Advance, extending to any lab steps already checked so stages_done stays a
+    // contiguous prefix (mirrors handleToggleStage).
+    const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
+    const labSteps: string[] = Array.isArray(selectedCase.lab_steps) ? selectedCase.lab_steps : [];
+    const labIdxs = labSteps.filter(s => LAB_STAGE_MAP[s]).map(s => PIPELINE_STAGES.findIndex(x => x.key === LAB_STAGE_MAP[s]));
+    const upto = Math.max(stageIdx, ...(labIdxs.length ? labIdxs : [-1]));
+    const newDone = PIPELINE_STAGES.slice(0, upto + 1).map(s => s.key);
+    patchCase({ stages_done: newDone });
   };
 
   const [showLabelModal, setShowLabelModal] = useState(false);
@@ -1669,9 +1673,25 @@ export default function CXClient({
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11.5, color: 'var(--ink-5)', marginTop: 8 }}>
-                ↑ Answer every step <strong>Yes</strong> and the case moves to the next stage automatically.
-              </div>
+              {(() => {
+                const allAnswered = guide.steps.length > 0 && guide.steps.every((_, i) => checked.includes(i));
+                const isCurrent = PIPELINE_STAGES[stagesDone.length]?.key === curKey;
+                return (
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <button onClick={() => handleDoneStage(curKey)} disabled={!allAnswered || !isCurrent}
+                      title={allAnswered ? 'Move this case to the next stage' : 'Mark every step Yes first'}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 8, fontSize: 13.5, fontWeight: 800, border: 'none',
+                        cursor: (allAnswered && isCurrent) ? 'pointer' : 'not-allowed',
+                        background: (allAnswered && isCurrent) ? 'oklch(0.55 0.16 145)' : 'var(--line)',
+                        color: (allAnswered && isCurrent) ? 'white' : 'var(--ink-5)', opacity: (allAnswered && isCurrent) ? 1 : 0.7 }}>
+                      ✓ Done — move to next stage
+                    </button>
+                    <span style={{ fontSize: 11.5, color: 'var(--ink-5)' }}>
+                      Mark every step <strong>Yes</strong>, then hit <strong>Done</strong> — the case only moves when you click it.
+                    </span>
+                  </div>
+                );
+              })()}
               {curKey === 'pre_imp_appointment' && (
                 <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Virtual appointment — create the meeting and send the link to the customer</div>
