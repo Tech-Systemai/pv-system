@@ -107,11 +107,8 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
   imp_appointment_done: {
     summary: 'Impression appointment complete. Verify the impression looks good before send-back.',
     steps: [
-      "Make sure the customer's impression is approved",
-      'Confirm that the customer has the return label to send back the impression kit. If any issue occurs with the return label, the customer can go to any postal office and send it to this address: 35614 Buttonweed Trail, Zephyrhills, FL, 33541',
-      'Remind the customer to send back the impression within 24 hours',
-      'If the second impression kit was not used, it must still be sent back — return all kits, used or unused, to the address',
-      'Again, do not forget to collect the required payment — recommended amount is $199.99',
+      'If the second impression kit was not used, it must be sent back. Return all used or unused kits to the address provided in the guide.',
+      'If a customer messed up their impression kit, you can scroll down, edit the case, and add $50 to the remaining balance so that it will be charged in the future. You do not need to notify the customer of this charge, as they have already signed for it in their agreement or contract. Also mention that if they messed up, we will create a new label to get them another impression kit and then just put the $50 in the remaining balance. We have to create a label for them and get them a new impression kit for that.',
     ],
   },
   collect_payment: {
