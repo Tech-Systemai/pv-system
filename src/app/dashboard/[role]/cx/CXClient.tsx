@@ -357,7 +357,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'labels'|'lab'|'issues'|'completed_success'>(userRole === 'dentist' ? 'lab' : 'agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'ready_ship'|'labels'|'lab'|'issues'|'completed_success'>(userRole === 'dentist' ? 'lab' : 'agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -428,6 +428,23 @@ export default function CXClient({
   const labelsToPrint  = labelItems.filter(li => li.entry.label_url && !li.entry.printed);
   const labelsReadyCount = labelsToPrint.length;
 
+  // "Ready to be Shipped" tab = full payment collected AND the live-card stage is
+  // past the halfway mark, but NO shipping label made yet. The moment a label
+  // exists (bought in Shippo or hand-tagged in the tracking log) the case moves on
+  // to the Labels Ready tab and drops out of here.
+  const caseHasLabel = (c: any) =>
+    (Array.isArray(c.tracking_log) ? c.tracking_log : []).some((e: any) => e?.label_url || e?.label_type);
+  const isReadyToShip = (c: any) => {
+    if (isResolved(c)) return false;
+    const full = Number(c.full_price) || 0;
+    const collected = Number(c.amount_collected) || 0;
+    const fullyPaid = full > 0 && collected >= full;                       // full payment taken
+    const stagesDoneCount = Array.isArray(c.stages_done) ? c.stages_done.length : 0;
+    const stagePct = Math.round((stagesDoneCount / PIPELINE_STAGES.length) * 100);
+    return fullyPaid && stagePct > 50 && !caseHasLabel(c);                 // >50% stage · no label yet
+  };
+  const readyShipCount = cases.filter(isReadyToShip).length;
+
   // "Lab" tab = every impression kit with a lab ETA set. Kits stay listed through
   // production and beyond so the lab keeps tracking them. Soonest ETA first.
   const labCases = cases
@@ -447,6 +464,8 @@ export default function CXClient({
     // Issues / Completed Success tabs show only resolved cases of that outcome.
     if (section === 'issues')            return (isResolved(c) && c.completed_outcome === 'issues')  && matchesSearch(c);
     if (section === 'completed_success') return (isResolved(c) && c.completed_outcome === 'success') && matchesSearch(c);
+    // Ready to be Shipped: fully paid + past halfway, no label made yet.
+    if (section === 'ready_ship')        return isReadyToShip(c) && matchesSearch(c);
     // Resolved cases have moved out of every other view.
     if (isResolved(c)) return false;
     if (section === 'my_cases'    && c.assigned_to !== currentUserId)                 return false;
@@ -993,7 +1012,7 @@ export default function CXClient({
   const banner = (
     <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : section === 'new' ? 'linear-gradient(135deg, oklch(0.98 0.02 200), oklch(0.97 0.03 215))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : section === 'new' ? 'oklch(0.38 0.18 200)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'labels' ? 'LABELS READY TO PRINT' : section === 'lab' ? 'VERIFY IMPRESSION KIT → LAB' : section === 'issues' ? 'ISSUES' : section === 'completed_success' ? 'COMPLETED SUCCESS' : 'AGENTS — ASSIGNED CUSTOMERS'}
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'ready_ship' ? 'READY TO BE SHIPPED' : section === 'labels' ? 'LABELS READY TO PRINT' : section === 'lab' ? 'VERIFY IMPRESSION KIT → LAB' : section === 'issues' ? 'ISSUES' : section === 'completed_success' ? 'COMPLETED SUCCESS' : 'AGENTS — ASSIGNED CUSTOMERS'}
       </div>
       {section === 'issues' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
@@ -1018,6 +1037,12 @@ export default function CXClient({
           {labelsReadyCount === 0
             ? 'No labels waiting to print. Bought labels show up here the moment Shippo confirms them.'
             : <><strong style={{ color: 'oklch(0.42 0.14 170)' }}>{labelsReadyCount} label{labelsReadyCount !== 1 ? 's' : ''}</strong> ready to print. Print them individually or all at once — each gets checked off once printed.</>}
+        </div>
+      ) : section === 'ready_ship' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {readyShipCount === 0
+            ? 'Nothing waiting to be shipped. A case lands here once full payment is in and the order is past halfway — it leaves the moment a label is made.'
+            : <><strong style={{ color: 'oklch(0.40 0.15 145)' }}>{readyShipCount} order{readyShipCount !== 1 ? 's' : ''}</strong> paid in full and past halfway, still with no shipping label. Create a label for each and it moves to Labels Ready.</>}
         </div>
       ) : section === 'new' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
@@ -1089,6 +1114,10 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'my_cases' ? 'oklch(0.55 0.16 250)' : 'transparent', color: section === 'my_cases' ? 'white' : 'var(--ink-4)', boxShadow: section === 'my_cases' ? 'var(--sh-1)' : 'none' }}>
             👤 My Cases · {myCasesCount}
           </button>
+          <button onClick={() => setSection('ready_ship')} title="Fully paid and past halfway — needs a shipping label made"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'ready_ship' ? 'oklch(0.55 0.15 145)' : 'transparent', color: section === 'ready_ship' ? 'white' : (readyShipCount > 0 ? 'oklch(0.40 0.15 145)' : 'var(--ink-4)'), boxShadow: section === 'ready_ship' ? 'var(--sh-1)' : 'none' }}>
+            📦 Ready to be Shipped · {readyShipCount}
+          </button>
           <button onClick={() => setSection('labels')} title="Shipping labels bought in Shippo and ready to print"
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'labels' ? 'oklch(0.55 0.15 170)' : 'transparent', color: section === 'labels' ? 'white' : (labelsReadyCount > 0 ? 'oklch(0.42 0.14 170)' : 'var(--ink-4)'), boxShadow: section === 'labels' ? 'var(--sh-1)' : 'none' }}>
             🖨 Labels Ready · {labelsReadyCount}
@@ -1135,9 +1164,17 @@ export default function CXClient({
   /* ── Overview cards ─────────────────────────────────────────── */
   const overviewView = (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: 14 }}>
+      {section === 'ready_ship' && filtered.length > 0 && (
+        <div className="card" style={{ gridColumn: '1/-1', padding: '14px 18px', background: 'oklch(0.96 0.05 145)', border: '1px solid oklch(0.80 0.10 145)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 22 }}>📦</span>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'oklch(0.34 0.16 145)' }}>
+            Please create labels for all of these ready-to-be-shipped items.
+          </div>
+        </div>
+      )}
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          {section === 'my_cases' ? 'No cases are assigned to you right now.' : section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : section === 'issues' ? 'No completed orders with issues.' : section === 'completed_success' ? 'No completed orders yet.' : 'No customer cases found.'}
+          {section === 'my_cases' ? 'No cases are assigned to you right now.' : section === 'ready_ship' ? 'Nothing waiting to be shipped — every paid, past-halfway order already has a label.' : section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : section === 'issues' ? 'No completed orders with issues.' : section === 'completed_success' ? 'No completed orders yet.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
@@ -2275,7 +2312,7 @@ export default function CXClient({
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
-          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'labels' ? 'Labels Ready to Print' : section === 'lab' ? 'Verify Impression Kit → Lab' : section === 'issues' ? 'Issues' : section === 'completed_success' ? 'Completed Success' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
+          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'ready_ship' ? 'Ready to be Shipped' : section === 'labels' ? 'Labels Ready to Print' : section === 'lab' ? 'Verify Impression Kit → Lab' : section === 'issues' ? 'Issues' : section === 'completed_success' ? 'Completed Success' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
           {section === 'new'
@@ -2286,6 +2323,8 @@ export default function CXClient({
             ? 'Cases flagged by agents that require management review or action'
             : section === 'unreachable'
             ? 'Customers that could not be reached — click to manage or reactivate'
+            : section === 'ready_ship'
+            ? 'Paid in full and past halfway, but no shipping label yet — create a label and it moves to Labels Ready'
             : section === 'labels'
             ? 'Every shipping label bought in Shippo — print each one (or all at once) and it gets checked off'
             : section === 'lab'
