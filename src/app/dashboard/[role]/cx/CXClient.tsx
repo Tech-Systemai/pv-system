@@ -273,6 +273,28 @@ function shipStampFor(c: any): 'READY TO BE SHIPPED' | 'VENEERS SHIPPED' | 'DELI
   const shipped = done.includes('veneers_shipped') || !!eta;
   return delivered ? 'DELIVERED' : shipped ? 'VENEERS SHIPPED' : pct >= 90 ? 'READY TO BE SHIPPED' : null;
 }
+/* Some guide stages require a piece of data before the case may advance — an ETA
+   date, an uploaded recording, or a completed-outcome choice. The "Done" button
+   stays disabled until this returns true, so agents can't skip the date/upload. */
+function stageRequirementMet(stageKey: string, c: any): boolean {
+  switch (stageKey) {
+    case 'pre_imp_appointment':   return (c?.recording_uploads ?? []).length > 0;
+    case 'imp_kit_sent':          return !!c?.imp_kit_eta_date;
+    case 'imp_kit_on_way_to_lab': return !!c?.lab_eta_date;
+    case 'veneers_shipped':
+    case 'veneers_delivered':     return !!c?.veneers_eta_date;
+    case 'completed_no_issues':   return !!c?.completed_outcome;
+    default:                      return true;
+  }
+}
+const STAGE_REQ_HINT: Record<string, string> = {
+  pre_imp_appointment:   'Upload the appointment recording above before you can finish this stage.',
+  imp_kit_sent:          'Enter the Impression Kit ETA above before you can finish this stage.',
+  imp_kit_on_way_to_lab: 'Enter the Lab ETA above before you can finish this stage.',
+  veneers_shipped:       'Enter the Delivery ETA above before you can finish this stage.',
+  veneers_delivered:     'Enter the Delivery ETA above before you can finish this stage.',
+  completed_no_issues:   'Choose whether there are any issues above before you can finish this stage.',
+};
 /* Human label for a tracking_log entry. `label_type` (set by hand) wins; otherwise
    we derive from the Shippo tags (kind + is_return); legacy entries fall back to
    the carrier text. */
@@ -883,7 +905,8 @@ export default function CXClient({
     const allAnswered = !!guide && guide.steps.length > 0 && guide.steps.every((_, i) => done.has(i));
     const stagesDoneArr: string[] = Array.isArray(selectedCase.stages_done) ? selectedCase.stages_done : [];
     const isCurrent = PIPELINE_STAGES[stagesDoneArr.length]?.key === stageKey;
-    if (!isCurrent || !allAnswered) return;
+    // Never advance past a stage whose required field (ETA / upload / outcome) is empty.
+    if (!isCurrent || !allAnswered || !stageRequirementMet(stageKey, selectedCase)) return;
     // Advance, extending to any lab steps already checked so stages_done stays a
     // contiguous prefix (mirrors handleToggleStage).
     const stageIdx = PIPELINE_STAGES.findIndex(s => s.key === stageKey);
@@ -1671,25 +1694,9 @@ export default function CXClient({
                   );
                 })}
               </div>
-              {(() => {
-                const allAnswered = guide.steps.length > 0 && guide.steps.every((_, i) => checked.includes(i));
-                const isCurrent = PIPELINE_STAGES[stagesDone.length]?.key === curKey;
-                return (
-                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <button onClick={() => handleDoneStage(curKey)} disabled={!allAnswered || !isCurrent}
-                      title={allAnswered ? 'Move this case to the next stage' : 'Mark every step Yes first'}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 8, fontSize: 13.5, fontWeight: 800, border: 'none',
-                        cursor: (allAnswered && isCurrent) ? 'pointer' : 'not-allowed',
-                        background: (allAnswered && isCurrent) ? 'oklch(0.55 0.16 145)' : 'var(--line)',
-                        color: (allAnswered && isCurrent) ? 'white' : 'var(--ink-5)', opacity: (allAnswered && isCurrent) ? 1 : 0.7 }}>
-                      ✓ Done — move to next stage
-                    </button>
-                    <span style={{ fontSize: 11.5, color: 'var(--ink-5)' }}>
-                      Mark every step <strong>Yes</strong>, then hit <strong>Done</strong> — the case only moves when you click it.
-                    </span>
-                  </div>
-                );
-              })()}
+              <div style={{ fontSize: 11.5, color: 'var(--ink-5)', marginTop: 8 }}>
+                ↑ Mark every step <strong>Yes</strong>{stageRequirementMet(curKey, selectedCase) ? '' : ', fill in the required field below,'} then hit <strong>Done</strong> at the bottom to move to the next stage.
+              </div>
               {curKey === 'pre_imp_appointment' && (
                 <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 8, background: 'white', border: '1px solid var(--line)' }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Virtual appointment — create the meeting and send the link to the customer</div>
@@ -1794,6 +1801,30 @@ export default function CXClient({
                         ? 'On completing the stage below, this profile moves to the Completed Success tab (full history kept).'
                         : 'Pick an answer, then check the Completed stage below to file the order — the profile moves automatically.'}
                     </div>
+                  </div>
+                );
+              })()}
+              {(() => {
+                const allAnswered = guide.steps.length > 0 && guide.steps.every((_, i) => checked.includes(i));
+                const isCurrent = PIPELINE_STAGES[stagesDone.length]?.key === curKey;
+                const reqMet = stageRequirementMet(curKey, selectedCase);
+                const canDone = allAnswered && isCurrent && reqMet;
+                const missingReq = isCurrent && allAnswered && !reqMet && STAGE_REQ_HINT[curKey];
+                return (
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <button onClick={() => handleDoneStage(curKey)} disabled={!canDone}
+                      title={canDone ? 'Move this case to the next stage' : !allAnswered ? 'Mark every step Yes first' : !reqMet ? (STAGE_REQ_HINT[curKey] ?? 'Complete the required field above first') : 'Move this case to the next stage'}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 8, fontSize: 13.5, fontWeight: 800, border: 'none',
+                        cursor: canDone ? 'pointer' : 'not-allowed',
+                        background: canDone ? 'oklch(0.55 0.16 145)' : 'var(--line)',
+                        color: canDone ? 'white' : 'var(--ink-5)', opacity: canDone ? 1 : 0.7 }}>
+                      ✓ Done — move to next stage
+                    </button>
+                    <span style={{ fontSize: 11.5, fontWeight: missingReq ? 700 : 400, color: missingReq ? 'oklch(0.52 0.16 25)' : 'var(--ink-5)' }}>
+                      {missingReq
+                        ? STAGE_REQ_HINT[curKey]
+                        : <>Mark every step <strong>Yes</strong>, then hit <strong>Done</strong> — the case only moves when you click it.</>}
+                    </span>
                   </div>
                 );
               })()}
