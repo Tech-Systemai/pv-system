@@ -402,7 +402,7 @@ export default function CXClient({
   const [stages,  setStages]  = useState<string[]>(savedPipelineStages ?? DEFAULT_PIPELINE_STAGES);
 
   const [viewMode,    setViewMode]    = useState<'overview'|'board'|'table'>('overview');
-  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'ready_ship'|'labels'|'lab'|'issues'|'completed_success'>(userRole === 'dentist' ? 'lab' : 'agents');
+  const [section,     setSection]     = useState<'new'|'agents'|'admin'|'no_update'|'unreachable'|'my_cases'|'on_hold'|'ready_ship'|'labels'|'lab'|'issues'|'completed_success'>(userRole === 'dentist' ? 'lab' : 'agents');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase,  setSelectedCase]  = useState<any>(null);
   const [showForm,      setShowForm]      = useState(false);
@@ -443,19 +443,21 @@ export default function CXClient({
   const nameMap = Object.fromEntries(allProfiles.map((p: any) => [p.id, p.name]));
   const todayUpdatedIds = new Set(updates.filter((u: any) => u.update_date === today).map((u: any) => u.case_id));
 
-  const escalatedCount   = cases.filter(c => c.escalated).length;
-  const noUpdateCount    = cases.filter(c => c.no_update_needed && !c.escalated).length;
-  const unreachableCount = cases.filter(c => c.unreachable && !c.escalated).length;
+  const escalatedCount   = cases.filter(c => c.escalated && !c.on_hold).length;
+  const noUpdateCount    = cases.filter(c => c.no_update_needed && !c.escalated && !c.on_hold).length;
+  const unreachableCount = cases.filter(c => c.unreachable && !c.escalated && !c.on_hold).length;
   // A case is "resolved" once it reaches the Completed stage AND an outcome was
   // chosen (issues vs success). Resolved cases leave the active views and live in
   // the Issues / Completed Success tabs instead.
   const isResolved = (c: any) =>
     Array.isArray(c.stages_done) && c.stages_done.includes('completed_no_issues') && !!c.completed_outcome;
+  // On-hold (paused) cases collect in their own tab and drop out of every active view.
+  const onHoldCount      = cases.filter(c => c.on_hold && !isResolved(c)).length;
   // "New orders" = active, unassigned cases. They move to "Agents" the moment they get an assignee.
-  const isActiveCase     = (c: any) => !c.escalated && !c.no_update_needed && !c.unreachable && !isResolved(c);
+  const isActiveCase     = (c: any) => !c.escalated && !c.no_update_needed && !c.unreachable && !c.on_hold && !isResolved(c);
   const newOrdersCount   = cases.filter(c => isActiveCase(c) && !c.assigned_to).length;
   const agentsCount      = cases.filter(c => isActiveCase(c) && c.assigned_to).length;
-  const myCasesCount     = cases.filter(c => c.assigned_to === currentUserId && !isResolved(c)).length;
+  const myCasesCount     = cases.filter(c => c.assigned_to === currentUserId && !isResolved(c) && !c.on_hold).length;
   const issuesCount      = cases.filter(c => isResolved(c) && c.completed_outcome === 'issues').length;
   const completedSuccessCount = cases.filter(c => isResolved(c) && c.completed_outcome === 'success').length;
 
@@ -480,7 +482,7 @@ export default function CXClient({
   const caseHasLabel = (c: any) =>
     (Array.isArray(c.tracking_log) ? c.tracking_log : []).some((e: any) => e?.label_url || e?.label_type);
   const isReadyToShip = (c: any) => {
-    if (isResolved(c)) return false;
+    if (isResolved(c) || c.on_hold) return false;
     const full = Number(c.full_price) || 0;
     const collected = Number(c.amount_collected) || 0;
     const fullyPaid = full > 0 && collected >= full;                       // full payment taken
@@ -511,8 +513,12 @@ export default function CXClient({
     if (section === 'completed_success') return (isResolved(c) && c.completed_outcome === 'success') && matchesSearch(c);
     // Ready to be Shipped: fully paid + past halfway, no label made yet.
     if (section === 'ready_ship')        return isReadyToShip(c) && matchesSearch(c);
+    // On Hold: every paused case collects here, whatever tab it came from.
+    if (section === 'on_hold')           return !!c.on_hold && !isResolved(c) && matchesSearch(c);
     // Resolved cases have moved out of every other view.
     if (isResolved(c)) return false;
+    // Paused cases live only in the On Hold tab — hide them from the active tabs.
+    if (c.on_hold) return false;
     if (section === 'my_cases'    && c.assigned_to !== currentUserId)                 return false;
     if (section === 'admin'       && !c.escalated)                                    return false;
     if (section === 'new'         && (!isActiveCase(c) || c.assigned_to))             return false;
@@ -1062,7 +1068,7 @@ export default function CXClient({
   const banner = (
     <div className="card" style={{ marginBottom: 16, padding: '16px 22px', background: section === 'admin' && escalatedCount > 0 ? 'linear-gradient(135deg, oklch(0.98 0.03 25), oklch(0.97 0.04 15))' : section === 'no_update' ? 'linear-gradient(135deg, oklch(0.98 0.02 145), oklch(0.97 0.03 120))' : section === 'unreachable' ? 'linear-gradient(135deg, oklch(0.98 0.02 290), oklch(0.97 0.03 270))' : section === 'new' ? 'linear-gradient(135deg, oklch(0.98 0.02 200), oklch(0.97 0.03 215))' : 'linear-gradient(135deg, oklch(0.98 0.01 260), oklch(0.97 0.02 200))' }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: section === 'admin' && escalatedCount > 0 ? 'oklch(0.45 0.20 25)' : section === 'no_update' ? 'oklch(0.36 0.15 145)' : section === 'unreachable' ? 'oklch(0.40 0.18 290)' : section === 'new' ? 'oklch(0.38 0.18 200)' : 'var(--ink-4)', marginBottom: 6 }}>
-        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'ready_ship' ? 'READY TO BE SHIPPED' : section === 'labels' ? 'LABELS READY TO PRINT' : section === 'lab' ? 'VERIFY IMPRESSION KIT → LAB' : section === 'issues' ? 'ISSUES' : section === 'completed_success' ? 'COMPLETED SUCCESS' : 'AGENTS — ASSIGNED CUSTOMERS'}
+        CUSTOMER SERVICE · {section === 'admin' ? 'ADMIN — ESCALATED CASES' : section === 'no_update' ? 'NO UPDATE NEEDED' : section === 'unreachable' ? 'UNREACHABLE CUSTOMERS' : section === 'on_hold' ? 'ON HOLD' : section === 'new' ? 'NEW ORDERS — UNASSIGNED' : section === 'ready_ship' ? 'READY TO BE SHIPPED' : section === 'labels' ? 'LABELS READY TO PRINT' : section === 'lab' ? 'VERIFY IMPRESSION KIT → LAB' : section === 'issues' ? 'ISSUES' : section === 'completed_success' ? 'COMPLETED SUCCESS' : 'AGENTS — ASSIGNED CUSTOMERS'}
       </div>
       {section === 'issues' ? (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
@@ -1123,6 +1129,12 @@ export default function CXClient({
             ? 'No customers marked as unreachable.'
             : <><strong style={{ color: 'oklch(0.40 0.18 290)' }}>{unreachableCount} customer{unreachableCount !== 1 ? 's' : ''}</strong> marked as unreachable. These cases are excluded from the update-due counter until contact is re-established.</>}
         </div>
+      ) : section === 'on_hold' ? (
+        <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
+          {onHoldCount === 0
+            ? 'No cases on hold. Any case you put on hold collects here, out of the active tabs.'
+            : <><strong style={{ color: 'oklch(0.42 0 0)' }}>{onHoldCount} case{onHoldCount !== 1 ? 's' : ''}</strong> on hold. These are paused and parked out of the active tabs until you take them off hold.</>}
+        </div>
       ) : (
         <div style={{ fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 }}>
           {escalatedCount === 0
@@ -1152,6 +1164,10 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.92 0.06 25)' : 'white') : 'transparent', color: section === 'admin' ? (escalatedCount > 0 ? 'oklch(0.38 0.20 25)' : 'var(--ink)') : (escalatedCount > 0 ? 'oklch(0.45 0.18 25)' : 'var(--ink-4)'), boxShadow: section === 'admin' ? 'var(--sh-1)' : 'none' }}>
             {escalatedCount > 0 ? '⚠ ' : ''}Admin · {escalatedCount}
           </button>
+          <button onClick={() => setSection('my_cases')} title="Only the cases assigned to you"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'my_cases' ? 'oklch(0.55 0.16 250)' : 'transparent', color: section === 'my_cases' ? 'white' : 'var(--ink-4)', boxShadow: section === 'my_cases' ? 'var(--sh-1)' : 'none' }}>
+            👤 My Cases · {myCasesCount}
+          </button>
           <button onClick={() => setSection('no_update')}
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'no_update' ? 'oklch(0.93 0.05 145)' : 'transparent', color: section === 'no_update' ? 'oklch(0.36 0.15 145)' : 'var(--ink-4)', boxShadow: section === 'no_update' ? 'var(--sh-1)' : 'none' }}>
             ✓ No Update Needed · {noUpdateCount}
@@ -1160,17 +1176,9 @@ export default function CXClient({
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'unreachable' ? 'oklch(0.92 0.06 290)' : 'transparent', color: section === 'unreachable' ? 'oklch(0.38 0.18 290)' : (unreachableCount > 0 ? 'oklch(0.45 0.15 290)' : 'var(--ink-4)'), boxShadow: section === 'unreachable' ? 'var(--sh-1)' : 'none' }}>
             📵 Unreachable · {unreachableCount}
           </button>
-          <button onClick={() => setSection('my_cases')} title="Only the cases assigned to you"
-            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'my_cases' ? 'oklch(0.55 0.16 250)' : 'transparent', color: section === 'my_cases' ? 'white' : 'var(--ink-4)', boxShadow: section === 'my_cases' ? 'var(--sh-1)' : 'none' }}>
-            👤 My Cases · {myCasesCount}
-          </button>
-          <button onClick={() => setSection('ready_ship')} title="Fully paid and past halfway — needs a shipping label made"
-            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'ready_ship' ? 'oklch(0.55 0.15 145)' : 'transparent', color: section === 'ready_ship' ? 'white' : (readyShipCount > 0 ? 'oklch(0.40 0.15 145)' : 'var(--ink-4)'), boxShadow: section === 'ready_ship' ? 'var(--sh-1)' : 'none' }}>
-            📦 Ready to be Shipped · {readyShipCount}
-          </button>
-          <button onClick={() => setSection('labels')} title="Shipping labels bought in Shippo and ready to print"
-            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'labels' ? 'oklch(0.55 0.15 170)' : 'transparent', color: section === 'labels' ? 'white' : (labelsReadyCount > 0 ? 'oklch(0.42 0.14 170)' : 'var(--ink-4)'), boxShadow: section === 'labels' ? 'var(--sh-1)' : 'none' }}>
-            🖨 Labels Ready · {labelsReadyCount}
+          <button onClick={() => setSection('on_hold')} title="Paused / on-hold cases — parked out of the active tabs"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'on_hold' ? 'oklch(0.50 0 0)' : 'transparent', color: section === 'on_hold' ? 'white' : (onHoldCount > 0 ? 'oklch(0.45 0 0)' : 'var(--ink-4)'), boxShadow: section === 'on_hold' ? 'var(--sh-1)' : 'none' }}>
+            🔒 On Hold · {onHoldCount}
           </button>
           </>)}
           {canViewLab && (
@@ -1180,6 +1188,14 @@ export default function CXClient({
           </button>
           )}
           {!labOnly && (<>
+          <button onClick={() => setSection('ready_ship')} title="Fully paid and past halfway — needs a shipping label made"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'ready_ship' ? 'oklch(0.55 0.15 145)' : 'transparent', color: section === 'ready_ship' ? 'white' : (readyShipCount > 0 ? 'oklch(0.40 0.15 145)' : 'var(--ink-4)'), boxShadow: section === 'ready_ship' ? 'var(--sh-1)' : 'none' }}>
+            📦 Ready to be Shipped · {readyShipCount}
+          </button>
+          <button onClick={() => setSection('labels')} title="Shipping labels bought in Shippo and ready to print"
+            style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'labels' ? 'oklch(0.55 0.15 170)' : 'transparent', color: section === 'labels' ? 'white' : (labelsReadyCount > 0 ? 'oklch(0.42 0.14 170)' : 'var(--ink-4)'), boxShadow: section === 'labels' ? 'var(--sh-1)' : 'none' }}>
+            🖨 Labels Ready · {labelsReadyCount}
+          </button>
           <button onClick={() => setSection('issues')} title="Completed orders the customer flagged issues on"
             style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', background: section === 'issues' ? 'oklch(0.55 0.18 25)' : 'transparent', color: section === 'issues' ? 'white' : (issuesCount > 0 ? 'oklch(0.45 0.18 25)' : 'var(--ink-4)'), boxShadow: section === 'issues' ? 'var(--sh-1)' : 'none' }}>
             ⚠ Issues · {issuesCount}
@@ -1224,7 +1240,7 @@ export default function CXClient({
       )}
       {filtered.length === 0 && (
         <div className="card" style={{ gridColumn: '1/-1', padding: '48px 20px', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13 }}>
-          {section === 'my_cases' ? 'No cases are assigned to you right now.' : section === 'ready_ship' ? 'Nothing waiting to be shipped — every paid, past-halfway order already has a label.' : section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : section === 'issues' ? 'No completed orders with issues.' : section === 'completed_success' ? 'No completed orders yet.' : 'No customer cases found.'}
+          {section === 'my_cases' ? 'No cases are assigned to you right now.' : section === 'ready_ship' ? 'Nothing waiting to be shipped — every paid, past-halfway order already has a label.' : section === 'on_hold' ? 'No cases on hold right now.' : section === 'admin' ? 'No escalated cases. All customers are being handled by agents.' : section === 'no_update' ? 'No cases marked as no update needed.' : section === 'unreachable' ? 'No customers marked as unreachable.' : section === 'new' ? 'No new orders waiting — every active customer is assigned to an agent.' : section === 'issues' ? 'No completed orders with issues.' : section === 'completed_success' ? 'No completed orders yet.' : 'No customer cases found.'}
         </div>
       )}
       {filtered.map(c => {
@@ -2399,7 +2415,7 @@ export default function CXClient({
       {banner}
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 2 }}>
-          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'ready_ship' ? 'Ready to be Shipped' : section === 'labels' ? 'Labels Ready to Print' : section === 'lab' ? 'Verify Impression Kit → Lab' : section === 'issues' ? 'Issues' : section === 'completed_success' ? 'Completed Success' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
+          {section === 'new' ? 'New Orders — Unassigned' : section === 'agents' ? 'Agents — Assigned customers' : section === 'admin' ? 'Admin — Escalated cases' : section === 'unreachable' ? 'Unreachable customers' : section === 'on_hold' ? 'On Hold' : section === 'ready_ship' ? 'Ready to be Shipped' : section === 'labels' ? 'Labels Ready to Print' : section === 'lab' ? 'Verify Impression Kit → Lab' : section === 'issues' ? 'Issues' : section === 'completed_success' ? 'Completed Success' : section === 'my_cases' ? 'My Cases' : 'No Update Needed'}
         </div>
         <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>
           {section === 'new'
@@ -2410,6 +2426,8 @@ export default function CXClient({
             ? 'Cases flagged by agents that require management review or action'
             : section === 'unreachable'
             ? 'Customers that could not be reached — click to manage or reactivate'
+            : section === 'on_hold'
+            ? 'Paused cases parked out of the active tabs — take a case off hold to send it back into the workflow'
             : section === 'ready_ship'
             ? 'Paid in full and past halfway, but no shipping label yet — create a label and it moves to Labels Ready'
             : section === 'labels'
