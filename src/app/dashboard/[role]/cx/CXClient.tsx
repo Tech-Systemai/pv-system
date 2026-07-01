@@ -115,9 +115,7 @@ const STAGE_GUIDE: Record<string, { summary: string; steps: string[] }> = {
     summary: 'Collect the partial or full payment before the kit goes to the lab.',
     steps: [
       'Collect the required payment (either partial or full)',
-      'Log the payment in the CRM',
-      'Log the payment in the portal',
-      'Log the payment in the collecting payments section to earn your commission',
+      'Verify the payment in the portal',
     ],
   },
   waiting_sendback_tracking: {
