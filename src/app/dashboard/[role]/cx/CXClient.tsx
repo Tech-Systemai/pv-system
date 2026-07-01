@@ -1484,6 +1484,26 @@ export default function CXClient({
                 style={{ display: 'flex', alignItems: 'center', gap: 5, opacity: veneersReady ? 1 : 0.55 }}>
                 {creatingLabel ? 'Sending…' : '🦷 Create veneers label'}
               </button>
+              {/* Impression-kit appointment actions, pinned to the top so agents can
+                  spin up the meeting and upload the recording without scrolling to the
+                  guide. The hidden file input lives here (always mounted) so both this
+                  top Upload button and the one inside the guide can trigger it. */}
+              <input ref={recInputRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleRecordingSelected} />
+              <a href="https://www.sylaps.com" target="_blank" rel="noopener noreferrer"
+                className="btn btn-sm" title="Open Sylaps and create the appointment meeting"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none', background: 'oklch(0.50 0.16 260)', color: 'white', border: 'none' }}>
+                🎥 Create meeting
+              </a>
+              <a href="https://www.sylaps.com" target="_blank" rel="noopener noreferrer"
+                className="btn btn-sm" title="Create another meeting if you need a second one"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none', background: 'oklch(0.50 0.16 260)', color: 'white', border: 'none' }}>
+                🎥 Create another meeting
+              </a>
+              <button onClick={() => recInputRef.current?.click()} disabled={recUploading}
+                className="btn btn-sm" title="Upload the impression-kit appointment recording"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: recUploading ? 'var(--line)' : 'oklch(0.50 0.16 200)', color: 'white', border: 'none', cursor: recUploading ? 'default' : 'pointer' }}>
+                {recUploading ? 'Uploading…' : '⬆ Upload recording'}
+              </button>
             </div>
             {showReferralAdd && (
               <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--line)' }}>
@@ -1670,7 +1690,6 @@ export default function CXClient({
                   </a>
                   <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', marginBottom: 8 }}>Recording Upload — upload the appointment recording when you finish</div>
-                    <input ref={recInputRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={handleRecordingSelected} />
                     <button onClick={() => recInputRef.current?.click()} disabled={recUploading}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700,
                         cursor: recUploading ? 'default' : 'pointer', background: recUploading ? 'var(--line)' : 'oklch(0.50 0.16 200)', color: 'white', border: 'none' }}>
