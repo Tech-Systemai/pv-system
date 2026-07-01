@@ -20,6 +20,38 @@ type Contract = {
 };
 
 const CONTRACT_TEMPLATES: Record<string, Section[]> = {
+  'Remote Sales Representative': [
+    { title: '1. Parties & Effective Date', content: `This Remote Sales Representative Agreement ("Agreement") is entered into as of the date last signed below ("Effective Date") by and between Pioneers Veneers ("Company"). The parties agree to the following terms governing the Representative's engagement with the Company.` },
+    { title: '2. Nature of Relationship', content: `The Representative is engaged as an independent contractor. Nothing in this Agreement shall be construed to create an employer-employee relationship, partnership, joint venture, or agency. The Representative is not entitled to employee benefits, social security contributions, PhilHealth, Pag-IBIG, or any statutory Philippine employment benefits unless separately agreed in writing. The Representative acknowledges full responsibility for their own tax obligations under Philippine law and shall indemnify the Company against any tax liabilities arising from this engagement.` },
+    { title: '3. Probationary Period', content: `The Representative will serve a ninety (90) day Probationary Period commencing on the Effective Date. During this period: (a) all compensation terms, qualification thresholds, and performance standards in this Agreement apply in full; (b) the Company may terminate this Agreement at any time without notice if the Representative fails to meet the minimum performance standards defined in Clause 6; and (c) upon successful completion of the Probationary Period, the Representative transitions to a standard engagement subject to the 30-day notice requirement in Clause 10. Successful completion of the Probationary Period is not guaranteed and is contingent solely on demonstrated sales performance.` },
+    { title: '4. Duties & Responsibilities', content: `The Representative agrees to: (a) conduct outbound and inbound sales calls, SMS, and messaging to prospective Pioneers Veneers customers; (b) follow the Company's approved sales scripts, objection handling frameworks, and CRM workflows at all times; (c) log all interactions, dispositions, and outcomes accurately and promptly in the Company's CRM system; (d) attend all required team meetings, training sessions, and one-on-ones as scheduled by the Company; (e) collect payment from customers and ensure full order amounts ($600.00 USD, or cumulative down payments totaling $600.00 USD) are processed through Company-approved payment methods only; (f) maintain professional standards in all customer communications; (g) protect the confidentiality of all customer data, Company processes, pricing, scripts, and proprietary information; and (h) meet or exceed the minimum performance thresholds defined in Clause 6 on an ongoing basis.` },
+    { title: '5. Compensation', content: `5.1 — Base Salary: The Representative shall receive a monthly base salary of ₱15,000.00 Philippine Pesos ("Base"), subject exclusively to the performance qualification conditions defined in Clause 6. The Base is not guaranteed. It is a performance-contingent payment and shall not be earned, accrued, or paid in any period where the Representative fails to meet the minimum threshold.
+
+5.2 — Commission: The Representative shall earn commission on each fully collected order. An order is "fully collected" when the full $600.00 USD order value has been received by the Company — either as a single payment or as cumulative down payments totaling $600.00 USD for that specific order. Commission tiers reset at the start of each calendar month and are structured as follows: Sales 1 through 10 (first 10 fully collected orders in the month) earn $10.00 USD per order. Sales 11 through 20 (next 10 fully collected orders) earn $15.00 USD per order. Sales 21 and beyond (all orders exceeding 20) earn $20.00 USD per order. Commission is earned in the billing cycle in which the final payment for an order is collected, regardless of when the order was originally placed. No commission is paid on partial collections, cancelled orders, or orders subject to a chargeback or dispute.
+
+5.3 — Payment Schedule: Compensation is paid bi-monthly. Period 1 (covering weeks 1–2) is paid on or before the 5th of the following month. Period 2 (covering weeks 3–4) is paid on or before the 20th of the same month. Payment is made via GCash, bank transfer, or another method mutually agreed upon in writing. The Company reserves the right to withhold any payout pending resolution of a disputed order, chargeback, or customer complaint directly attributable to the Representative.` },
+    { title: '6. Performance Requirements & Base Qualification', content: `6.1 — Minimum Threshold: The Base salary is conditional. It is only earned if the Representative closes a minimum of ten (10) fully collected orders in every consecutive two (2) week period ("Bi-Weekly Evaluation Period"). Bi-Weekly Evaluation Periods run Monday through Sunday of weeks 1–2, then weeks 3–4 of each calendar month.
+
+6.2 — Forfeiture: If the Representative closes fewer than ten (10) fully collected orders in any single Bi-Weekly Evaluation Period, the Base for that period is forfeited in full. It is not pro-rated, deferred, or carried forward to any future period. Commission earned on collected orders in that period is still payable regardless of whether the Base is forfeited.
+
+6.3 — Zero Sales: A Representative who closes zero (0) sales in any Bi-Weekly Evaluation Period earns zero compensation for that period — no Base, no commission, and no partial payment of any kind.
+
+6.4 — Termination Trigger: Failure to meet the ten (10) order threshold for two (2) or more consecutive Bi-Weekly Evaluation Periods constitutes grounds for immediate termination without notice, at the Company's sole discretion.` },
+    { title: '7. Termination for Cause', content: `The following each independently constitute grounds for immediate termination without notice and without compensation for any unearned period: (a) failure to meet the bi-weekly performance threshold for two or more consecutive evaluation periods; (b) misrepresentation of sales data, order status, or payment collection in the CRM or to management; (c) accepting, diverting, or misappropriating customer payments through unauthorized channels; (d) sharing, selling, or disclosing any Company data, scripts, customer information, or proprietary processes to any third party; (e) gross insubordination, harassment of customers or colleagues, or conduct materially damaging to the Company's reputation; or (f) any breach of the confidentiality, non-solicitation, or data protection provisions of this Agreement. Termination for cause results in immediate cessation of all Base payments. Commission already earned on fully collected orders prior to the termination date remains payable at the next scheduled payout, less any amounts owed to the Company.` },
+    { title: '8. Monitoring & Technology', content: `The Representative consents to: (a) call recording on all sales calls conducted through Company-provided telephony systems, used for quality assurance, training, and dispute resolution; (b) screen capture via the Company's productivity monitoring system (Hubstaff or equivalent), active during all logged working hours, accessible by the Company's management team; and (c) CRM activity logging, including call logs, SMS records, and disposition notes, which may be reviewed by supervisors at any time. The Representative is prohibited from conducting sales activity on personal or non-Company-approved platforms, phone numbers, or payment processors. Any such activity constitutes a material breach of this Agreement.` },
+    { title: '9. Confidentiality & Non-Solicitation', content: `9.1 — Confidentiality: The Representative agrees to keep strictly confidential, both during and after the term of this Agreement, all non-public information belonging to the Company, including but not limited to: customer lists and contact data, sales scripts and processes, pricing and commission structures, software systems and CRM configurations, and any other proprietary business information. Breach of confidentiality entitles the Company to seek injunctive relief and damages without the need to prove specific harm.
+
+9.2 — Non-Solicitation: For twelve (12) months following termination of this Agreement for any reason, the Representative agrees not to: (a) directly or indirectly solicit, contact, or attempt to sell to any customer of the Company with whom the Representative had contact during their engagement; or (b) recruit, solicit, or induce any Company employee or contractor to leave the Company or join a competing business.
+
+9.3 — Data Privacy: The Representative shall comply at all times with the Philippine Data Privacy Act of 2012 (Republic Act No. 10173). Customer personal data accessed through the Company's systems shall be used solely for fulfilling sales duties under this Agreement and shall not be retained, copied, or transferred upon termination.` },
+    { title: '10. Termination', content: `10.1 — By Either Party: After the Probationary Period, either party may terminate this Agreement by providing thirty (30) days written notice delivered via the Representative's Company email or official communication channel on record.
+
+10.2 — For Cause: The Company may terminate immediately and without notice for any cause listed in Clause 7. In such cases, no Base is payable for any period not yet paid.
+
+10.3 — Obligations Upon Termination: Upon termination for any reason, the Representative must immediately: (a) cease all sales activity on behalf of the Company; (b) return, delete, or destroy all Company materials, data, scripts, and access credentials; (c) cooperate with any knowledge transfer process as directed by the Company; and (d) provide accurate final reporting of all outstanding orders, partial collections, and customer commitments. Failure to comply may result in withholding of any outstanding commission until obligations are fulfilled.` },
+    { title: '11. Limitation of Liability & Indemnification', content: `The Company's maximum liability to the Representative under this Agreement, for any reason, shall not exceed the total compensation paid to the Representative in the ninety (90) days immediately preceding the event giving rise to the claim. The Representative shall indemnify, defend, and hold harmless the Company, its officers, employees, and agents from any claim, loss, or liability arising from: (a) the Representative's breach of this Agreement; (b) misrepresentation to customers; (c) unauthorized collection or handling of customer funds; or (d) violation of applicable Philippine law.` },
+    { title: '12. General Provisions', content: `This Agreement constitutes the entire agreement between the parties and supersedes all prior understandings, whether written or oral. It may only be modified by a written document signed by both parties. If any provision is found unenforceable, the remaining provisions remain in full force. Failure to enforce any provision shall not constitute a waiver of that or any other provision. This Agreement may be signed electronically and in counterparts, each of which shall be deemed an original. The Representative confirms they have read and understood this Agreement in its entirety, including the performance-contingent nature of the Base salary, the bi-weekly evaluation thresholds, and the consequences of non-performance, and agrees that no Base is guaranteed.` },
+  ],
   'Sales Associate': [
     { title: '1. Position and Duties', content: 'The Employee is hired as a Sales Associate. Responsibilities include prospecting new clients, closing sales, maintaining client relationships, meeting monthly sales targets, and complying with all company policies.' },
     { title: '2. Compensation', content: 'Base salary as configured in the HR system. Commission is earned per the official tiered commission ladder. Point-based deductions apply for attendance violations as governed by the Policy Engine.' },
@@ -55,12 +87,30 @@ function parseSections(content?: string): Section[] {
   try { return JSON.parse(content); } catch { return []; }
 }
 
+// Independent-contractor style agreements (sales rep, contractor) read
+// "Company / Representative" and "Services Agreement"; employment templates keep
+// "Employer / Employee". Keeps the header, intro, and signature labels accurate.
+const SERVICES_TYPES   = new Set(['Remote Sales Representative', 'Independent Contractor']);
+const isServicesType   = (type: string) => SERVICES_TYPES.has(type);
+const companyPartyWord = (type: string) => (isServicesType(type) ? 'Company' : 'Employer');
+const partyRoleWord    = (type: string) =>
+  type === 'Remote Sales Representative' ? 'Representative'
+  : type === 'Independent Contractor'    ? 'Contractor'
+  : 'Employee';
+const docSubtitle      = (type: string) =>
+  isServicesType(type) ? 'Services Agreement · Official Document' : 'Employment Agreement · Official Document';
+
 function buildContractHtml(contract: Contract, sections: Section[]): string {
   const empSig   = contract.employer_signature ?? '';
   const empeeSig = contract.employee_signature ?? '';
   const empDate  = contract.employer_signed_at  ? new Date(contract.employer_signed_at).toLocaleDateString()  : '';
   const empeeDate= contract.employee_signed_at  ? new Date(contract.employee_signed_at).toLocaleDateString()  : '';
   const refId    = (contract.id?.slice(0, 8) ?? Date.now().toString().slice(-8)).toUpperCase();
+  const services = isServicesType(contract.type);
+  const role     = partyRoleWord(contract.type);
+  const introHtml = services
+    ? `<p>This ${contract.type} Agreement is entered into on <strong>${contract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Company") and <strong>${contract.profiles?.name ?? `the ${role}`}</strong> (the "${role}"), and shall govern the terms of engagement as outlined below.</p>`
+    : `<p>This Employment Agreement is entered into on <strong>${contract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Employer") and <strong>${contract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.</p>`;
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <title>${contract.type} Agreement</title>
@@ -82,7 +132,7 @@ function buildContractHtml(contract: Contract, sections: Section[]): string {
 </style></head><body>
 <div style="text-align:center;border-bottom:2px solid #1a1f2e;padding-bottom:20px;margin-bottom:30px">
   <h1>PIONEERS VENEERS</h1>
-  <div style="font-size:11px;color:#6b7689;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Employment Agreement · Official Document</div>
+  <div style="font-size:11px;color:#6b7689;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">${docSubtitle(contract.type)}</div>
 </div>
 <h2>${contract.type} Agreement</h2>
 <div class="meta">
@@ -91,17 +141,17 @@ function buildContractHtml(contract: Contract, sections: Section[]): string {
   <div><span class="meta-lbl">Effective Date</span><strong>${contract.effective_date}</strong></div>
   ${contract.end_date ? `<div><span class="meta-lbl">End Date</span><strong>${contract.end_date}</strong></div>` : ''}
 </div>
-<p>This Employment Agreement is entered into on <strong>${contract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Employer") and <strong>${contract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.</p>
+${introHtml}
 ${sections.map(s => `<div style="margin-bottom:20px"><h3>${s.title}</h3><p>${s.content}</p></div>`).join('')}
 <div class="sigs">
   <div style="width:44%">
-    <strong style="font-size:12px">Employer Signature</strong><br>
+    <strong style="font-size:12px">${services ? 'Company' : 'Employer'} Signature</strong><br>
     <span style="font-size:11px;color:#6b7689">Pioneers Veneers — Authorized Management</span>
     <div class="sig-name">${empSig}</div>
     <div class="sig-line">Signature${empDate ? ` · ${empDate}` : ''}</div>
   </div>
   <div style="width:44%;text-align:right">
-    <strong style="font-size:12px">Employee Signature</strong><br>
+    <strong style="font-size:12px">${role} Signature</strong><br>
     <span style="font-size:11px;color:#6b7689">${contract.profiles?.name ?? ''}</span>
     <div class="sig-name" style="text-align:right">${empeeSig || '<!--EMP_SIG_PLACEHOLDER-->'}</div>
     <div class="sig-line">${empeeDate ? `Signature · ${empeeDate}` : '<!--EMP_DATE_PLACEHOLDER-->Signature'}</div>
@@ -127,10 +177,10 @@ export default function ContractsClient({
 
   // Create/edit form state
   const [selectedUser, setSelectedUser] = useState('');
-  const [contractType, setContractType] = useState('Sales Associate');
+  const [contractType, setContractType] = useState('Remote Sales Representative');
   const [effectiveDate, setEffectiveDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate]           = useState('');
-  const [sections, setSections]         = useState<Section[]>(CONTRACT_TEMPLATES['Sales Associate']);
+  const [sections, setSections]         = useState<Section[]>(CONTRACT_TEMPLATES['Remote Sales Representative']);
   const [isSaving, setIsSaving]         = useState(false);
 
   // Signature state
@@ -165,10 +215,10 @@ export default function ContractsClient({
   const openCreate = () => {
     setEditing(null);
     setSelectedUser('');
-    setContractType('Sales Associate');
+    setContractType('Remote Sales Representative');
     setEffectiveDate(new Date().toISOString().split('T')[0]);
     setEndDate('');
-    setSections(CONTRACT_TEMPLATES['Sales Associate']);
+    setSections(CONTRACT_TEMPLATES['Remote Sales Representative']);
     setView('create');
   };
 
@@ -322,7 +372,7 @@ export default function ContractsClient({
           {/* Header */}
           <div style={{ textAlign: 'center', borderBottom: '2px solid #1a1f2e', paddingBottom: 20, marginBottom: 30 }}>
             <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '1px', color: '#0f172a' }}>PIONEERS VENEERS</div>
-            <div style={{ fontSize: 11, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: 4 }}>Employment Agreement · Official Document</div>
+            <div style={{ fontSize: 11, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: 4 }}>{docSubtitle(viewingContract.type)}</div>
           </div>
 
           <h2 style={{ fontSize: 15, fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 28, color: '#1a1f2e' }}>
@@ -339,7 +389,11 @@ export default function ContractsClient({
 
           {/* Intro */}
           <p style={{ lineHeight: 1.8, color: '#1a1f2e', fontSize: 13, marginBottom: 24 }}>
-            This Employment Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Employer") and <strong>{viewingContract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.
+            {isServicesType(viewingContract.type) ? (
+              <>This {viewingContract.type} Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Company") and <strong>{viewingContract.profiles?.name ?? `the ${partyRoleWord(viewingContract.type)}`}</strong> (the "{partyRoleWord(viewingContract.type)}"), and shall govern the terms of engagement as outlined below.</>
+            ) : (
+              <>This Employment Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Employer") and <strong>{viewingContract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.</>
+            )}
           </p>
 
           {/* Sections */}
@@ -355,7 +409,7 @@ export default function ContractsClient({
 
             {/* Employer */}
             <div style={{ width: '44%' }}>
-              <strong style={{ fontSize: 12 }}>Employer Signature</strong><br />
+              <strong style={{ fontSize: 12 }}>{companyPartyWord(viewingContract.type)} Signature</strong><br />
               <span style={{ fontSize: 11, color: '#6b7689' }}>Pioneers Veneers — Authorized Management</span>
               {viewingContract.employer_signature ? (
                 <>
@@ -388,14 +442,14 @@ export default function ContractsClient({
                   onClick={canSignEmployer ? () => { setSigInput('employer'); setSigText(''); } : undefined}
                   style={{ marginTop: 28, borderTop: '1px solid #94a3b8', fontSize: 11, paddingTop: 4, cursor: canSignEmployer ? 'pointer' : 'default', color: canSignEmployer ? 'var(--accent)' : '#94a3b8' }}
                 >
-                  {canSignEmployer ? '✍ Click here to sign' : 'Awaiting employer signature'}
+                  {canSignEmployer ? '✍ Click here to sign' : `Awaiting ${companyPartyWord(viewingContract.type).toLowerCase()} signature`}
                 </div>
               )}
             </div>
 
             {/* Employee */}
             <div style={{ width: '44%', textAlign: 'right' }}>
-              <strong style={{ fontSize: 12 }}>Employee Signature</strong><br />
+              <strong style={{ fontSize: 12 }}>{partyRoleWord(viewingContract.type)} Signature</strong><br />
               <span style={{ fontSize: 11, color: '#6b7689' }}>{viewingContract.profiles?.name}</span>
               {viewingContract.employee_signature ? (
                 <>
@@ -428,7 +482,7 @@ export default function ContractsClient({
                   onClick={canSignEmployee ? () => { setSigInput('employee'); setSigText(''); } : undefined}
                   style={{ marginTop: 28, borderTop: '1px solid #94a3b8', fontSize: 11, paddingTop: 4, cursor: canSignEmployee ? 'pointer' : 'default', color: canSignEmployee ? 'var(--accent)' : '#94a3b8', textAlign: 'right' }}
                 >
-                  {canSignEmployee ? '✍ Click here to sign' : 'Awaiting employee signature'}
+                  {canSignEmployee ? '✍ Click here to sign' : `Awaiting ${partyRoleWord(viewingContract.type).toLowerCase()} signature`}
                 </div>
               )}
             </div>
