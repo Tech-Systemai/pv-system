@@ -273,6 +273,34 @@ function shipStampFor(c: any): 'READY TO BE SHIPPED' | 'VENEERS SHIPPED' | 'DELI
   const shipped = done.includes('veneers_shipped') || !!eta;
   return delivered ? 'DELIVERED' : shipped ? 'VENEERS SHIPPED' : pct >= 90 ? 'READY TO BE SHIPPED' : null;
 }
+/* Every pipeline stage gets its own stamp so the card shows exactly where the
+   order is — same look as the old "Ready to be shipped" stamp, one per stage.
+   Keyed by the current stage: the first stage not yet marked done. */
+const STAGE_STAMP: Record<string, { label: string; hue: number; icon: string }> = {
+  new_order:                    { label: 'New Order',            hue: 250, icon: '🆕' },
+  imp_kit_sent:                 { label: 'Imp Kit Sent',         hue: 200, icon: '📦' },
+  imp_kit_delivered:            { label: 'Imp Kit Delivered',    hue: 190, icon: '📬' },
+  pre_imp_appointment:          { label: 'Pre-Imp Appointment',  hue: 280, icon: '📅' },
+  imp_appointment_done:         { label: 'Appointment Done',     hue: 290, icon: '✅' },
+  collect_payment:              { label: 'To Collect Payment',   hue: 40,  icon: '💰' },
+  waiting_sendback_tracking:    { label: 'Waiting',              hue: 70,  icon: '⏳' },
+  imp_kit_on_way_to_lab:        { label: 'Sent to Lab',          hue: 300, icon: '🚚' },
+  received_imp_kit_at_lab:      { label: 'Received by Lab',      hue: 170, icon: '🧪' },
+  in_production:                { label: 'In Production',         hue: 320, icon: '⚙️' },
+  collect_payment_production:   { label: 'Collect Payment',      hue: 40,  icon: '💰' },
+  quality_check:                { label: 'Quality Check',        hue: 95,  icon: '🔍' },
+  collect_full_payment_veneers: { label: 'Collect Full Payment', hue: 25,  icon: '💵' },
+  shipping_veneers:             { label: 'Ready to Ship',        hue: 145, icon: '🏷️' },
+  veneers_shipped:              { label: 'Veneers Shipped',      hue: 230, icon: '🚚' },
+  veneers_delivered:            { label: 'Veneers Delivered',    hue: 150, icon: '📦' },
+  completed_no_issues:          { label: 'Completed',            hue: 150, icon: '🎉' },
+};
+function stageStampFor(c: any): { label: string; hue: number; icon: string } {
+  const done: string[] = Array.isArray(c?.stages_done) ? c.stages_done : [];
+  const idx = Math.min(done.length, PIPELINE_STAGES.length - 1);
+  const key = PIPELINE_STAGES[idx]?.key;
+  return STAGE_STAMP[key] ?? { label: PIPELINE_STAGES[idx]?.label ?? 'In Progress', hue: 250, icon: '•' };
+}
 /* Some guide stages require a piece of data before the case may advance — an ETA
    date, an uploaded recording, or a completed-outcome choice. The "Done" button
    stays disabled until this returns true, so agents can't skip the date/upload. */
@@ -1207,7 +1235,7 @@ export default function CXClient({
         const fullPrice = Number(c.full_price) || 0;
         const collectedAmt = Number(c.amount_collected) || 0;
         const collectedPct = fullPrice > 0 ? Math.min(100, Math.round((collectedAmt / fullPrice) * 100)) : null;
-        const stamp = shipStampFor(c);
+        const stageStamp = stageStampFor(c);
         const stagesDoneCount = Array.isArray(c.stages_done) ? c.stages_done.length : 0;
         const stagePct = Math.round((stagesDoneCount / PIPELINE_STAGES.length) * 100);
         return (
@@ -1216,11 +1244,10 @@ export default function CXClient({
             onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--sh-2)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.transform = ''; }}>
             <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-              {stamp ? (
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 10px', borderRadius: 8, color: STAMP_STYLE[stamp].color, background: STAMP_STYLE[stamp].bg, border: `2px solid ${STAMP_STYLE[stamp].color}`, transform: 'rotate(4deg)', textTransform: 'uppercase' }}>
-                  {STAMP_STYLE[stamp].icon} {stamp}
-                </span>
-              ) : collectedPct != null && (
+              <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.04em', padding: '4px 10px', borderRadius: 8, whiteSpace: 'nowrap', color: `oklch(0.36 0.16 ${stageStamp.hue})`, background: `oklch(0.93 0.06 ${stageStamp.hue})`, border: `2px solid oklch(0.58 0.16 ${stageStamp.hue})`, transform: 'rotate(4deg)', textTransform: 'uppercase' }}>
+                {stageStamp.icon} {stageStamp.label}
+              </span>
+              {collectedPct != null && (
                 <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, color: 'oklch(0.38 0.16 145)', background: 'oklch(0.95 0.05 145)', border: '1px solid oklch(0.85 0.07 145)' }}>
                   {collectedPct}% paid
                 </span>
@@ -1229,7 +1256,7 @@ export default function CXClient({
                 {stagePct}% stage
               </span>
             </div>
-            <div style={{ padding: `14px ${stamp ? 170 : 86}px 10px 16px`, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ padding: '14px 186px 10px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'oklch(0.50 0.20 200)', color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {initials(c.customer_name)}
               </div>
