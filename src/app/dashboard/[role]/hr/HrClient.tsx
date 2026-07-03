@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { dbOp } from '@/utils/db';
 import { createEmployeeAccount } from '../users/actions';
 import { useRouter } from 'next/navigation';
+import InterviewerPanel from './InterviewerPanel';
 
 const STAGES = ['Applied', 'Screening', 'Interview', 'Offer', 'Hired'] as const;
 type Stage = typeof STAGES[number] | 'Rejected';
@@ -22,7 +23,18 @@ function scoreColor(s: number) {
   return { bg: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)' };
 }
 
-export default function HrClient({ initialApplicants }: { initialApplicants: any[] }) {
+export default function HrClient({
+  initialApplicants,
+  initialInterviewModules = [],
+  initialInterviewInvites = [],
+  interviewSiteUrl = '',
+}: {
+  initialApplicants: any[];
+  initialInterviewModules?: any[];
+  initialInterviewInvites?: any[];
+  interviewSiteUrl?: string;
+}) {
+  const [tab, setTab] = useState<'pipeline' | 'interviewer'>('pipeline');
   const [applicants, setApplicants] = useState(initialApplicants);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [viewApplicant, setViewApplicant] = useState<any>(null);
@@ -125,6 +137,33 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
 
   return (
     <div className="page-fade">
+      {/* Section tabs */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 18, borderBottom: '1px solid var(--line)', paddingBottom: 0 }}>
+        {([['pipeline', '👥 Pipeline'], ['interviewer', '🎤 AI Interviewer']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+              padding: '9px 16px', fontSize: 13, fontWeight: 600,
+              color: tab === id ? 'var(--accent-ink)' : 'var(--ink-3)',
+              borderBottom: tab === id ? '2px solid var(--accent)' : '2px solid transparent',
+              marginBottom: -1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'interviewer' && (
+        <InterviewerPanel
+          initialModules={initialInterviewModules}
+          initialInvites={initialInterviewInvites}
+          siteUrl={interviewSiteUrl}
+        />
+      )}
+
+      {tab === 'pipeline' && (<>
       {/* Stat row */}
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         <div className="stat-card" style={{ cursor: 'default' }}>
@@ -326,6 +365,7 @@ export default function HrClient({ initialApplicants }: { initialApplicants: any
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 }

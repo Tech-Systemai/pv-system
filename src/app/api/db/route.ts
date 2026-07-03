@@ -14,6 +14,7 @@ const ALLOWED_TABLES = [
   'condition_approvals',
   'personal_file_entries',
   'customer_portal',
+  'interview_modules', 'interview_invites', 'interview_sessions', 'interview_messages', 'interview_scorecards',
 ];
 
 export async function POST(req: NextRequest) {
