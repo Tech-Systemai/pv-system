@@ -41,6 +41,7 @@ export default function InterviewerPanel({
   const [editModule, setEditModule] = useState<any>(null);
   const [isNewModule, setIsNewModule] = useState(false);
   const [isNewInvite, setIsNewInvite] = useState(false);
+  const [linkType, setLinkType] = useState<'open' | 'personal'>('open');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState('');
   const [openResult, setOpenResult] = useState('');
@@ -94,6 +95,7 @@ export default function InterviewerPanel({
       candidate_email: (fd.get('email') as string) || '',
       difficulty: fd.get('difficulty') as string,
       status: 'pending',
+      is_open: linkType === 'open',
     };
     if (expiresDays > 0) row.expires_at = new Date(Date.now() + expiresDays * 86400000).toISOString();
     const { data, error } = await dbOp('interview_invites', 'insert', row);
@@ -153,7 +155,7 @@ export default function InterviewerPanel({
       {err && (
         <div style={{ background: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)', padding: '8px 12px', borderRadius: 7, fontSize: 12, marginBottom: 12 }}>
           {err.includes('not allowed') || err.includes('does not exist') || err.includes('schema')
-            ? 'Interview tables not found — run supabase/schema_v82_ai_interviewer.sql in the Supabase SQL Editor first.'
+            ? 'Interview tables missing or outdated — run supabase/schema_v82_ai_interviewer.sql and schema_v83_open_invites.sql in the Supabase SQL Editor.'
             : err}
         </div>
       )}
@@ -168,7 +170,7 @@ export default function InterviewerPanel({
                 Each candidate gets a one-time link to study the material and take the AI mock sales call.
               </div>
             </div>
-            <button className="btn btn-acc btn-sm" onClick={() => { setErr(''); setIsNewInvite(true); }}>+ New Invite</button>
+            <button className="btn btn-acc btn-sm" onClick={() => { setErr(''); setIsNewInvite(true); }}>+ New Link</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="tbl">
@@ -179,17 +181,29 @@ export default function InterviewerPanel({
                 )}
                 {invites.map(inv => {
                   const st = STATUS_STYLE[inv.status] || STATUS_STYLE.pending;
+                  const uses = inv.is_open ? invites.filter(x => x.parent_id === inv.id).length : 0;
                   return (
                     <tr key={inv.id}>
                       <td>
-                        <div style={{ fontWeight: 500 }}>{inv.candidate_name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{inv.candidate_email}</div>
+                        <div style={{ fontWeight: 500 }}>
+                          {inv.is_open && <span style={{ marginRight: 5 }}>🔗</span>}
+                          {inv.candidate_name}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                          {inv.is_open ? `Open link · ${uses} candidate${uses === 1 ? '' : 's'} joined` : inv.candidate_email}
+                        </div>
                       </td>
                       <td style={{ textTransform: 'capitalize', color: 'var(--ink-2)' }}>{inv.difficulty}</td>
                       <td>
-                        <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 5, background: st.bg, color: st.color, textTransform: 'capitalize' }}>
-                          {inv.status.replace('_', ' ')}
-                        </span>
+                        {inv.is_open ? (
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 5, background: 'var(--accent-soft)', color: 'var(--accent-ink)' }}>
+                            {['expired', 'revoked'].includes(inv.status) ? inv.status : 'open to all'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 5, background: st.bg, color: st.color, textTransform: 'capitalize' }}>
+                            {inv.status.replace('_', ' ')}
+                          </span>
+                        )}
                       </td>
                       <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{new Date(inv.created_at).toLocaleDateString()}</td>
                       <td>
@@ -374,10 +388,33 @@ export default function InterviewerPanel({
       {isNewInvite && (
         <div className="mb">
           <div className="md" style={{ width: 440 }}>
-            <div className="md-t">New Interview Invite</div>
+            <div className="md-t">New Interview Link</div>
             <form onSubmit={createInvite}>
-              <div className="pv-fld"><label>Candidate Name</label><input type="text" name="name" required /></div>
-              <div className="pv-fld"><label>Email (optional)</label><input type="email" name="email" /></div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                {([['open', '🔗 Generic link', 'One link for everyone — candidates enter their own name & email'], ['personal', '👤 Personal invite', 'A one-time link for a specific candidate']] as const).map(([id, label, desc]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setLinkType(id)}
+                    style={{
+                      flex: 1, textAlign: 'left', padding: '10px 12px', borderRadius: 9,
+                      border: linkType === id ? '2px solid var(--accent)' : '1px solid var(--line)',
+                      background: linkType === id ? 'var(--accent-soft)' : 'var(--surface)',
+                    }}
+                  >
+                    <div style={{ fontSize: 12.5, fontWeight: 700 }}>{label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>{desc}</div>
+                  </button>
+                ))}
+              </div>
+              {linkType === 'open' ? (
+                <div className="pv-fld"><label>Link Label (for your own tracking)</label><input type="text" name="name" required placeholder="e.g. Sales Hiring — July 2026" /></div>
+              ) : (
+                <>
+                  <div className="pv-fld"><label>Candidate Name</label><input type="text" name="name" required /></div>
+                  <div className="pv-fld"><label>Email (optional)</label><input type="email" name="email" /></div>
+                </>
+              )}
               <div className="pv-fld">
                 <label>Customer Difficulty</label>
                 <select name="difficulty" defaultValue="medium">
@@ -388,10 +425,12 @@ export default function InterviewerPanel({
               </div>
               <div className="pv-fld">
                 <label>Expires after (days, 0 = never)</label>
-                <input type="number" name="expires_days" defaultValue={7} min={0} />
+                <input type="number" name="expires_days" defaultValue={linkType === 'open' ? 0 : 7} min={0} key={linkType} />
               </div>
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12 }}>
-                The interview link is copied to your clipboard when you create the invite — send it to the candidate however you like.
+                {linkType === 'open'
+                  ? 'The link is copied to your clipboard — post it in your job ad or send it to all applicants. Each candidate registers with their name and email, and their result shows up here individually.'
+                  : 'The interview link is copied to your clipboard when you create the invite — send it to the candidate however you like.'}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" className="btn btn-acc" disabled={busy}>{busy ? 'Creating…' : 'Create & Copy Link'}</button>
