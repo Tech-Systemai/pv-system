@@ -114,6 +114,25 @@ export default function InterviewerPanel({
     setInvites(prev => prev.map(i => (i.id === inv.id ? { ...i, status: 'revoked' } : i)));
   };
 
+  const deleteInvite = async (inv: any) => {
+    const children = invites.filter(x => x.parent_id === inv.id);
+    const msg = inv.is_open
+      ? `Delete the open link "${inv.candidate_name}"${children.length ? ` AND its ${children.length} candidate(s), including their results and recordings` : ''}? This cannot be undone.`
+      : `Permanently delete ${inv.candidate_name} — including their interview, scorecard, and recording? This cannot be undone.`;
+    if (!confirm(msg)) return;
+    // Remove recording files first (rows cascade on invite delete, files don't).
+    for (const target of [inv, ...children]) {
+      const s = sessionOf(target);
+      if (s?.recording_path) {
+        try { await fetch(`/api/interview-recording?session_id=${s.id}`, { method: 'DELETE' }); } catch {}
+      }
+    }
+    const { error } = await dbOp('interview_invites', 'delete', {}, { id: inv.id });
+    if (error) { setErr(error); return; }
+    const gone = new Set([inv.id, ...children.map(c => c.id)]);
+    setInvites(prev => prev.filter(i => !gone.has(i.id)));
+  };
+
   const copyLink = (token: string) => {
     navigator.clipboard.writeText(linkFor(token)).then(() => {
       setCopied(token);
@@ -221,6 +240,13 @@ export default function InterviewerPanel({
                           {scorecardOf(inv) && (
                             <button className="btn btn-sec btn-sm" onClick={() => { setSub('results'); setOpenResult(''); }}>View result</button>
                           )}
+                          <button
+                            className="btn btn-sm"
+                            style={{ background: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)' }}
+                            onClick={() => deleteInvite(inv)}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>

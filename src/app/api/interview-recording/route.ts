@@ -37,3 +37,29 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.redirect(signed.signedUrl);
 }
+
+/** Staff-only: removes a session's recording file (used when deleting a candidate). */
+export async function DELETE(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return new NextResponse('Unauthorized', { status: 401 });
+
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+  if (!['owner', 'admin', 'supervisor'].includes(profile?.role ?? '')) {
+    return new NextResponse('Forbidden', { status: 403 });
+  }
+
+  const sessionId = req.nextUrl.searchParams.get('session_id');
+  if (!sessionId) return new NextResponse('Missing session_id', { status: 400 });
+
+  const { data: session } = await admin
+    .from('interview_sessions')
+    .select('recording_path')
+    .eq('id', sessionId)
+    .single();
+  if (session?.recording_path) {
+    await admin.storage.from(BUCKET).remove([session.recording_path]);
+  }
+  return NextResponse.json({ ok: true });
+}
