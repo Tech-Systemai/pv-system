@@ -20,7 +20,7 @@ export default async function HrPipelinePage() {
     admin.from('interview_modules').select('*').order('order_index', { ascending: true }),
     admin
       .from('interview_invites')
-      .select('*, interview_sessions(id, status, turn_count, started_at, ended_at, interview_scorecards(*))')
+      .select('*, interview_sessions(id, status, turn_count, started_at, ended_at, recording_path, interview_scorecards(*))')
       .order('created_at', { ascending: false }),
   ]);
 

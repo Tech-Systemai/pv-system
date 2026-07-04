@@ -336,9 +336,21 @@ export default function InterviewerPanel({
                   </div>
                 </div>
 
-                <button className="btn btn-sec btn-sm" onClick={() => toggleTranscript(inv)}>
-                  {openResult === inv.id ? 'Hide transcript' : 'View transcript'}
-                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-sec btn-sm" onClick={() => toggleTranscript(inv)}>
+                    {openResult === inv.id ? 'Hide transcript' : 'View transcript'}
+                  </button>
+                  {s?.recording_path && (
+                    <a
+                      className="btn btn-sec btn-sm"
+                      href={`/api/interview-recording?session_id=${s.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      🎥 Watch recording
+                    </a>
+                  )}
+                </div>
                 {openResult === inv.id && (
                   <div style={{ marginTop: 10, maxHeight: 320, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 12 }}>
                     {!transcripts[inv.id] && <div style={{ color: 'var(--ink-4)', fontSize: 12 }}>Loading…</div>}
