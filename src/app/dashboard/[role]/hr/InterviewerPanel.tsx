@@ -20,6 +20,19 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   revoked:     { bg: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)' },
 };
 
+const SCORE_BANDS: { key: string; label: string; min: number; max: number }[] = [
+  { key: '100', label: '💯 100', min: 100, max: 100 },
+  { key: '90s', label: '90s — Outstanding', min: 90, max: 99 },
+  { key: '80s', label: '80s — Excellent', min: 80, max: 89 },
+  { key: '70s', label: '70s — Strong', min: 70, max: 79 },
+  { key: '60s', label: '60s — Decent', min: 60, max: 69 },
+  { key: '50s', label: '50s — Average', min: 50, max: 59 },
+  { key: '40s', label: '40s — Below the bar', min: 40, max: 49 },
+  { key: '30s', label: '30s — Weak', min: 30, max: 39 },
+  { key: '20s', label: '20s — Poor', min: 20, max: 29 },
+  { key: 'low', label: 'Below 20', min: 0, max: 19 },
+];
+
 function makeToken(): string {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
@@ -45,6 +58,8 @@ export default function InterviewerPanel({
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState('');
   const [openResult, setOpenResult] = useState('');
+  const [openDetail, setOpenDetail] = useState('');
+  const [approving, setApproving] = useState('');
   const [transcripts, setTranscripts] = useState<Record<string, any[]>>({});
   const [err, setErr] = useState('');
 
@@ -148,6 +163,34 @@ export default function InterviewerPanel({
     return Array.isArray(s.interview_scorecards) ? s.interview_scorecards[0] : s.interview_scorecards;
   };
   const results = invites.filter(i => scorecardOf(i));
+
+  // Approve a graded candidate into the HR pipeline (Interview stage), carrying
+  // their AI score and summary; the invite is linked via applicant_id.
+  const approveToPipeline = async (inv: any) => {
+    const sc = scorecardOf(inv);
+    if (!sc || inv.applicant_id) return;
+    setApproving(inv.id);
+    setErr('');
+    const { data, error } = await dbOp('hr_applicants', 'insert', {
+      name: inv.candidate_name,
+      email: inv.candidate_email || '',
+      position: 'Sales',
+      score: sc.overall,
+      notes: `AI Interview — ${String(sc.verdict).replace('_', ' ')} (${sc.overall}/100). ${sc.summary || ''}`,
+      status: 'Reviewing',
+      stage: 'Interview',
+    });
+    if (error) {
+      setErr(error);
+    } else {
+      const applicantId = data?.[0]?.id;
+      if (applicantId) {
+        await dbOp('interview_invites', 'update', { applicant_id: applicantId }, { id: inv.id });
+        setInvites(prev => prev.map(i => (i.id === inv.id ? { ...i, applicant_id: applicantId } : i)));
+      }
+    }
+    setApproving('');
+  };
 
   const toggleTranscript = async (inv: any) => {
     const s = sessionOf(inv);
@@ -295,7 +338,7 @@ export default function InterviewerPanel({
         </div>
       )}
 
-      {/* ── RESULTS ── */}
+      {/* ── RESULTS: score-banded board ── */}
       {sub === 'results' && (
         <div>
           {results.length === 0 && (
@@ -303,93 +346,143 @@ export default function InterviewerPanel({
               No completed interviews yet. Scorecards appear here automatically once a candidate finishes their mock call.
             </div>
           )}
-          {results.map(inv => {
-            const sc = scorecardOf(inv);
-            const s = sessionOf(inv);
-            const v = VERDICT_STYLE[sc.verdict] || VERDICT_STYLE.borderline;
-            const dims: [string, number][] = [
-              ['Product knowledge', sc.product_knowledge],
-              ['Objection handling', sc.objection_handling],
-              ['Rapport & tone', sc.rapport],
-              ['Closing', sc.closing],
-            ];
+          {SCORE_BANDS.map(band => {
+            const rows = results
+              .filter(inv => {
+                const sc = scorecardOf(inv);
+                return sc.overall >= band.min && sc.overall <= band.max;
+              })
+              .sort((a, b) => scorecardOf(b).overall - scorecardOf(a).overall);
+            if (rows.length === 0) return null;
+            const tone = band.min >= 70
+              ? { bg: 'var(--ok-soft)', color: 'oklch(0.42 0.12 155)' }
+              : band.min >= 50
+                ? { bg: 'var(--warn-soft)', color: 'oklch(0.45 0.12 75)' }
+                : { bg: 'var(--err-soft)', color: 'oklch(0.45 0.16 25)' };
             return (
-              <div className="card" key={inv.id} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 14.5 }}>{inv.candidate_name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>
-                      {inv.candidate_email} · {inv.difficulty} difficulty · {s?.turn_count ?? 0} turns · {s?.ended_at ? new Date(s.ended_at).toLocaleString() : ''}
+              <div key={band.key} style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 6, background: tone.bg, color: tone.color, letterSpacing: '.03em' }}>
+                    {band.label}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: 'var(--ink-4)' }}>{rows.length} candidate{rows.length === 1 ? '' : 's'}</span>
+                  <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+                </div>
+                {rows.map(inv => {
+                  const sc = scorecardOf(inv);
+                  const s = sessionOf(inv);
+                  const v = VERDICT_STYLE[sc.verdict] || VERDICT_STYLE.borderline;
+                  const expanded = openDetail === inv.id;
+                  const dims: [string, number][] = [
+                    ['Product knowledge', sc.product_knowledge],
+                    ['Needs discovery', sc.discovery ?? 0],
+                    ['Objection handling', sc.objection_handling],
+                    ['Rapport & tone', sc.rapport],
+                    ['Closing', sc.closing],
+                  ];
+                  return (
+                    <div className="card" key={inv.id} style={{ marginBottom: 8, padding: expanded ? 18 : '12px 16px' }}>
+                      {/* Compact row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div
+                          style={{
+                            width: 44, height: 44, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center',
+                            fontWeight: 800, fontSize: 15, background: tone.bg, color: tone.color,
+                          }}
+                        >
+                          {sc.overall}
+                        </div>
+                        <div style={{ minWidth: 140, flex: 1, cursor: 'pointer' }} onClick={() => setOpenDetail(expanded ? '' : inv.id)}>
+                          <div style={{ fontWeight: 700, fontSize: 13.5 }}>{inv.candidate_name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                            {inv.candidate_email || 'no email'} · {inv.difficulty} · {s?.ended_at ? new Date(s.ended_at).toLocaleDateString() : ''}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 11.5, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: v.bg, color: v.color, flexShrink: 0 }}>{v.label}</span>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          {s?.recording_path && (
+                            <a className="btn btn-sec btn-sm" href={`/api/interview-recording?session_id=${s.id}`} target="_blank" rel="noopener noreferrer">
+                              🎥 Watch
+                            </a>
+                          )}
+                          <button className="btn btn-sec btn-sm" onClick={() => setOpenDetail(expanded ? '' : inv.id)}>
+                            {expanded ? 'Hide details' : 'Details'}
+                          </button>
+                          {inv.applicant_id ? (
+                            <span className="btn btn-sm" style={{ background: 'var(--ok-soft)', color: 'oklch(0.42 0.12 155)', cursor: 'default' }}>
+                              ✓ In pipeline
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-acc btn-sm"
+                              disabled={approving === inv.id}
+                              onClick={() => approveToPipeline(inv)}
+                              title="Adds this candidate to the HR Pipeline (Interview stage) with their AI score"
+                            >
+                              {approving === inv.id ? 'Approving…' : '✓ Approve → Pipeline'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Expanded detail */}
+                      {expanded && (
+                        <div style={{ marginTop: 14, borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 12 }}>
+                            {dims.map(([label, val]) => (
+                              <div key={label}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 4 }}>
+                                  <span>{label}</span><span style={{ fontWeight: 700, color: 'var(--ink-2)' }}>{val}</span>
+                                </div>
+                                <div style={{ height: 6, borderRadius: 4, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${val}%`, borderRadius: 4, background: val >= 70 ? 'var(--ok)' : val >= 45 ? 'oklch(0.70 0.13 75)' : 'var(--err)' }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {sc.summary && (
+                            <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--surface-2)', padding: '10px 12px', borderRadius: 8, marginBottom: 10 }}>
+                              {sc.summary}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+                            <div>
+                              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'oklch(0.42 0.12 155)', textTransform: 'uppercase', marginBottom: 4 }}>Strengths</div>
+                              {(sc.strengths || []).map((x: string, i: number) => (
+                                <div key={i} style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 3 }}>• {x}</div>
+                              ))}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'oklch(0.45 0.16 25)', textTransform: 'uppercase', marginBottom: 4 }}>Weaknesses</div>
+                              {(sc.weaknesses || []).map((x: string, i: number) => (
+                                <div key={i} style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 3 }}>• {x}</div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <button className="btn btn-sec btn-sm" onClick={() => toggleTranscript(inv)}>
+                            {openResult === inv.id ? 'Hide transcript' : 'View transcript'}
+                          </button>
+                          {openResult === inv.id && (
+                            <div style={{ marginTop: 10, maxHeight: 320, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 12 }}>
+                              {!transcripts[inv.id] && <div style={{ color: 'var(--ink-4)', fontSize: 12 }}>Loading…</div>}
+                              {(transcripts[inv.id] || []).map((m: any, i: number) => (
+                                <div key={i} style={{ marginBottom: 8 }}>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: m.role === 'candidate' ? 'var(--accent-ink)' : 'var(--ink-3)' }}>
+                                    {m.role === 'candidate' ? 'CANDIDATE' : 'AI CUSTOMER'}:
+                                  </span>{' '}
+                                  <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{m.content}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 6, background: v.bg, color: v.color }}>{v.label}</span>
-                    <div style={{ fontSize: 22, fontWeight: 800 }}>{sc.overall}<span style={{ fontSize: 12, color: 'var(--ink-4)', fontWeight: 600 }}>/100</span></div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, margin: '14px 0' }}>
-                  {dims.map(([label, val]) => (
-                    <div key={label}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', marginBottom: 4 }}>
-                        <span>{label}</span><span style={{ fontWeight: 700, color: 'var(--ink-2)' }}>{val}</span>
-                      </div>
-                      <div style={{ height: 6, borderRadius: 4, background: 'var(--surface-2)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${val}%`, borderRadius: 4, background: val >= 70 ? 'var(--ok)' : val >= 45 ? 'oklch(0.70 0.13 75)' : 'var(--err)' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {sc.summary && (
-                  <div style={{ fontSize: 13, color: 'var(--ink-2)', background: 'var(--surface-2)', padding: '10px 12px', borderRadius: 8, marginBottom: 10 }}>
-                    {sc.summary}
-                  </div>
-                )}
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, color: 'oklch(0.42 0.12 155)', textTransform: 'uppercase', marginBottom: 4 }}>Strengths</div>
-                    {(sc.strengths || []).map((x: string, i: number) => (
-                      <div key={i} style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 3 }}>• {x}</div>
-                    ))}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10.5, fontWeight: 700, color: 'oklch(0.45 0.16 25)', textTransform: 'uppercase', marginBottom: 4 }}>Weaknesses</div>
-                    {(sc.weaknesses || []).map((x: string, i: number) => (
-                      <div key={i} style={{ fontSize: 12.5, color: 'var(--ink-2)', marginBottom: 3 }}>• {x}</div>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-sec btn-sm" onClick={() => toggleTranscript(inv)}>
-                    {openResult === inv.id ? 'Hide transcript' : 'View transcript'}
-                  </button>
-                  {s?.recording_path && (
-                    <a
-                      className="btn btn-sec btn-sm"
-                      href={`/api/interview-recording?session_id=${s.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      🎥 Watch recording
-                    </a>
-                  )}
-                </div>
-                {openResult === inv.id && (
-                  <div style={{ marginTop: 10, maxHeight: 320, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 12 }}>
-                    {!transcripts[inv.id] && <div style={{ color: 'var(--ink-4)', fontSize: 12 }}>Loading…</div>}
-                    {(transcripts[inv.id] || []).map((m: any, i: number) => (
-                      <div key={i} style={{ marginBottom: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: m.role === 'candidate' ? 'var(--accent-ink)' : 'var(--ink-3)' }}>
-                          {m.role === 'candidate' ? 'CANDIDATE' : 'AI CUSTOMER'}:
-                        </span>{' '}
-                        <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>{m.content}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  );
+                })}
               </div>
             );
           })}
