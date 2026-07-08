@@ -299,7 +299,10 @@ export default function PresentationClient() {
             <div className="ikp-present-content">
               {slide.kind === 'welcome' ? (
                 <div className="ikp-content-inner ikp-welcome">
-                  <h2 className="ikp-welcome-title">{slide.title}</h2>
+                  <div className="ikp-welcome-kicker">Let&apos;s get started</div>
+                  <h2 className="ikp-welcome-title">
+                    Welcome to <span className="grad">Pioneers Veneers</span>
+                  </h2>
                   <p className="ikp-welcome-sub">{slide.subtitle}</p>
                 </div>
               ) : (

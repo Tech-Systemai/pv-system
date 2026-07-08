@@ -943,16 +943,21 @@ a { color: inherit; text-decoration: none; }
 .ikp-slide-sub { font-size: 17px; line-height: 1.55; color: var(--ink-2); margin-bottom: 30px; }
 
 /* ── Welcome slide ── */
-.ikp-welcome { display: flex; flex-direction: column; justify-content: center; max-width: 20ch; height: 100%; }
-.ikp-welcome-title {
-  font-size: clamp(44px, 6vw, 82px); font-weight: 700; line-height: 1.02; letter-spacing: -.035em;
-  background: linear-gradient(115deg, var(--accent) 0%, var(--accent-h2) 45%, oklch(0.58 0.19 330) 100%);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--accent);
-  margin-bottom: 22px; animation: ikp-welcome-in .55s var(--ease-spring) both;
+.ikp-welcome { display: flex; flex-direction: column; justify-content: center; max-width: none; height: 100%; }
+.ikp-welcome-kicker {
+  font-size: 13px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--accent-ink); margin-bottom: 18px;
+  animation: ikp-welcome-in .5s var(--ease-spring) both;
 }
+.ikp-welcome-title {
+  font-size: clamp(42px, 4.6vw, 74px); font-weight: 700; line-height: 1.04; letter-spacing: -.03em;
+  color: var(--ink); margin-bottom: 22px; max-width: 15ch;
+  animation: ikp-welcome-in .55s var(--ease-spring) .06s both;
+}
+.ikp-welcome-title .grad { color: var(--accent); }
 .ikp-welcome-sub {
-  font-size: 19px; line-height: 1.55; color: var(--ink-2); max-width: 40ch;
-  animation: ikp-welcome-in .55s var(--ease-spring) .1s both;
+  font-size: 19px; line-height: 1.6; color: var(--ink-2); max-width: 44ch;
+  animation: ikp-welcome-in .55s var(--ease-spring) .14s both;
 }
 @keyframes ikp-welcome-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
