@@ -737,6 +737,7 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
   const [boards, setBoards]             = useState<Board[]>(initialBoards);
   const [activeBoardId, setActive]      = useState<string | null>(null);
   const [areaFilter, setAreaFilter]     = useState('all');
+  const [statusFilter, setStatusFilter] = useState<BoardStatus | 'all'>('in_progress');
   const [showCalendar, setShowCalendar] = useState(false);
   const [showNew, setShowNew]           = useState(false);
   const [editBoard, setEditBoard]       = useState<Board | null>(null);
@@ -858,10 +859,17 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
   const updateById  = (id: string, fn: (b: Board) => Board) => setBoards(prev => prev.map(b => b.id === id ? fn(b) : b));
 
   // Change a board's lifecycle status and stamp the moment it changed.
-  const changeStatus = (id: string, status: BoardStatus) => {
+  const changeStatus = async (id: string, status: BoardStatus) => {
     const now = new Date().toISOString();
+    const prev = boards.find(b => b.id === id);
     updateById(id, b => ({ ...b, status, statusChangedAt: now }));
-    dbOp('planning_documents', 'update', { status, status_changed_at: now }, { id });
+    const { error } = await dbOp('planning_documents', 'update', { status, status_changed_at: now }, { id });
+    if (error) {
+      // Roll the optimistic change back so the UI matches what's actually stored,
+      // and tell the user why (almost always: the schema_v86 migration isn't applied).
+      updateById(id, b => ({ ...b, status: prev?.status ?? 'in_progress', statusChangedAt: prev?.statusChangedAt }));
+      setDbBanner(`Couldn't save the board status. Run the schema_v86 migration in Supabase, then try again. (${error})`);
+    }
   };
 
   // ── Live time tracking (clock in / out per board) ──────────────────────────
@@ -980,8 +988,13 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
   if (activeBoard) return <WhiteboardView board={activeBoard} onUpdate={updateBoard} onBack={handleBack} />;
   if (showCalendar) return <CalendarView boards={boards} onClose={() => setShowCalendar(false)} onEditBoard={b => { openEditBoard(b); setShowCalendar(false); }} />;
 
-  const usedAreaIds = [...new Set(boards.map(b => b.areaId))];
-  const filtered    = areaFilter === 'all' ? boards : boards.filter(b => b.areaId === areaFilter);
+  const usedAreaIds  = [...new Set(boards.map(b => b.areaId))];
+  const statusOf     = (b: Board): BoardStatus => b.status ?? 'in_progress';
+  const statusCount  = (s: BoardStatus | 'all') => s === 'all' ? boards.length : boards.filter(b => statusOf(b) === s).length;
+  const filtered     = boards.filter(b =>
+    (statusFilter === 'all' || statusOf(b) === statusFilter) &&
+    (areaFilter === 'all' || b.areaId === areaFilter)
+  );
   const totalItems  = boards.reduce((s, b) => s + b.widgets.length + b.strokes.length, 0);
   const sharedCount = boards.filter(b => b.shared).length;
 
@@ -1009,6 +1022,31 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
         ))}
       </div>
 
+      {/* Status tabs — boards live under In Progress / Extended / Closed */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {([
+          { id: 'in_progress', label: 'In Progress', emoji: '🟢' },
+          { id: 'extended',    label: 'Extended',    emoji: '⏳' },
+          { id: 'closed',      label: 'Closed',      emoji: '✅' },
+          { id: 'all',         label: 'All',         emoji: '▦' },
+        ] as { id: BoardStatus | 'all'; label: string; emoji: string }[]).map(t => {
+          const active = statusFilter === t.id;
+          const meta = t.id !== 'all' ? STATUS_META[t.id] : null;
+          const count = statusCount(t.id);
+          return (
+            <button key={t.id} onClick={() => setStatusFilter(t.id)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: '1.5px solid',
+                ...(active
+                  ? (meta ? { background: meta.bg, color: meta.fg, borderColor: meta.bd } : { background: 'var(--ink)', color: '#fff', borderColor: 'var(--ink)' })
+                  : { background: 'white', color: 'var(--ink-3)', borderColor: 'var(--line)' }) }}>
+              <span>{t.emoji}</span>
+              {t.label}
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: active ? 'rgba(0,0,0,0.10)' : 'var(--surface-3)', color: active ? 'inherit' : 'var(--ink-4)' }}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <div className="tabs" style={{ flex: 1, minWidth: 0 }}>
           <button className={`tab${areaFilter === 'all' ? ' active' : ''}`} onClick={() => setAreaFilter('all')}>All ({boards.length})</button>
@@ -1024,10 +1062,23 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
 
       {filtered.length === 0 ? (
         <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--ink-4)' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🖊</div>
-          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink-2)', marginBottom: 8 }}>No boards yet</div>
-          <div style={{ marginBottom: 20, fontSize: 13 }}>Create a board and start placing ideas.</div>
-          <button className="btn btn-acc" onClick={() => setShowNew(true)}>+ New Board</button>
+          {boards.length === 0 ? (
+            <>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🖊</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink-2)', marginBottom: 8 }}>No boards yet</div>
+              <div style={{ marginBottom: 20, fontSize: 13 }}>Create a board and start placing ideas.</div>
+              <button className="btn btn-acc" onClick={() => setShowNew(true)}>+ New Board</button>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>{statusFilter !== 'all' ? STATUS_META[statusFilter].emoji : '🗂'}</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink-2)', marginBottom: 8 }}>
+                No {statusFilter !== 'all' ? STATUS_META[statusFilter].label : ''} boards{areaFilter !== 'all' ? ' in this area' : ''}
+              </div>
+              <div style={{ marginBottom: 20, fontSize: 13 }}>Change a board’s status from its card, or view another tab.</div>
+              <button className="btn btn-sec" onClick={() => setStatusFilter('all')}>View all boards</button>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 14 }}>
