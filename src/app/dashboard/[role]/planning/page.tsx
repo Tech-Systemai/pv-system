@@ -23,6 +23,8 @@ export default async function PlanningPage() {
     dueDate: row.due_date ?? undefined,
     status: row.status ?? 'in_progress',
     statusChangedAt: row.status_changed_at ?? undefined,
+    timeRunningSince: row.time_running_since ?? undefined,
+    timeAccruedSeconds: row.time_accrued_seconds ?? 0,
     created: row.created_at,
     widgets: row.content?.widgets ?? [],
     strokes: row.content?.strokes ?? [],

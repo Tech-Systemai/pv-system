@@ -24,8 +24,15 @@ interface Board  {
   shared: boolean; created: string;
   startDate?: string; dueDate?: string;
   status?: BoardStatus; statusChangedAt?: string;
+  timeRunningSince?: string; timeAccruedSeconds?: number;
   widgets: Widget[]; strokes: Stroke[];
 }
+
+// Elapsed seconds → HH:MM:SS clock for the board time tracker.
+const fmtClock = (s: number) => {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+};
 
 // Board lifecycle status shown (and changeable) on the outer card.
 const STATUS_META: Record<BoardStatus, { label: string; emoji: string; bg: string; fg: string; bd: string }> = {
@@ -857,6 +864,39 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
     dbOp('planning_documents', 'update', { status, status_changed_at: now }, { id });
   };
 
+  // ── Live time tracking (clock in / out per board) ──────────────────────────
+  // A board's clock counts up while running; tick once a second only when at
+  // least one board is actively running.
+  const anyRunning = boards.some(b => b.timeRunningSince);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!anyRunning) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [anyRunning]);
+
+  const elapsedSeconds = (b: Board) => {
+    const accrued = b.timeAccruedSeconds ?? 0;
+    if (!b.timeRunningSince) return accrued;
+    return accrued + Math.max(0, Math.floor((nowMs - new Date(b.timeRunningSince).getTime()) / 1000));
+  };
+
+  const startTimer = (id: string) => {
+    const iso = new Date().toISOString();
+    setNowMs(Date.now());
+    updateById(id, b => ({ ...b, timeRunningSince: iso }));
+    dbOp('planning_documents', 'update', { time_running_since: iso }, { id });
+  };
+
+  const stopTimer = (id: string) => {
+    const b = boards.find(x => x.id === id);
+    if (!b || !b.timeRunningSince) return;
+    const accrued = (b.timeAccruedSeconds ?? 0)
+      + Math.max(0, Math.floor((Date.now() - new Date(b.timeRunningSince).getTime()) / 1000));
+    updateById(id, bb => ({ ...bb, timeRunningSince: undefined, timeAccruedSeconds: accrued }));
+    dbOp('planning_documents', 'update', { time_running_since: null, time_accrued_seconds: accrued }, { id });
+  };
+
   /* Save active board immediately then navigate back */
   const handleBack = () => {
     if (savePendingRef.current) clearTimeout(savePendingRef.current);
@@ -1026,6 +1066,31 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
                     {new Date(board.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} → {new Date(board.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
                 )}
+
+                {(() => {
+                  const running = !!board.timeRunningSince;
+                  const secs = elapsedSeconds(board);
+                  return (
+                    <div onClick={e => e.stopPropagation()}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '7px 10px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--line-2)' }}>
+                      <span style={{ fontSize: 12 }}>⏱</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 14, fontWeight: 700, letterSpacing: '0.02em', color: running ? 'oklch(0.55 0.16 25)' : secs > 0 ? 'var(--ink)' : 'var(--ink-4)' }}>
+                        {fmtClock(secs)}
+                      </span>
+                      {running && <span style={{ fontSize: 9, fontWeight: 700, color: 'oklch(0.55 0.16 25)', letterSpacing: '0.06em' }}>● TRACKING</span>}
+                      <button
+                        onClick={e => { e.stopPropagation(); if (running) stopTimer(board.id); else startTimer(board.id); }}
+                        title={running ? 'Stop the clock' : 'Start the clock'}
+                        style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 6, cursor: 'pointer', border: '1px solid',
+                          ...(running
+                            ? { background: 'var(--err-soft)', color: 'oklch(0.5 0.16 25)', borderColor: 'oklch(0.85 0.10 25)' }
+                            : { background: 'var(--ok-soft)', color: 'oklch(0.42 0.12 155)', borderColor: 'oklch(0.85 0.08 155)' }) }}
+                      >
+                        {running ? '■ Stop' : secs > 0 ? '▶ Resume' : '▶ Start'}
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {widgetCount > 0 && (
                   <div style={{ height: 38, background: 'var(--surface-2)', borderRadius: 7, marginBottom: 10, position: 'relative', overflow: 'hidden', border: '1px solid var(--line-2)' }}>
