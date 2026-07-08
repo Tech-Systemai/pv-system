@@ -21,6 +21,8 @@ export default async function PlanningPage() {
     shared: row.shared,
     startDate: row.start_date ?? undefined,
     dueDate: row.due_date ?? undefined,
+    status: row.status ?? 'in_progress',
+    statusChangedAt: row.status_changed_at ?? undefined,
     created: row.created_at,
     widgets: row.content?.widgets ?? [],
     strokes: row.content?.strokes ?? [],

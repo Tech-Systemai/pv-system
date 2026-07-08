@@ -18,12 +18,22 @@ interface FileW      extends WBase { type: 'file'; name: string; ext: string; da
 type Widget = StickyW | NoteW | TextW | GoalW | ChecklistW | FileW;
 
 interface Stroke { id: string; pts: [number, number][]; color: string; w: number; }
+type BoardStatus = 'in_progress' | 'extended' | 'closed';
 interface Board  {
   id: string; title: string; desc: string; areaId: string;
   shared: boolean; created: string;
   startDate?: string; dueDate?: string;
+  status?: BoardStatus; statusChangedAt?: string;
   widgets: Widget[]; strokes: Stroke[];
 }
+
+// Board lifecycle status shown (and changeable) on the outer card.
+const STATUS_META: Record<BoardStatus, { label: string; emoji: string; bg: string; fg: string; bd: string }> = {
+  in_progress: { label: 'In Progress', emoji: '🟢', bg: 'var(--accent-soft)', fg: 'var(--accent-ink)',      bd: 'var(--accent-line)' },
+  extended:    { label: 'Extended',    emoji: '⏳', bg: 'var(--warn-soft)',   fg: 'oklch(0.45 0.12 75)',   bd: 'oklch(0.85 0.08 75)' },
+  closed:      { label: 'Closed',      emoji: '✅', bg: 'var(--ok-soft)',     fg: 'oklch(0.42 0.12 155)',  bd: 'oklch(0.85 0.08 155)' },
+};
+const STATUS_ORDER: BoardStatus[] = ['in_progress', 'extended', 'closed'];
 interface XF { x: number; y: number; s: number; }
 
 /* ── Constants ──────────────────────────────────────────────────── */
@@ -85,7 +95,7 @@ function makePath(pts: [number, number][]): string {
   return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
 }
 function makeBoard(title: string, areaId: string, desc = '', startDate = '', dueDate = ''): Board {
-  return { id: uid(), title, desc, areaId, shared: false, created: new Date().toISOString(), startDate: startDate || undefined, dueDate: dueDate || undefined, widgets: [], strokes: [] };
+  return { id: uid(), title, desc, areaId, shared: false, created: new Date().toISOString(), startDate: startDate || undefined, dueDate: dueDate || undefined, status: 'in_progress', widgets: [], strokes: [] };
 }
 
 /* ── CX Plan board data ─────────────────────────────────────────── */
@@ -840,6 +850,13 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
   const updateBoard = (fn: (b: Board) => Board) => setBoards(prev => prev.map(b => b.id === activeBoardId ? fn(b) : b));
   const updateById  = (id: string, fn: (b: Board) => Board) => setBoards(prev => prev.map(b => b.id === id ? fn(b) : b));
 
+  // Change a board's lifecycle status and stamp the moment it changed.
+  const changeStatus = (id: string, status: BoardStatus) => {
+    const now = new Date().toISOString();
+    updateById(id, b => ({ ...b, status, statusChangedAt: now }));
+    dbOp('planning_documents', 'update', { status, status_changed_at: now }, { id });
+  };
+
   /* Save active board immediately then navigate back */
   const handleBack = () => {
     if (savePendingRef.current) clearTimeout(savePendingRef.current);
@@ -872,6 +889,8 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
       shared: b.shared,
       start_date: b.startDate ?? null,
       due_date: b.dueDate ?? null,
+      status: 'in_progress',
+      status_changed_at: b.created,
       content: { widgets: [], strokes: [] },
       created_by: currentUserId,
     });
@@ -1020,6 +1039,30 @@ export default function PlanningClient({ initialBoards, currentUserId }: { initi
                 )}
 
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {(() => {
+                    const status = (board.status ?? 'in_progress') as BoardStatus;
+                    const meta = STATUS_META[status];
+                    return (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+                        <select
+                          value={status}
+                          title="Change board status"
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => { e.stopPropagation(); changeStatus(board.id, e.target.value as BoardStatus); }}
+                          style={{ fontSize: 10, fontWeight: 700, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', background: meta.bg, color: meta.fg, border: `1px solid ${meta.bd}` }}
+                        >
+                          {STATUS_ORDER.map(s => (
+                            <option key={s} value={s}>{STATUS_META[s].emoji} {STATUS_META[s].label}</option>
+                          ))}
+                        </select>
+                        {status !== 'in_progress' && board.statusChangedAt && (
+                          <span style={{ fontSize: 10, color: 'var(--ink-4)', fontWeight: 600 }}>
+                            · {new Date(board.statusChangedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })()}
                   {board.shared && <span className="bdg bdg-ok" style={{ fontSize: 10 }}>🔗 Shared</span>}
                   {goals > 0 && <span className="bdg bdg-acc" style={{ fontSize: 10 }}>🎯 {goals}</span>}
                   {checklists > 0 && <span className="bdg bdg-gy" style={{ fontSize: 10 }}>☑ {checklists}</span>}
