@@ -3,11 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── Presentation content ────────────────────────────────────────────────────
-// A single video file drives every step; drop it at /public/impression-walkthrough.mp4
-const VIDEO_SRC = '/impression-walkthrough.mp4';
-const VIDEO_FILE = 'impression-walkthrough.mp4';
+// A single video file drives every slide; lives at /public/1.mp4
+const VIDEO_SRC = '/1.mp4';
+const VIDEO_FILE = '1.mp4';
 
 type Slide =
+  | {
+      kind: 'welcome';
+      title: string;
+      subtitle: string;
+      videoLabel: string;
+    }
   | {
       kind: 'step';
       step: number;
@@ -27,6 +33,12 @@ type Slide =
     };
 
 const SLIDES: Slide[] = [
+  {
+    kind: 'welcome',
+    title: 'Welcome to Pioneers Veneers',
+    subtitle: "Let's take your impressions together — it only takes a few minutes, and I'll walk you through every step.",
+    videoLabel: 'Welcome',
+  },
   {
     kind: 'step',
     step: 1,
@@ -269,9 +281,9 @@ export default function PresentationClient() {
                   type="button"
                   className={`ikp-dot${i === index ? ' active' : ''}${i < index ? ' done' : ''}`}
                   onClick={() => go(i)}
-                  aria-label={s.kind === 'timer' ? 'Timer' : `Step ${s.step}`}
+                  aria-label={s.kind === 'welcome' ? 'Welcome' : s.kind === 'timer' ? 'Timer' : `Step ${s.step}`}
                 >
-                  {s.kind === 'timer' ? '⏱' : s.step}
+                  {s.kind === 'welcome' ? '✦' : s.kind === 'timer' ? '⏱' : s.step}
                 </button>
               ))}
             </div>
@@ -285,24 +297,31 @@ export default function PresentationClient() {
             </div>
 
             <div className="ikp-present-content">
-              <div className="ikp-content-inner">
-                <div className="ikp-eyebrow">{slide.eyebrow}</div>
-                <h2 className="ikp-slide-title">{slide.title}</h2>
-                <p className="ikp-slide-sub">{slide.subtitle}</p>
+              {slide.kind === 'welcome' ? (
+                <div className="ikp-content-inner ikp-welcome">
+                  <h2 className="ikp-welcome-title">{slide.title}</h2>
+                  <p className="ikp-welcome-sub">{slide.subtitle}</p>
+                </div>
+              ) : (
+                <div className="ikp-content-inner">
+                  <div className="ikp-eyebrow">{slide.eyebrow}</div>
+                  <h2 className="ikp-slide-title">{slide.title}</h2>
+                  <p className="ikp-slide-sub">{slide.subtitle}</p>
 
-                {slide.kind === 'step' ? (
-                  <ol className="ikp-bullets">
-                    {slide.bullets.map((b, i) => (
-                      <li key={i} className="ikp-bullet">
-                        <span className="ikp-bullet-num">{i + 1}</span>
-                        <span>{b}</span>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <MixTimer seconds={slide.seconds} />
-                )}
-              </div>
+                  {slide.kind === 'step' ? (
+                    <ol className="ikp-bullets">
+                      {slide.bullets.map((b, i) => (
+                        <li key={i} className="ikp-bullet">
+                          <span className="ikp-bullet-num">{i + 1}</span>
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <MixTimer seconds={slide.seconds} />
+                  )}
+                </div>
+              )}
 
               <div className="ikp-nav">
                 <button
@@ -314,7 +333,7 @@ export default function PresentationClient() {
                   ‹ Back
                 </button>
                 <div className="ikp-nav-label">
-                  {slide.kind === 'timer' ? 'MIXING' : `STEP ${slide.step}`}
+                  {slide.kind === 'welcome' ? 'WELCOME' : slide.kind === 'timer' ? 'MIXING' : `STEP ${slide.step}`}
                 </div>
                 {index < total - 1 ? (
                   <button className="ikp-nav-btn primary" type="button" onClick={() => go(index + 1)}>

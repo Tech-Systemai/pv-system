@@ -834,7 +834,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 .ikp-hero {
-  display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; align-items: center;
+  display: grid; grid-template-columns: 1fr 1.25fr; gap: 32px; align-items: center;
   background: var(--surface); border: 1px solid var(--line);
   border-radius: 16px; padding: 30px 32px; box-shadow: var(--sh-1);
 }
@@ -927,18 +927,35 @@ a { color: inherit; text-decoration: none; }
 }
 .ikp-exit:hover { border-color: var(--err); color: var(--err); background: var(--err-soft); }
 
-.ikp-present-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+.ikp-present-body { flex: 1; display: grid; grid-template-columns: 1.7fr 1fr; min-height: 0; }
 .ikp-present-video {
-  display: flex; align-items: center; justify-content: center; padding: 40px;
-  background: var(--surface-3); border-right: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; padding: 18px;
+  background: var(--surface-3); border-right: 1px solid var(--line); min-height: 0;
 }
-.ikp-present-video .ikp-video { max-width: 620px; }
+/* Fill the whole left panel so the customer gets the biggest possible view */
+.ikp-present-video .ikp-video { width: 100%; height: 100%; max-width: none; aspect-ratio: auto; border-radius: 16px; }
+.ikp-present-video .ikp-video-el { object-fit: contain; }
 
 .ikp-present-content { display: flex; flex-direction: column; justify-content: space-between; padding: 48px 56px 28px; overflow-y: auto; }
 .ikp-content-inner { max-width: 46ch; }
 .ikp-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 14px; }
 .ikp-slide-title { font-size: 40px; font-weight: 700; letter-spacing: -.025em; color: var(--ink); line-height: 1.08; margin-bottom: 14px; }
 .ikp-slide-sub { font-size: 17px; line-height: 1.55; color: var(--ink-2); margin-bottom: 30px; }
+
+/* ── Welcome slide ── */
+.ikp-welcome { display: flex; flex-direction: column; justify-content: center; max-width: 20ch; height: 100%; }
+.ikp-welcome-title {
+  font-size: clamp(44px, 6vw, 82px); font-weight: 700; line-height: 1.02; letter-spacing: -.035em;
+  background: linear-gradient(115deg, var(--accent) 0%, var(--accent-h2) 45%, oklch(0.58 0.19 330) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--accent);
+  margin-bottom: 22px; animation: ikp-welcome-in .55s var(--ease-spring) both;
+}
+.ikp-welcome-sub {
+  font-size: 19px; line-height: 1.55; color: var(--ink-2); max-width: 40ch;
+  animation: ikp-welcome-in .55s var(--ease-spring) .1s both;
+}
+@keyframes ikp-welcome-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
 .ikp-bullets { display: flex; flex-direction: column; gap: 18px; list-style: none; }
 .ikp-bullet { display: flex; align-items: flex-start; gap: 14px; font-size: 16px; line-height: 1.5; color: var(--ink); }
 .ikp-bullet-num {
@@ -984,14 +1001,18 @@ a { color: inherit; text-decoration: none; }
 }
 .ikp-timer-btn:hover { background: var(--accent-h2); transform: translateY(-1px); }
 
+/* Bigger play button to match the full-panel present video */
+.ikp-present-video .ikp-video-play { width: 96px; height: 96px; font-size: 32px; }
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .ikp-hero { grid-template-columns: 1fr; }
   .ikp-steps-grid { grid-template-columns: 1fr 1fr; }
   .ikp-step-card { border-right: 0; border-bottom: 1px solid var(--line); }
-  .ikp-present-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .ikp-present-video { border-right: 0; border-bottom: 1px solid var(--line); padding: 20px; }
+  .ikp-present-body { grid-template-columns: 1fr; grid-template-rows: minmax(240px, 44vh) 1fr; }
+  .ikp-present-video { border-right: 0; border-bottom: 1px solid var(--line); padding: 14px; }
   .ikp-present-content { padding: 28px 22px 20px; }
+  .ikp-welcome-title { font-size: clamp(36px, 12vw, 56px); }
   .ikp-slide-title { font-size: 30px; }
   .ikp-dots { gap: 6px; }
   .ikp-dot { width: 30px; height: 30px; }
