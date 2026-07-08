@@ -22,11 +22,20 @@ export default async function NotesPage() {
     owner_name: profileMap[n.user_id]?.name ?? 'Unknown',
   }));
 
+  // CX/Sales agents may only share notes with management — not each other.
+  // Hide agent peers from the share picker (server-side guard in /api/db backs this up).
+  const AGENT_ROLES = ['cx', 'sales'];
+  const currentRole = (profileMap[user.id]?.role ?? '').toLowerCase();
+  const currentIsAgent = AGENT_ROLES.includes(currentRole);
+  const shareableUsers = (allProfiles ?? []).filter(p =>
+    p.id !== user.id && !(currentIsAgent && AGENT_ROLES.includes((p.role ?? '').toLowerCase()))
+  );
+
   return (
     <NotesClient
       initialNotes={myNotes || []}
       sharedNotes={sharedNotes}
-      users={(allProfiles ?? []).filter(p => p.id !== user.id)}
+      users={shareableUsers}
       currentUserId={user.id}
     />
   );

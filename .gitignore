@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# local MCP server config (contains secrets — do not commit)
+.mcp.json

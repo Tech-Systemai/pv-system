@@ -31,6 +31,37 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
+  // ── Peer-communication guard ────────────────────────────────────────────────
+  // CX/Sales agents may only message or share notes with management — never with
+  // another CX/Sales agent. This backs up the UI recipient filtering so a crafted
+  // request can't bypass it.
+  const AGENT_ROLES = new Set(['cx', 'sales']);
+  const guardsTable =
+    (operation === 'insert' && table === 'inbox_documents') ||
+    (['insert', 'update', 'upsert'].includes(operation) && table === 'notes');
+  if (guardsTable) {
+    const rows = Array.isArray(data) ? data : data ? [data] : [];
+    const rawIds: unknown[] = table === 'inbox_documents'
+      ? rows.map((r: any) => r?.user_id)
+      : rows.flatMap((r: any) => (Array.isArray(r?.shared_with) ? r.shared_with : []));
+    const targetIds = [...new Set(
+      rawIds.filter((id): id is string => typeof id === 'string' && id.length > 0 && id !== user.id)
+    )];
+    if (targetIds.length > 0) {
+      const { data: me } = await admin.from('profiles').select('role').eq('id', user.id).single();
+      if (AGENT_ROLES.has((me?.role ?? '').toLowerCase())) {
+        const { data: targets } = await admin.from('profiles').select('role').in('id', targetIds);
+        const hitsAgent = (targets ?? []).some((p: any) => AGENT_ROLES.has((p?.role ?? '').toLowerCase()));
+        if (hitsAgent) {
+          return NextResponse.json(
+            { error: 'CX and Sales agents can only send messages and share notes with management, not with each other.' },
+            { status: 403 },
+          );
+        }
+      }
+    }
+  }
+
   try {
     let result: any;
 

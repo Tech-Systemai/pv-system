@@ -64,6 +64,15 @@ export default function InboxClient({
   const currentUser     = allUsers.find((u: any) => u.id === currentUserId);
   const currentUserName = currentUser?.name ?? 'Unknown';
 
+  // CX/Sales agents may only message management — not each other. Hide agent
+  // peers from the recipient pickers (server-side guard in /api/db backs this up).
+  const AGENT_ROLES = ['cx', 'sales'];
+  const isAgentRole = (r?: string) => AGENT_ROLES.includes((r ?? '').toLowerCase());
+  const currentIsAgent = isAgentRole(currentUser?.role);
+  const recipientUsers = allUsers.filter(
+    (u: any) => u.id !== currentUserId && !(currentIsAgent && isAgentRole(u.role))
+  );
+
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 4000);
@@ -754,7 +763,7 @@ export default function InboxClient({
                 <label>To</label>
                 <select name="to" required>
                   <option value="">— Select recipient —</option>
-                  {allUsers.filter((u: any) => u.id !== currentUserId).map((u: any) => (
+                  {recipientUsers.map((u: any) => (
                     <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                   ))}
                 </select>
@@ -809,7 +818,7 @@ export default function InboxClient({
                 <label>To</label>
                 <select name="to" required>
                   <option value="">— Select recipient —</option>
-                  {allUsers.filter((u: any) => u.id !== currentUserId).map((u: any) => (
+                  {recipientUsers.map((u: any) => (
                     <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
                   ))}
                 </select>
