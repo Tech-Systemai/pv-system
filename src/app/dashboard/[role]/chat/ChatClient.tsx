@@ -26,6 +26,26 @@ const BUCKET    = 'chat-files';
 
 const dmId = (uid1: string, uid2: string) => `dm-${[uid1, uid2].sort().join('|')}`;
 
+// Message timestamp: always shows a date AND a time, with Today/Yesterday for
+// recent days and the year only when it differs from the current year.
+const formatStamp = (iso: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+  let datePart: string;
+  if (dayDiff === 0) datePart = 'Today';
+  else if (dayDiff === 1) datePart = 'Yesterday';
+  else datePart = d.toLocaleDateString([], {
+    month: 'short', day: 'numeric',
+    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+  return `${datePart}, ${time}`;
+};
+
 const isCustom = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(id);
 
 const toChannelShape = (c: any) => ({
@@ -82,6 +102,7 @@ export default function ChatClient({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef    = useRef<HTMLDivElement>(null);
+  const prevChannelRef = useRef<string | null>(null);
 
   // Channels visible to this user (archived ones hidden for everyone)
   const visibleChannels = channelList.filter(c => {
@@ -124,7 +145,14 @@ export default function ChatClient({
     setDmUnreads(initial);
   }, []);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [channelMessages.length]);
+  // Jump straight to the newest message when opening/switching a chat (so the
+  // latest is visible and you scroll UP for history); follow along smoothly as
+  // new messages arrive in the chat you're already viewing.
+  useEffect(() => {
+    const switched = prevChannelRef.current !== channel;
+    prevChannelRef.current = channel;
+    bottomRef.current?.scrollIntoView(switched ? { block: 'end' } : { behavior: 'smooth', block: 'end' });
+  }, [channel, channelMessages.length]);
 
   // Realtime: messages + channel creations
   useEffect(() => {
@@ -383,7 +411,7 @@ export default function ChatClient({
                 </div>
                 <div style={{ maxWidth: '70%', position: 'relative' }}>
                   <div style={{ fontSize: '10px', color: '#6b7689', marginBottom: '3px', textAlign: isMe ? 'right' : 'left' }}>
-                    {name} · {m.sender_role || ''} · {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {name} · {m.sender_role || ''} · {formatStamp(m.created_at)}
                   </div>
                   <div style={{ background: isMe ? '#4f46e5' : '#f5f6f8', color: isMe ? '#fff' : '#1a1f2e', padding: m.file_url && !m.content ? '6px' : '9px 13px', borderRadius: isMe ? '12px 12px 0 12px' : '12px 12px 12px 0', fontSize: '13px', lineHeight: 1.5 }}>
                     {m.content && <div>{m.content}</div>}
