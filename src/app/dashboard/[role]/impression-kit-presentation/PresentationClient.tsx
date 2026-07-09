@@ -3,9 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── Presentation content ────────────────────────────────────────────────────
-// A single video file drives every slide; lives at /public/1.mp4
-const VIDEO_SRC = '/1.mp4';
-const VIDEO_FILE = '1.mp4';
 
 type Slide =
   | {
@@ -13,6 +10,8 @@ type Slide =
       title: string;
       subtitle: string;
       videoLabel: string;
+      videoSrc: string;
+      videoFile: string;
     }
   | {
       kind: 'step';
@@ -22,6 +21,8 @@ type Slide =
       subtitle: string;
       bullets: string[];
       videoLabel: string;
+      videoSrc: string;
+      videoFile: string;
     }
   | {
       kind: 'timer';
@@ -29,7 +30,17 @@ type Slide =
       title: string;
       subtitle: string;
       videoLabel: string;
+      videoSrc: string;
+      videoFile: string;
       seconds: number;
+    }
+  | {
+      kind: 'finish';
+      title: string;
+      subtitle: string;
+      videoLabel: string;
+      videoSrc: string;
+      videoFile: string;
     };
 
 const SLIDES: Slide[] = [
@@ -38,6 +49,8 @@ const SLIDES: Slide[] = [
     title: 'Welcome to Pioneers Veneers',
     subtitle: "Let's take your impressions together — it only takes a few minutes, and I'll walk you through every step.",
     videoLabel: 'Welcome',
+    videoSrc: '/1.mp4',
+    videoFile: '1.mp4',
   },
   {
     kind: 'step',
@@ -51,6 +64,8 @@ const SLIDES: Slide[] = [
       'Have a flat surface ready for the kit — nothing else is needed.',
     ],
     videoLabel: 'Getting set up',
+    videoSrc: '/2.mp4',
+    videoFile: '2.mp4',
   },
   {
     kind: 'step',
@@ -64,6 +79,8 @@ const SLIDES: Slide[] = [
       'Lay the pieces out so everything is within easy reach.',
     ],
     videoLabel: "What's in the box",
+    videoSrc: '/3.mp4',
+    videoFile: '3.mp4',
   },
   {
     kind: 'step',
@@ -77,6 +94,8 @@ const SLIDES: Slide[] = [
       'Work quickly — once mixed, you have a short window before it sets.',
     ],
     videoLabel: 'Mixing — getting started',
+    videoSrc: '/4.mp4',
+    videoFile: '4.mp4',
   },
   {
     kind: 'timer',
@@ -84,6 +103,8 @@ const SLIDES: Slide[] = [
     title: 'Keep mixing',
     subtitle: 'Fold the putty until the timer reaches zero.',
     videoLabel: 'Mixing — 20 second window',
+    videoSrc: '/5.mp4',
+    videoFile: '5.mp4',
     seconds: 20,
   },
   {
@@ -98,6 +119,8 @@ const SLIDES: Slide[] = [
       'Push up firmly and evenly so every tooth sinks into the putty.',
     ],
     videoLabel: 'Seating the tray',
+    videoSrc: '/6.mp4',
+    videoFile: '6.mp4',
   },
   {
     kind: 'step',
@@ -111,18 +134,28 @@ const SLIDES: Slide[] = [
       'Check for a clean, detailed imprint, then pack it for return.',
     ],
     videoLabel: 'Hold, then release',
+    videoSrc: '/7.mp4',
+    videoFile: '7.mp4',
+  },
+  {
+    kind: 'finish',
+    title: "You're all done!",
+    subtitle: 'Great job — your impressions are ready. Pack the trays carefully and drop them off for return shipping. We\'ll take it from here!',
+    videoLabel: 'Wrapping up',
+    videoSrc: '/8.mp4',
+    videoFile: '8.mp4',
   },
 ];
 
 // ─── Video panel (placeholder that plays a real file when available) ─────────
 // Remounted via `key` when the slide changes, so it always resets to the poster.
-function VideoPanel({ label }: { label: string }) {
+function VideoPanel({ label, src, file }: { label: string; src: string; file: string }) {
   const [playing, setPlaying] = useState(false);
 
   if (playing) {
     return (
       <div className="ikp-video">
-        <video className="ikp-video-el" src={VIDEO_SRC} controls autoPlay onEnded={() => setPlaying(false)} />
+        <video className="ikp-video-el" src={src} controls autoPlay onEnded={() => setPlaying(false)} />
       </div>
     );
   }
@@ -131,7 +164,7 @@ function VideoPanel({ label }: { label: string }) {
     <button className="ikp-video ikp-video-ph" type="button" onClick={() => setPlaying(true)} aria-label="Play walkthrough video">
       <span className="ikp-video-badge">{label}</span>
       <span className="ikp-video-play">▶</span>
-      <span className="ikp-video-file">VIDEO · {VIDEO_FILE}</span>
+      <span className="ikp-video-file">VIDEO · {file}</span>
       <span className="ikp-video-bar">
         <span className="ikp-video-bar-fill" />
         <span className="ikp-video-mute">🔊</span>
@@ -250,7 +283,7 @@ export default function PresentationClient() {
               screen; the portal disappears entirely.
             </p>
           </div>
-          <VideoPanel label="Walkthrough preview" />
+          <VideoPanel label="Walkthrough preview" src={SLIDES[0].videoSrc} file={SLIDES[0].videoFile} />
         </div>
 
         <div className="ikp-steps-grid">
@@ -281,9 +314,9 @@ export default function PresentationClient() {
                   type="button"
                   className={`ikp-dot${i === index ? ' active' : ''}${i < index ? ' done' : ''}`}
                   onClick={() => go(i)}
-                  aria-label={s.kind === 'welcome' ? 'Welcome' : s.kind === 'timer' ? 'Timer' : `Step ${s.step}`}
+                  aria-label={s.kind === 'welcome' ? 'Welcome' : s.kind === 'timer' ? 'Timer' : s.kind === 'finish' ? 'Finish' : `Step ${s.step}`}
                 >
-                  {s.kind === 'welcome' ? '✦' : s.kind === 'timer' ? '⏱' : s.step}
+                  {s.kind === 'welcome' ? '✦' : s.kind === 'timer' ? '⏱' : s.kind === 'finish' ? '✓' : s.step}
                 </button>
               ))}
             </div>
@@ -293,7 +326,7 @@ export default function PresentationClient() {
 
           <div className="ikp-present-body">
             <div className="ikp-present-video">
-              <VideoPanel key={index} label={slide.videoLabel} />
+              <VideoPanel key={index} label={slide.videoLabel} src={slide.videoSrc} file={slide.videoFile} />
             </div>
 
             <div className="ikp-present-content">
@@ -302,6 +335,14 @@ export default function PresentationClient() {
                   <div className="ikp-welcome-kicker">Let&apos;s get started</div>
                   <h2 className="ikp-welcome-title">
                     Welcome to <span className="grad">Pioneers Veneers</span>
+                  </h2>
+                  <p className="ikp-welcome-sub">{slide.subtitle}</p>
+                </div>
+              ) : slide.kind === 'finish' ? (
+                <div className="ikp-content-inner ikp-welcome">
+                  <div className="ikp-welcome-kicker">All done!</div>
+                  <h2 className="ikp-welcome-title">
+                    <span className="grad">{slide.title}</span>
                   </h2>
                   <p className="ikp-welcome-sub">{slide.subtitle}</p>
                 </div>
@@ -336,7 +377,7 @@ export default function PresentationClient() {
                   ‹ Back
                 </button>
                 <div className="ikp-nav-label">
-                  {slide.kind === 'welcome' ? 'WELCOME' : slide.kind === 'timer' ? 'MIXING' : `STEP ${slide.step}`}
+                  {slide.kind === 'welcome' ? 'WELCOME' : slide.kind === 'timer' ? 'MIXING' : slide.kind === 'finish' ? 'FINISH' : `STEP ${slide.step}`}
                 </div>
                 {index < total - 1 ? (
                   <button className="ikp-nav-btn primary" type="button" onClick={() => go(index + 1)}>
