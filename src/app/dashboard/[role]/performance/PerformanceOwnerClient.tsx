@@ -108,14 +108,15 @@ export default function PerformanceOwnerClient({ currentProfile, employees, allV
       return;
     }
 
-    // Notify employee via inbox
+    // Notify employee via inbox — sent from the system, not an individual
     await dbOp('inbox_documents', 'insert', {
       user_id: empId,
       title: `Deduction Applied — ${rule}`,
       subject: `Deduction Applied — ${rule}`,
-      content: `${explanationText}\n\nPoints deducted: ${pts} pts\nSalary deducted: $${salary}\n\nIf you believe this is an error, contact your manager.`,
+      content: `This is an automated notice from the system.\n\n${explanationText}\n\nPoints deducted: ${pts} pts\nSalary deducted: $${salary}\n\nIf you believe this is an error, contact your manager.`,
       type: 'Violation Notice',
-      sender: 'Management',
+      sender: 'System',
+      sender_id: null,
       requires_signature: false,
       is_read: false,
     });
