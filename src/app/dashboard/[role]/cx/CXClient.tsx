@@ -2047,6 +2047,9 @@ export default function CXClient({
             <LogCard title="Customer notes" icon="✉" hue={235} entries={selectedCase.customer_notes_log ?? []} nameMap={nameMap}
               placeholder="What the customer said or wants…" addLabel="Add"
               onAdd={text => addLogEntry('customer_notes_log', { text })} onRemove={id => removeLogEntry('customer_notes_log', id)} />
+            <LogCard title="Payment notes" icon="$" hue={150} entries={selectedCase.payment_notes_log ?? []} nameMap={nameMap}
+              placeholder="Payment terms, balances, follow-ups…" addLabel="Add"
+              onAdd={text => addLogEntry('payment_notes_log', { text })} onRemove={id => removeLogEntry('payment_notes_log', id)} />
             <LogCard title="Lab notes" icon="⚙" hue={260} entries={selectedCase.lab_notes_log ?? []} nameMap={nameMap}
               placeholder="Internal lab / production note…" addLabel="Add"
               onAdd={text => addLogEntry('lab_notes_log', { text })} onRemove={id => removeLogEntry('lab_notes_log', id)} />
