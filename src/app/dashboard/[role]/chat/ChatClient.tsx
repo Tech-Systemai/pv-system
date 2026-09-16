@@ -12,15 +12,15 @@ const DEFAULT_CHANNELS = [
   { id: 'announcements', label: '# Announcements', roles: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'], archived: false },
 ];
 
-const ALL_ROLES = ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant', 'dentist'];
+const ALL_ROLES = ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'];
 
 // sales/cx can only DM non-sales/cx roles; everyone else can DM anyone
 const getDMableRoles = (role: string): string[] =>
   role === 'sales' || role === 'cx'
-    ? ['owner', 'admin', 'supervisor', 'accountant', 'dentist']
+    ? ['owner', 'admin', 'supervisor', 'accountant']
     : ALL_ROLES;
 
-const ALWAYS_ACTIVE_ROLES = ['owner', 'admin', 'accountant', 'dentist'];
+const ALWAYS_ACTIVE_ROLES = ['owner', 'admin', 'accountant'];
 const isClockedIn = (u: any) => ALWAYS_ACTIVE_ROLES.includes(u?.role) || !!u?.clocked_in;
 const BUCKET    = 'chat-files';
 

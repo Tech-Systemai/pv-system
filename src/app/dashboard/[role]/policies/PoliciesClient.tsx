@@ -35,7 +35,7 @@ const POLICY_TEMPLATES: Record<string, Clause[]> = {
     { title: '1. Professional Behavior', content: 'All employees are expected to conduct themselves professionally at all times. This includes respectful communication with colleagues and clients, adherence to dress codes, and maintaining a positive work environment.' },
     { title: '2. Confidentiality', content: 'Employees must maintain strict confidentiality regarding all company information, client data, and internal processes. Sharing confidential information with unauthorised parties is grounds for immediate termination.' },
     { title: '3. Conflict of Interest', content: 'Employees must disclose any personal, financial, or professional interests that may conflict with the interests of the company. Employment with competitors or engagement in competing activities is prohibited without prior written consent.' },
-    { title: '4. Zero Tolerance Policy', content: 'Pioneers Veneers maintains a zero-tolerance policy for harassment, discrimination, bullying, or any form of workplace misconduct. Violations will be investigated and may result in disciplinary action up to and including termination.' },
+    { title: '4. Zero Tolerance Policy', content: 'Octopus Engines maintains a zero-tolerance policy for harassment, discrimination, bullying, or any form of workplace misconduct. Violations will be investigated and may result in disciplinary action up to and including termination.' },
     { title: '5. Compliance', content: 'All employees are required to comply with this policy and all applicable laws and regulations. Failure to comply may result in disciplinary action up to and including termination of employment.' },
   ],
   'Attendance': [
@@ -82,7 +82,7 @@ const POLICY_TEMPLATES: Record<string, Clause[]> = {
   ],
   'General': [
     { title: '1. Purpose', content: 'This policy is established to ensure consistent, fair, and compliant practices within the organisation. All employees are expected to read, understand, and adhere to this policy.' },
-    { title: '2. Scope', content: 'This policy applies to all full-time, part-time, and contract employees of Pioneers Veneers, regardless of position or location.' },
+    { title: '2. Scope', content: 'This policy applies to all full-time, part-time, and contract employees of Octopus Engines, regardless of position or location.' },
     { title: '3. Responsibilities', content: 'Managers are responsible for ensuring their team members are aware of and comply with this policy. Employees are responsible for seeking clarification if any aspect is unclear.' },
     { title: '4. Review and Updates', content: 'This policy will be reviewed annually or as required by changes in legislation or business practice. Employees will be notified of any significant changes.' },
     { title: '5. Non-Compliance', content: 'Non-compliance with this policy may result in disciplinary action, up to and including termination of employment. Serious violations may also result in legal action.' },
@@ -118,7 +118,7 @@ function buildPolicyHtml(policy: Policy, clauses: Clause[], employeeName: string
   @media print{body{margin:0}}
 </style></head><body>
 <div style="text-align:center;border-bottom:2px solid #1a1f2e;padding-bottom:20px;margin-bottom:30px">
-  <h1>PIONEERS VENEERS</h1>
+  <h1>OCTOPUS ENGINES</h1>
   <div style="font-size:11px;color:#6b7689;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">Official Company Policy</div>
 </div>
 <h2>${policy.title}</h2>
@@ -128,7 +128,7 @@ function buildPolicyHtml(policy: Policy, clauses: Clause[], employeeName: string
   <div><span class="meta-lbl">Effective Date</span><strong>${date}</strong></div>
   <div><span class="meta-lbl">Issued By</span><strong>${policy.created_by_name ?? 'Management'}</strong></div>
 </div>
-<div class="notice">This document is an official company policy issued by Pioneers Veneers management. All employees are required to read, understand, and acknowledge receipt of this policy.</div>
+<div class="notice">This document is an official company policy issued by Octopus Engines management. All employees are required to read, understand, and acknowledge receipt of this policy.</div>
 ${clauses.map(c => `<div style="margin-bottom:20px"><h3>${c.title}</h3><p>${c.content}</p></div>`).join('')}
 <div class="ack">
   <strong style="font-size:13px">Employee Acknowledgment</strong><br>
@@ -138,7 +138,7 @@ ${clauses.map(c => `<div style="margin-bottom:20px"><h3>${c.title}</h3><p>${c.co
     <div class="sig-line"><!--EMP_DATE_PLACEHOLDER-->Signature &amp; Date</div>
   </div>
 </div>
-<div class="footer">Pioneers Veneers Enterprise Platform · Ref: POL-${refId} · Issued ${new Date().toLocaleDateString()}</div>
+<div class="footer">Octopus Engines Enterprise Platform · Ref: POL-${refId} · Issued ${new Date().toLocaleDateString()}</div>
 </body></html>`;
 }
 
@@ -380,7 +380,7 @@ export default function PoliciesClient({
         {/* Policy document */}
         <div style={{ background: '#fff', padding: '48px', maxWidth: 800, margin: '0 auto', boxShadow: '0 4px 20px rgba(0,0,0,.08)', borderRadius: 8, fontFamily: 'Inter, sans-serif' }}>
           <div style={{ textAlign: 'center', borderBottom: '2px solid #1a1f2e', paddingBottom: 20, marginBottom: 30 }}>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '1px', color: '#0f172a' }}>PIONEERS VENEERS</div>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '1px', color: '#0f172a' }}>OCTOPUS ENGINES</div>
             <div style={{ fontSize: 11, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: 4 }}>Official Company Policy</div>
           </div>
           <h2 style={{ fontSize: 15, fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 28, color: '#1a1f2e' }}>
@@ -393,7 +393,7 @@ export default function PoliciesClient({
             <div><span style={{ color: '#64748b', textTransform: 'uppercase', fontSize: 10, fontWeight: 700 }}>Issued By</span><br /><strong>{viewing.created_by_name || 'Management'}</strong></div>
           </div>
           <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: '12px 16px', borderRadius: 8, fontSize: 12, color: '#0369a1', marginBottom: 24 }}>
-            This document is an official company policy issued by Pioneers Veneers management. All employees are required to read, understand, and acknowledge receipt of this policy.
+            This document is an official company policy issued by Octopus Engines management. All employees are required to read, understand, and acknowledge receipt of this policy.
           </div>
           {parseClauses(viewing.content).map((c, i) => (
             <div key={i} style={{ marginBottom: 20 }}>
@@ -409,7 +409,7 @@ export default function PoliciesClient({
             <div style={{ marginTop: 20, borderTop: '1px solid #94a3b8', fontSize: 11, color: '#94a3b8', paddingTop: 4, width: '50%' }}>Signature &amp; Date</div>
           </div>
           <div style={{ marginTop: 24, fontSize: 9, color: '#94a3b8', textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-            Pioneers Veneers Enterprise Platform · Ref: POL-{viewing.id?.slice(0, 8).toUpperCase() ?? ''} · Issued {new Date().toLocaleDateString()}
+            Octopus Engines Enterprise Platform · Ref: POL-{viewing.id?.slice(0, 8).toUpperCase() ?? ''} · Issued {new Date().toLocaleDateString()}
           </div>
         </div>
 
@@ -699,7 +699,7 @@ export default function PoliciesClient({
             <div className="card-title" style={{ marginBottom: 16 }}>Preview</div>
             <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: 20, fontFamily: 'Inter, sans-serif', fontSize: 11 }}>
               <div style={{ textAlign: 'center', borderBottom: '1.5px solid #1a1f2e', paddingBottom: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>PIONEERS VENEERS</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>OCTOPUS ENGINES</div>
                 <div style={{ fontSize: 9, color: '#6b7689', marginTop: 2, textTransform: 'uppercase' }}>Official Company Policy</div>
               </div>
               <div style={{ fontWeight: 700, textAlign: 'center', marginBottom: 12, fontSize: 12 }}>{title || <span style={{ color: '#9ca3af' }}>Policy Title</span>}</div>

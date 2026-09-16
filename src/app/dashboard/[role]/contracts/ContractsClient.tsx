@@ -21,10 +21,10 @@ type Contract = {
 
 const CONTRACT_TEMPLATES: Record<string, Section[]> = {
   'Remote Sales Representative': [
-    { title: '1. Parties & Effective Date', content: `This Remote Sales Representative Agreement ("Agreement") is entered into as of the date last signed below ("Effective Date") by and between Pioneers Veneers ("Company"). The parties agree to the following terms governing the Representative's engagement with the Company.` },
+    { title: '1. Parties & Effective Date', content: `This Remote Sales Representative Agreement ("Agreement") is entered into as of the date last signed below ("Effective Date") by and between Octopus Engines ("Company"). The parties agree to the following terms governing the Representative's engagement with the Company.` },
     { title: '2. Nature of Relationship', content: `The Representative is engaged as an independent contractor. Nothing in this Agreement shall be construed to create an employer-employee relationship, partnership, joint venture, or agency. The Representative is not entitled to employee benefits, social security contributions, PhilHealth, Pag-IBIG, or any statutory Philippine employment benefits unless separately agreed in writing. The Representative acknowledges full responsibility for their own tax obligations under Philippine law and shall indemnify the Company against any tax liabilities arising from this engagement.` },
     { title: '3. Probationary Period', content: `The Representative will serve a ninety (90) day Probationary Period commencing on the Effective Date. During this period: (a) all compensation terms, qualification thresholds, and performance standards in this Agreement apply in full; (b) the Company may terminate this Agreement at any time without notice if the Representative fails to meet the minimum performance standards defined in Clause 6; and (c) upon successful completion of the Probationary Period, the Representative transitions to a standard engagement subject to the 30-day notice requirement in Clause 10. Successful completion of the Probationary Period is not guaranteed and is contingent solely on demonstrated sales performance.` },
-    { title: '4. Duties & Responsibilities', content: `The Representative agrees to: (a) conduct outbound and inbound sales calls, SMS, and messaging to prospective Pioneers Veneers customers; (b) follow the Company's approved sales scripts, objection handling frameworks, and CRM workflows at all times; (c) log all interactions, dispositions, and outcomes accurately and promptly in the Company's CRM system; (d) attend all required team meetings, training sessions, and one-on-ones as scheduled by the Company; (e) collect payment from customers and ensure full order amounts ($600.00 USD, or cumulative down payments totaling $600.00 USD) are processed through Company-approved payment methods only; (f) maintain professional standards in all customer communications; (g) protect the confidentiality of all customer data, Company processes, pricing, scripts, and proprietary information; and (h) meet or exceed the minimum performance thresholds defined in Clause 6 on an ongoing basis.` },
+    { title: '4. Duties & Responsibilities', content: `The Representative agrees to: (a) conduct outbound and inbound sales calls, SMS, and messaging to prospective Octopus Engines customers; (b) follow the Company's approved sales scripts, objection handling frameworks, and CRM workflows at all times; (c) log all interactions, dispositions, and outcomes accurately and promptly in the Company's CRM system; (d) attend all required team meetings, training sessions, and one-on-ones as scheduled by the Company; (e) collect payment from customers and ensure full order amounts ($600.00 USD, or cumulative down payments totaling $600.00 USD) are processed through Company-approved payment methods only; (f) maintain professional standards in all customer communications; (g) protect the confidentiality of all customer data, Company processes, pricing, scripts, and proprietary information; and (h) meet or exceed the minimum performance thresholds defined in Clause 6 on an ongoing basis.` },
     { title: '5. Compensation', content: `5.1 — Base Salary: The Representative shall receive a monthly base salary of ₱15,000.00 Philippine Pesos ("Base"), subject exclusively to the performance qualification conditions defined in Clause 6. The Base is not guaranteed. It is a performance-contingent payment and shall not be earned, accrued, or paid in any period where the Representative fails to meet the minimum threshold.
 
 5.2 — Commission: The Representative shall earn commission on each fully collected order. An order is "fully collected" when the full $600.00 USD order value has been received by the Company — either as a single payment or as cumulative down payments totaling $600.00 USD for that specific order. Commission tiers reset at the start of each calendar month and are structured as follows: Sales 1 through 10 (first 10 fully collected orders in the month) earn $10.00 USD per order. Sales 11 through 20 (next 10 fully collected orders) earn $15.00 USD per order. Sales 21 and beyond (all orders exceeding 20) earn $20.00 USD per order. Commission is earned in the billing cycle in which the final payment for an order is collected, regardless of when the order was originally placed. No commission is paid on partial collections, cancelled orders, or orders subject to a chargeback or dispute.
@@ -64,12 +64,12 @@ const CONTRACT_TEMPLATES: Record<string, Section[]> = {
     { title: '2. Required Collections and Tasks', content: `The Employee is expected to meet the collections targets and task completion standards set by the Company for their assigned role. These targets are communicated through the Company's enterprise platform and may be updated by management with reasonable notice. Failure to consistently meet required targets may affect eligibility for bonuses and may be subject to performance review.` },
     { title: '3. Bonus Eligibility', content: `The Employee shall be eligible to receive performance-based bonuses as outlined in the Company's compensation policy. Bonus eligibility is contingent upon the Employee completing a minimum of forty (40) working hours per week during the applicable bonus period, as recorded through the Company's official timekeeping system. Weeks with fewer than 40 logged hours will not qualify for bonus consideration for that period, regardless of performance outcomes.` },
     { title: '4. Confidentiality', content: `The Employee agrees to maintain strict confidentiality with respect to all proprietary, business, and client information obtained in the course of employment. This includes, but is not limited to, customer data, pricing structures, internal processes, financial records, scripts, and communications. The Employee shall not disclose, share, or use such information for any purpose outside of their assigned duties, both during the term of employment and indefinitely thereafter.` },
-    { title: '5. Data Privacy', content: `The Employee acknowledges that in the performance of their duties they may have access to personal and sensitive information belonging to clients of Pioneers Veneers. The Employee agrees to handle all such data in compliance with applicable data privacy laws and regulations, including the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines. Unauthorized access, copying, transmission, or disclosure of client data is strictly prohibited and may result in immediate termination and legal action.` },
-    { title: '6. Non-Solicitation', content: `During the term of employment and for a period of twelve (12) months following separation from the Company for any reason, the Employee agrees not to directly or indirectly solicit, contact, or approach any client or customer of Pioneers Veneers for the purpose of conducting competing business or redirecting such clients to any other individual or organization.` },
+    { title: '5. Data Privacy', content: `The Employee acknowledges that in the performance of their duties they may have access to personal and sensitive information belonging to clients of Octopus Engines. The Employee agrees to handle all such data in compliance with applicable data privacy laws and regulations, including the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines. Unauthorized access, copying, transmission, or disclosure of client data is strictly prohibited and may result in immediate termination and legal action.` },
+    { title: '6. Non-Solicitation', content: `During the term of employment and for a period of twelve (12) months following separation from the Company for any reason, the Employee agrees not to directly or indirectly solicit, contact, or approach any client or customer of Octopus Engines for the purpose of conducting competing business or redirecting such clients to any other individual or organization.` },
     { title: '7. Timekeeping and Attendance', content: `The Employee is required to clock in at the start of their scheduled shift and clock out at the conclusion of their shift using the Company's designated timekeeping platform. Failure to clock in or out on time, or manipulation of timekeeping records, is a violation of Company policy and may result in disciplinary action including salary deductions in accordance with the Company's attendance and discipline policy. The Employee's session is automatically recorded upon clock-in and the Company may monitor activity during working hours for performance and compliance purposes.` },
     { title: '8. Final Pay and Bonus Conditions', content: `Should the Employee wish to resign from their position, they are required to provide a minimum of fourteen (14) calendar days' written notice prior to their intended last day of work. Notice must be submitted formally through the Company's platform or in writing addressed to the Employee's direct supervisor and/or the Company's management. Failure to provide the required notice period may affect the release of final pay and any outstanding bonuses.` },
     { title: '9. Training Pay Disbursement', content: `Any compensation earned during the Employee's initial training period shall be disbursed in the 2nd payroll cycle of the month immediately following the completion of training. The Employee acknowledges that training pay is not issued concurrently with the training period and agrees to this disbursement schedule as a condition of employment.` },
-    { title: '10. Knowledge Transfer Obligation', content: `As a condition of maintaining good standing with Pioneers Veneers, the Employee agrees to actively assist in the onboarding and training of a replacement or successor during the notice period. This includes sharing relevant knowledge, workflows, client context, and documentation required for a smooth transition. Fulfillment of this obligation will be considered in the Company's decision to provide a positive employment reference and to release any discretionary final entitlements. This requirement reflects the Company's commitment to continuity of service and is considered an act of professional goodwill.` },
+    { title: '10. Knowledge Transfer Obligation', content: `As a condition of maintaining good standing with Octopus Engines, the Employee agrees to actively assist in the onboarding and training of a replacement or successor during the notice period. This includes sharing relevant knowledge, workflows, client context, and documentation required for a smooth transition. Fulfillment of this obligation will be considered in the Company's decision to provide a positive employment reference and to release any discretionary final entitlements. This requirement reflects the Company's commitment to continuity of service and is considered an act of professional goodwill.` },
   ],
   'Supervisor': [
     { title: '1. Position and Duties', content: 'The Employee is hired as Supervisor with responsibility over assigned team members. Duties include performance management, coaching, schedule approval, QA evaluations, and policy enforcement.' },
@@ -79,10 +79,10 @@ const CONTRACT_TEMPLATES: Record<string, Section[]> = {
     { title: '5. Termination', content: 'Either party may terminate this agreement with 60 days written notice. Immediate termination may occur for gross misconduct or breach of fiduciary duty.' },
   ],
   'Independent Contractor': [
-    { title: '1. Nature of Engagement', content: 'This is a contract for services, not an employment agreement. The Contractor is engaged as an independent contractor and is not an employee of Pioneers Veneers.' },
+    { title: '1. Nature of Engagement', content: 'This is a contract for services, not an employment agreement. The Contractor is engaged as an independent contractor and is not an employee of Octopus Engines.' },
     { title: '2. Scope of Work', content: 'The Contractor shall provide services as described in the attached Statement of Work. The Contractor retains control over how work is performed.' },
     { title: '3. Payment Terms', content: 'Payment is made per invoice submission at rates agreed upon prior to engagement. No benefits, deductions, or point systems apply.' },
-    { title: '4. Intellectual Property', content: 'All deliverables produced under this contract are the property of Pioneers Veneers upon full payment.' },
+    { title: '4. Intellectual Property', content: 'All deliverables produced under this contract are the property of Octopus Engines upon full payment.' },
     { title: '5. Termination', content: 'Either party may terminate this engagement with 14 days written notice without penalty, unless mid-project as specified in the Statement of Work.' },
   ],
 };
@@ -114,8 +114,8 @@ function buildContractHtml(contract: Contract, sections: Section[]): string {
   const services = isServicesType(contract.type);
   const role     = partyRoleWord(contract.type);
   const introHtml = services
-    ? `<p>This ${contract.type} Agreement is entered into on <strong>${contract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Company") and <strong>${contract.profiles?.name ?? `the ${role}`}</strong> (the "${role}"), and shall govern the terms of engagement as outlined below.</p>`
-    : `<p>This Employment Agreement is entered into on <strong>${contract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Employer") and <strong>${contract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.</p>`;
+    ? `<p>This ${contract.type} Agreement is entered into on <strong>${contract.effective_date}</strong> between <strong>Octopus Engines</strong> ("Company") and <strong>${contract.profiles?.name ?? `the ${role}`}</strong> (the "${role}"), and shall govern the terms of engagement as outlined below.</p>`
+    : `<p>This Employment Agreement is entered into on <strong>${contract.effective_date}</strong> between <strong>Octopus Engines</strong> ("Employer") and <strong>${contract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.</p>`;
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
 <title>${contract.type} Agreement</title>
@@ -136,7 +136,7 @@ function buildContractHtml(contract: Contract, sections: Section[]): string {
   @media print{body{margin:0}}
 </style></head><body>
 <div style="text-align:center;border-bottom:2px solid #1a1f2e;padding-bottom:20px;margin-bottom:30px">
-  <h1>PIONEERS VENEERS</h1>
+  <h1>OCTOPUS ENGINES</h1>
   <div style="font-size:11px;color:#6b7689;text-transform:uppercase;letter-spacing:.08em;margin-top:4px">${docSubtitle(contract.type)}</div>
 </div>
 <h2>${contract.type} Agreement</h2>
@@ -151,7 +151,7 @@ ${sections.map(s => `<div style="margin-bottom:20px"><h3>${s.title}</h3><p>${s.c
 <div class="sigs">
   <div style="width:44%">
     <strong style="font-size:12px">${services ? 'Company' : 'Employer'} Signature</strong><br>
-    <span style="font-size:11px;color:#6b7689">Pioneers Veneers — Authorized Management</span>
+    <span style="font-size:11px;color:#6b7689">Octopus Engines — Authorized Management</span>
     <div class="sig-name">${empSig}</div>
     <div class="sig-line">Signature${empDate ? ` · ${empDate}` : ''}</div>
   </div>
@@ -162,7 +162,7 @@ ${sections.map(s => `<div style="margin-bottom:20px"><h3>${s.title}</h3><p>${s.c
     <div class="sig-line">${empeeDate ? `Signature · ${empeeDate}` : '<!--EMP_DATE_PLACEHOLDER-->Signature'}</div>
   </div>
 </div>
-<div class="footer">Generated by Pioneers Veneers Enterprise Platform · Ref: CTR-${refId} · ${new Date().toLocaleDateString()}</div>
+<div class="footer">Generated by Octopus Engines Enterprise Platform · Ref: CTR-${refId} · ${new Date().toLocaleDateString()}</div>
 </body></html>`;
 }
 
@@ -376,7 +376,7 @@ export default function ContractsClient({
         <div style={{ background: '#fff', padding: '48px', maxWidth: 800, margin: '0 auto', boxShadow: '0 4px 20px rgba(0,0,0,.08)', borderRadius: 8, fontFamily: 'Inter, sans-serif' }}>
           {/* Header */}
           <div style={{ textAlign: 'center', borderBottom: '2px solid #1a1f2e', paddingBottom: 20, marginBottom: 30 }}>
-            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '1px', color: '#0f172a' }}>PIONEERS VENEERS</div>
+            <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '1px', color: '#0f172a' }}>OCTOPUS ENGINES</div>
             <div style={{ fontSize: 11, color: '#6b7689', textTransform: 'uppercase', letterSpacing: '.08em', marginTop: 4 }}>{docSubtitle(viewingContract.type)}</div>
           </div>
 
@@ -395,9 +395,9 @@ export default function ContractsClient({
           {/* Intro */}
           <p style={{ lineHeight: 1.8, color: '#1a1f2e', fontSize: 13, marginBottom: 24 }}>
             {isServicesType(viewingContract.type) ? (
-              <>This {viewingContract.type} Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Company") and <strong>{viewingContract.profiles?.name ?? `the ${partyRoleWord(viewingContract.type)}`}</strong> (the "{partyRoleWord(viewingContract.type)}"), and shall govern the terms of engagement as outlined below.</>
+              <>This {viewingContract.type} Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Octopus Engines</strong> ("Company") and <strong>{viewingContract.profiles?.name ?? `the ${partyRoleWord(viewingContract.type)}`}</strong> (the "{partyRoleWord(viewingContract.type)}"), and shall govern the terms of engagement as outlined below.</>
             ) : (
-              <>This Employment Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Pioneers Veneers</strong> ("Employer") and <strong>{viewingContract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.</>
+              <>This Employment Agreement is entered into on <strong>{viewingContract.effective_date}</strong> between <strong>Octopus Engines</strong> ("Employer") and <strong>{viewingContract.profiles?.name ?? 'the Employee'}</strong> ("Employee"), and shall govern the terms of employment as outlined below.</>
             )}
           </p>
 
@@ -415,7 +415,7 @@ export default function ContractsClient({
             {/* Employer */}
             <div style={{ width: '44%' }}>
               <strong style={{ fontSize: 12 }}>{companyPartyWord(viewingContract.type)} Signature</strong><br />
-              <span style={{ fontSize: 11, color: '#6b7689' }}>Pioneers Veneers — Authorized Management</span>
+              <span style={{ fontSize: 11, color: '#6b7689' }}>Octopus Engines — Authorized Management</span>
               {viewingContract.employer_signature ? (
                 <>
                   <div className="sig-cursive" style={{ fontSize: 34, color: '#1a1f2e', marginTop: 10, marginBottom: 4 }}>
@@ -500,7 +500,7 @@ export default function ContractsClient({
           )}
 
           <div style={{ marginTop: 24, fontSize: 9, color: '#94a3b8', textAlign: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-            Generated by Pioneers Veneers Enterprise Platform · Ref: CTR-{viewingContract.id?.slice(0, 8).toUpperCase() ?? Date.now().toString().slice(-8)} · {new Date().toLocaleDateString()}
+            Generated by Octopus Engines Enterprise Platform · Ref: CTR-{viewingContract.id?.slice(0, 8).toUpperCase() ?? Date.now().toString().slice(-8)} · {new Date().toLocaleDateString()}
           </div>
         </div>
 
@@ -586,7 +586,7 @@ export default function ContractsClient({
             <div className="card-title" style={{ marginBottom: 16 }}>Live Preview</div>
             <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: 20, fontFamily: 'Inter, sans-serif', fontSize: 11 }}>
               <div style={{ textAlign: 'center', borderBottom: '1.5px solid #1a1f2e', paddingBottom: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>PIONEERS VENEERS</div>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>OCTOPUS ENGINES</div>
                 <div style={{ fontSize: 9, color: '#6b7689', marginTop: 2, textTransform: 'uppercase' }}>Employment Agreement</div>
               </div>
               <div style={{ fontWeight: 700, textAlign: 'center', marginBottom: 12, textTransform: 'uppercase' }}>{contractType}</div>

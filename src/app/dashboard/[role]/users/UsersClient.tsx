@@ -100,7 +100,7 @@ export default function UsersClient({
     e.preventDefault();
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
-    fd.set('password', 'pioneers2026!');
+    fd.set('password', 'octopus2026!');
     const result = await createEmployeeAccount(fd);
     if (result.error) {
       alert(result.error);
@@ -303,7 +303,6 @@ export default function UsersClient({
                   <option value="supervisor">Supervisor</option>
                   <option value="admin">Admin</option>
                   <option value="accountant">Accountant</option>
-                  <option value="dentist">Dentist</option>
                 </select>
               </div>
               <div className="pv-fld"><label>Department</label><input type="text" name="department" placeholder="e.g. Sales Team A" /></div>
@@ -338,7 +337,7 @@ export default function UsersClient({
               </div>
 
               <div style={{ background: 'var(--surface-2)', padding: '10px 12px', borderRadius: 7, fontSize: 11, color: 'var(--ink-3)', marginBottom: 16 }}>
-                Default password: <strong>pioneers2026!</strong> — employee should change on first login.
+                Default password: <strong>octopus2026!</strong> — employee should change on first login.
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="submit" className="btn btn-acc" disabled={isSubmitting}>{isSubmitting ? 'Creating…' : 'Create Employee'}</button>
@@ -542,7 +541,6 @@ export default function UsersClient({
                   <option value="supervisor">Supervisor</option>
                   <option value="admin">Admin</option>
                   <option value="accountant">Accountant</option>
-                  <option value="dentist">Dentist</option>
                   <option value="owner">Owner</option>
                 </select>
               </div>

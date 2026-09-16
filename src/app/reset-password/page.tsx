@@ -61,9 +61,9 @@ export default function ResetPasswordPage() {
     <div className="pv-login">
       <aside className="pv-login-aside">
         <div className="pv-login-brand">
-          <div className="pv-sb-icon">PV</div>
+          <div className="pv-sb-icon">OE</div>
           <div>
-            <div className="pv-login-brand-name">Pioneers Veneers</div>
+            <div className="pv-login-brand-name">Octopus Engines</div>
             <div className="pv-login-brand-sub">Enterprise Platform · v4.12</div>
           </div>
         </div>

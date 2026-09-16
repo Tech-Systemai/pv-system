@@ -72,7 +72,7 @@ export default function LoginPage() {
     setLoading(true);
     setMsg(null);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://portal.pioneersveneers.com/auth/callback?next=/reset-password',
+      redirectTo: 'https://portal.octopusengines.com/auth/callback?next=/reset-password',
     });
     if (error) {
       setMsg({ text: error.message, type: 'error' });
@@ -87,9 +87,9 @@ export default function LoginPage() {
       {/* ── Left atmospheric panel ── */}
       <aside className="pv-login-aside">
         <div className="pv-login-brand">
-          <div className="pv-sb-icon">PV</div>
+          <div className="pv-sb-icon">OE</div>
           <div>
-            <div className="pv-login-brand-name">Pioneers Veneers</div>
+            <div className="pv-login-brand-name">Octopus Engines</div>
             <div className="pv-login-brand-sub">Enterprise Platform · v4.12</div>
           </div>
         </div>
@@ -181,7 +181,7 @@ export default function LoginPage() {
                 <label>Work email</label>
                 <input
                   type="email"
-                  placeholder="you@pioneersveneers.com"
+                  placeholder="you@octopusengines.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
@@ -205,7 +205,7 @@ export default function LoginPage() {
                 </label>
                 <input
                   type="email"
-                  placeholder="you@pioneersveneers.com"
+                  placeholder="you@octopusengines.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required

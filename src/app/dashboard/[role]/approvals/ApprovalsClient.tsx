@@ -717,7 +717,6 @@ export default function ApprovalsClient({
                 <option value="supervisor">Supervisor</option>
                 <option value="admin">Admin</option>
                 <option value="accountant">Accountant</option>
-                <option value="dentist">Dentist</option>
               </select>
             </div>
             <div className="pv-fld">

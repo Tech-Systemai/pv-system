@@ -101,7 +101,7 @@ export default function HrClient({
     const fd = new FormData();
     fd.append('email', app.email);
     fd.append('username', app.email.split('@')[0]);
-    fd.append('password', 'pioneers2026!');
+    fd.append('password', 'octopus2026!');
     fd.append('name', app.name);
     fd.append('role', app.position.toLowerCase().replace(' ', '_'));
     fd.append('salary', '2500');

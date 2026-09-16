@@ -306,7 +306,7 @@ export default function InterviewerPanel({
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', maxWidth: 560 }}>
-              Candidates study these modules before the mock call, and the AI customer uses them to judge whether the rep&apos;s claims are accurate. Keep them factual: what snap-on veneers are, pricing, common objections and answers.
+              Candidates study these modules before the mock call, and the AI customer uses them to judge whether the rep&apos;s claims are accurate. Keep them factual: what the Octopus Engines platform does, pricing, common objections and answers.
             </div>
             <button className="btn btn-acc btn-sm" onClick={() => { setErr(''); setIsNewModule(true); setEditModule({ title: '', content: '', order_index: modules.length + 1, is_active: true }); }}>
               + Add Module
@@ -314,7 +314,7 @@ export default function InterviewerPanel({
           </div>
           {modules.length === 0 && (
             <div className="card" style={{ textAlign: 'center', color: 'var(--ink-4)', padding: 30 }}>
-              No training material yet. Add your first module (e.g. “What are snap-on veneers?”).
+              No training material yet. Add your first module (e.g. “What does Octopus Engines do?”).
             </div>
           )}
           {modules.map(m => (
@@ -498,7 +498,7 @@ export default function InterviewerPanel({
               <div className="pv-fld"><label>Title</label><input type="text" name="title" defaultValue={editModule.title} required /></div>
               <div className="pv-fld">
                 <label>Content</label>
-                <textarea name="content" rows={10} defaultValue={editModule.content} required placeholder="e.g. Snap-on veneers are removable dental veneers that clip over your natural teeth…" />
+                <textarea name="content" rows={10} defaultValue={editModule.content} required placeholder="e.g. Octopus Engines is an all-in-one CRM, phone system and AI agent platform for HVAC and home-service contractors…" />
               </div>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                 <div className="pv-fld" style={{ flex: 1 }}><label>Order</label><input type="number" name="order_index" defaultValue={editModule.order_index} min={0} /></div>

@@ -6,11 +6,11 @@ import { createClient } from '@/utils/supabase/client';
 import { useEffect, useState } from 'react';
 
 const CHANNEL_ROLES: Record<string, string[]> = {
-  general:       ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant', 'dentist'],
+  general:       ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'],
   management:    ['owner', 'admin', 'supervisor', 'accountant'],
   'sales-team':  ['owner', 'admin', 'supervisor', 'sales'],
   'cx-team':     ['owner', 'admin', 'supervisor', 'cx'],
-  announcements: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant', 'dentist'],
+  announcements: ['owner', 'admin', 'supervisor', 'sales', 'cx', 'accountant'],
 };
 
 const COUNT_ITEMS = new Set(['chat', 'inbox', 'tickets', 'hr', 'timeoff', 'approvals']);
@@ -55,16 +55,12 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'reports',    label: 'Reports',              icon: '📊', module: 'reports' },
       { id: 'contracts',  label: 'Contracts',            icon: '📄', module: 'contracts' },
       { id: 'policies',   label: 'Policies',             icon: '🛡', module: 'policies' },
-      { id: 'cx',                  label: 'Customer Service',    icon: '👤', badge: 'LIVE', badgeType: 'live' },
-      { id: 'condition-approval',  label: 'Condition Approval',  icon: '✔', badge: 'LIVE', badgeType: 'live' },
-      { id: 'impression-kit',      label: 'Impression Kit',      icon: '📦', badge: 'LIVE', badgeType: 'live' },
-      { id: 'impression-kit-presentation', label: 'Impression Kit Presentation', icon: '🖥' },
-      { id: 'remake-requests',     label: 'Remake Requests',     icon: '↺',  badge: 'LIVE', badgeType: 'live' },
-      { id: 'recording-uploads',   label: 'Recording Uploads',   icon: '🎥' },
       { id: 'fim',             label: 'CS Fault Manual',      icon: '⊘' },
-      { id: 'lab-fim',         label: 'Lab Fault Manual',     icon: '⊘' },
       { id: 'tickets',         label: 'Claims',               icon: '🎫', module: 'tickets', badgeType: 'alert' },
       { id: 'coaching',        label: 'Coaching + QA',        icon: '🎯', module: 'coaching' },
+    ]},
+    { head: 'AI', items: [
+      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Strategy', items: [
       { id: 'planning',   label: 'Planning',             icon: '📈', module: 'planning' },
@@ -99,8 +95,6 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'reports',    label: 'Reports',               icon: '📊', module: 'reports' },
       { id: 'contracts',  label: 'Contracts',             icon: '📄', module: 'contracts' },
       { id: 'policies',   label: 'Policies',              icon: '🛡', module: 'policies' },
-      { id: 'cx',         label: 'Customer Service',      icon: '👤', badge: 'LIVE', badgeType: 'live' },
-      { id: 'recording-uploads', label: 'Recording Uploads', icon: '🎥' },
       { id: 'fim',        label: 'FIM · Fault Manual',    icon: '⊘' },
       { id: 'tickets',    label: 'Claims',                icon: '🎫', module: 'tickets', badgeType: 'alert' },
       { id: 'coaching',   label: 'Coaching + QA',         icon: '🎯', module: 'coaching' },
@@ -118,6 +112,9 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'attendance',     label: 'Attendance Log',        icon: '📅', module: 'attendance' },
       { id: 'targets',        label: 'Targets',               icon: '⊕',  module: 'targets' },
       { id: 'kb',             label: 'Knowledge Base',        icon: '📚', module: 'kb' },
+    ]},
+    { head: 'AI', items: [
+      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Strategy', items: [
       { id: 'planning',        label: 'Planning',              icon: '📈', module: 'planning' },
@@ -153,7 +150,6 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'payroll',    label: 'Payroll',                icon: '💵', module: 'payroll' },
     ]},
     { head: 'Resources', items: [
-      { id: 'cx',         label: 'Customer Service',       icon: '👤', badge: 'LIVE', badgeType: 'live' },
       { id: 'fim',        label: 'FIM · Fault Manual',     icon: '⊘' },
       { id: 'notes',      label: 'Notes',                  icon: '📝' },
       { id: 'wise',       label: 'WISE',                   icon: '💡', module: 'wise' },
@@ -163,6 +159,9 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'monitoring', label: 'Live Monitoring',        icon: '◉',  module: 'monitoring' },
       { id: 'finance',    label: 'Finance',                icon: '$',  module: 'finance' },
       { id: 'policy',     label: 'Policy Engine',          icon: '⚙',  module: 'policy' },
+    ]},
+    { head: 'AI', items: [
+      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Access', items: [
       { id: 'request-access', label: 'Request Access',    icon: '🔑' },
@@ -217,14 +216,15 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'performance', label: 'My Performance',         icon: '📈' },
       { id: 'schedule',    label: 'My Schedule',            icon: '⏱',  module: 'schedule', agentLabel: 'My Schedule' },
       { id: 'tasks',       label: 'My Tasks',               icon: '✓',  module: 'tasks', agentLabel: 'My Tasks' },
-      { id: 'condition-approval', label: 'Condition Approval', icon: '✔', badge: 'LIVE', badgeType: 'live' },
-      { id: 'impression-kit-presentation', label: 'Impression Kit Presentation', icon: '🖥' },
       { id: 'revenue',     label: 'Revenue Tracker',        icon: '$' },
       { id: 'targets',     label: 'Target Progress',        icon: '⊕',  module: 'targets', agentLabel: 'Target Progress' },
       { id: 'timeoff',     label: 'Request Time Off',       icon: '🏝' },
       { id: 'tickets',     label: 'Claims',                 icon: '🎫', module: 'tickets', badgeType: 'alert' },
       { id: 'notes',       label: 'Notes',                  icon: '📝' },
       { id: 'kb',          label: 'Knowledge Base',         icon: '📚', module: 'kb' },
+    ]},
+    { head: 'AI', items: [
+      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Extra Access', items: [
       { id: 'contracts',      label: 'My Contract',            icon: '📄', module: 'contracts', agentLabel: 'My Contract' },
@@ -240,29 +240,6 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
     ]},
   ]},
 
-  dentist: { label: 'Dentist', sections: [
-    { head: 'Workspace', items: [
-      { id: 'inbox',       label: 'Inbox',            icon: '✉',  module: 'inbox' },
-      { id: 'chat',        label: 'Messages',          icon: '💬', module: 'chat' },
-      { id: 'performance', label: 'My Performance',    icon: '📈' },
-      { id: 'attendance',  label: 'Attendance Log',    icon: '📅', module: 'attendance' },
-      { id: 'schedule',    label: 'My Schedule',       icon: '⏱',  module: 'schedule', agentLabel: 'My Schedule' },
-      { id: 'tasks',       label: 'My Tasks',          icon: '✓',  module: 'tasks', agentLabel: 'My Tasks' },
-      { id: 'notes',       label: 'Personal Notes',    icon: '📝' },
-    ]},
-    { head: 'Clinical', items: [
-      { id: 'cx',                 label: 'Lab Cases',          icon: '🧪', badge: 'LIVE', badgeType: 'live' },
-      { id: 'condition-approval', label: 'Condition Approval', icon: '✔', badge: 'LIVE', badgeType: 'live' },
-      { id: 'impression-kit',     label: 'Impression Kit',     icon: '📦', badge: 'LIVE', badgeType: 'live' },
-      { id: 'impression-kit-presentation', label: 'Impression Kit Presentation', icon: '🖥' },
-      { id: 'remake-requests',    label: 'Remake Requests',    icon: '↺',  badge: 'LIVE', badgeType: 'live' },
-      { id: 'tickets',            label: 'Claims',             icon: '🎫', module: 'tickets', badgeType: 'alert' },
-    ]},
-    { head: 'Lab', items: [
-      { id: 'lab-fim', label: 'Lab Fault Manual', icon: '⊘' },
-    ]},
-  ]},
-
   cx: { label: 'CX', sections: [
     { head: 'Workspace', items: [
       { id: 'dashboard',   label: 'My Dashboard',           icon: '⊞' },
@@ -271,11 +248,6 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'performance', label: 'My Performance',         icon: '📈' },
       { id: 'schedule',    label: 'My Schedule',            icon: '⏱',  module: 'schedule', agentLabel: 'My Schedule' },
       { id: 'tasks',       label: 'My Tasks',               icon: '✓',  module: 'tasks', agentLabel: 'My Tasks' },
-      { id: 'cx',                  label: 'Customer Service',    icon: '👤', badge: 'LIVE', badgeType: 'live' },
-      { id: 'condition-approval',  label: 'Condition Approval',  icon: '✔', badge: 'LIVE', badgeType: 'live' },
-      { id: 'impression-kit',      label: 'Impression Kit',      icon: '📦', badge: 'LIVE', badgeType: 'live' },
-      { id: 'impression-kit-presentation', label: 'Impression Kit Presentation', icon: '🖥' },
-      { id: 'remake-requests',     label: 'Remake Requests',     icon: '↺',  badge: 'LIVE', badgeType: 'live' },
       { id: 'fim',             label: 'FIM · Fault Manual',  icon: '⊘' },
       { id: 'collections',    label: 'Collections',          icon: '$' },
       { id: 'targets',     label: 'Target Progress',        icon: '⊕',  module: 'targets', agentLabel: 'Target Progress' },
@@ -520,9 +492,9 @@ export default function Sidebar({
     <aside className={`sb${mobOpen ? ' mob-open' : ''}`}>
       {/* Brand header */}
       <div className="sb-brd">
-        <div className="sb-i">PV</div>
+        <div className="sb-i">OE</div>
         <div>
-          <div className="sb-n">Pioneers Veneers</div>
+          <div className="sb-n">Octopus Engines</div>
           <div className="sb-p">Portal · {p.label}</div>
         </div>
       </div>
@@ -592,7 +564,6 @@ export default function Sidebar({
               <option value="accountant">Accountant View</option>
               <option value="sales">Sales View</option>
               <option value="cx">CX View</option>
-              <option value="dentist">Dentist View</option>
             </select>
           </div>
         )}

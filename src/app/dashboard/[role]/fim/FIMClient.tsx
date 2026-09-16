@@ -40,7 +40,7 @@ type Category = { series: number; label: string; hue: number };
 /* ── Constants ───────────────────────────────────────────────────────── */
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { series: 100, label: 'Impression / Technical',         hue: 240 },
+  { series: 100, label: 'Installation / Technical',        hue: 240 },
   { series: 200, label: 'Customer Sentiment / Financials', hue: 15  },
   { series: 300, label: 'Operational / Internal',          hue: 55  },
 ];
@@ -48,7 +48,7 @@ const DEFAULT_CATEGORIES: Category[] = [
 // Hue cycle for auto-assigning new categories
 const HUE_CYCLE = [145, 290, 180, 320, 210, 90, 0, 270];
 
-const SOP_CATEGORIES = ['Impression', 'Sentiment', 'Financial', 'Operations'];
+const SOP_CATEGORIES = ['Installation', 'Sentiment', 'Financial', 'Operations'];
 
 const ESCALATION_OPTIONS = [
   { value: 'none',        label: 'None — no manager involvement' },
@@ -84,7 +84,7 @@ function formatDate(iso: string) {
 
 function sopCategoryColor(cat: string) {
   const map: Record<string, string> = {
-    Impression: 'oklch(0.55 0.18 240)',
+    Installation: 'oklch(0.55 0.18 240)',
     Sentiment:  'oklch(0.55 0.18 15)',
     Financial:  'oklch(0.55 0.18 145)',
     Operations: 'oklch(0.55 0.08 260)',
@@ -96,7 +96,7 @@ function sopCategoryColor(cat: string) {
 
 const EMPTY_CODE_FORM = {
   code: '',
-  category: 'Impression / Technical',
+  category: 'Installation / Technical',
   condition_text: '',
   agent_action: '',
   agent_steps_raw: '',
@@ -107,7 +107,7 @@ const EMPTY_CODE_FORM = {
 
 const EMPTY_SOP_FORM = {
   name: '',
-  category: 'Impression',
+  category: 'Installation',
   when_to_use: '',
   body: 'WHEN: …\n\nSTEPS:\n1. …\n2. …\n3. …\n\nWHY: …',
 };
@@ -133,7 +133,7 @@ export default function FIMClient({
   savedCategories: Category[] | null;
   section?: string;
 }) {
-  const isOwner = ['owner', 'admin', 'supervisor', 'dentist'].includes(userRole);
+  const isOwner = ['owner', 'admin', 'supervisor'].includes(userRole);
   const categoriesKey = section === 'lab' ? 'fim_categories_lab' : section === 'sales' ? 'fim_categories_sales' : 'fim_categories';
 
   /* ── State ── */

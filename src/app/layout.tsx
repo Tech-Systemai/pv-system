@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Pioneers Veneers - Enterprise Platform',
+  title: 'Octopus Engines - Enterprise Platform',
   description: 'Enterprise Operations Platform',
 };
 

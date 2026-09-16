@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Trigger Apploye sync
         run: |
-          curl -X POST https://portal.pioneersveneers.com/api/cron/apploye-pull \
+          curl -X POST https://portal.octopusengines.com/api/cron/apploye-pull \
             -H "Content-Type: application/json" \
             --fail-with-body \
             --max-time 30

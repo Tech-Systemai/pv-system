@@ -101,7 +101,7 @@ function buildPayslipHtml(emp: any, item: any, empViolations: any[]): string {
 <div style="border-bottom:2px solid #4f46e5;padding-bottom:20px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start">
   <div style="display:flex;align-items:center;gap:15px">
     <div style="width:50px;height:50px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px">PV</div>
-    <div><div style="font-size:24px;font-weight:800;color:#0f172a">Pioneers Veneers</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Official Payslip Document</div></div>
+    <div><div style="font-size:24px;font-weight:800;color:#0f172a">Octopus Engines</div><div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Official Payslip Document</div></div>
   </div>
   <div style="text-align:right"><div style="font-size:14px;font-weight:600">${periodLabel}</div><div style="font-size:12px;color:#64748b">Generated: ${date}</div></div>
 </div>
@@ -123,10 +123,10 @@ ${scheduleBlock}
 </div>
 ${deductTable}
 <div style="margin-top:40px;display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:20px">
-  <div style="width:40%"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Finance Department</div><div style="font-size:11px;color:#64748b">Pioneers Veneers — Authorized Signature</div></div></div>
+  <div style="width:40%"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Finance Department</div><div style="font-size:11px;color:#64748b">Octopus Engines — Authorized Signature</div></div></div>
   <div style="width:40%;text-align:right"><div style="border-top:1px solid #94a3b8;padding-top:4px;margin-top:40px"><div style="font-weight:600;font-size:12px">Employee Acknowledgement</div><div style="font-size:11px;color:#64748b">${emp.name}</div><div style="margin-top:8px;min-height:36px;font-family:'Dancing Script','Brush Script MT',cursive;font-size:28px;color:#1a1f2e"><!--EMP_SIG--></div><div style="font-size:10px;color:#94a3b8;margin-top:2px">Signature &amp; Date</div></div></div>
 </div>
-<div style="margin-top:24px;font-size:9px;color:#94a3b8;text-align:center;border-top:1px solid #f1f5f9;padding-top:12px">Official payslip · Pioneers Veneers · ${periodLabel} · ${date}</div>
+<div style="margin-top:24px;font-size:9px;color:#94a3b8;text-align:center;border-top:1px solid #f1f5f9;padding-top:12px">Official payslip · Octopus Engines · ${periodLabel} · ${date}</div>
 </body></html>`;
 }
 
@@ -817,7 +817,7 @@ export default function PayrollClient({
             <div style={{ borderBottom: '2px solid #4f46e5', paddingBottom: 20, marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
                 <div style={{ width: 50, height: 50, borderRadius: 10, background: 'linear-gradient(135deg,#6366f1,#4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 20 }}>PV</div>
-                <div><div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>Pioneers Veneers</div><div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>Official Payslip Document</div></div>
+                <div><div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>Octopus Engines</div><div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>Official Payslip Document</div></div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{printSlip.periodLabel}</div>
@@ -889,7 +889,7 @@ export default function PayrollClient({
             )}
 
             <div style={{ marginTop: 40, display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 20 }}>
-              <div style={{ width: '40%' }}><div style={{ borderTop: '1px solid #94a3b8', paddingTop: 4, marginTop: 40 }}><div style={{ fontWeight: 600, fontSize: 12 }}>Finance Department</div><div style={{ fontSize: 11, color: '#64748b' }}>Pioneers Veneers — Authorized Signature</div></div></div>
+              <div style={{ width: '40%' }}><div style={{ borderTop: '1px solid #94a3b8', paddingTop: 4, marginTop: 40 }}><div style={{ fontWeight: 600, fontSize: 12 }}>Finance Department</div><div style={{ fontSize: 11, color: '#64748b' }}>Octopus Engines — Authorized Signature</div></div></div>
               <div style={{ width: '40%', textAlign: 'right' }}><div style={{ borderTop: '1px solid #94a3b8', paddingTop: 4, marginTop: 40 }}><div style={{ fontWeight: 600, fontSize: 12 }}>Employee Acknowledgement</div><div style={{ fontSize: 11, color: '#64748b' }}>{printSlip.emp.name}</div></div></div>
             </div>
 
