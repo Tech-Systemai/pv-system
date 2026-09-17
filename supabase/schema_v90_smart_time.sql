@@ -14,10 +14,18 @@ CREATE TABLE IF NOT EXISTS public.smart_time_prefs (
   country            TEXT        NOT NULL DEFAULT '',
   latitude           NUMERIC,
   longitude          NUMERIC,
-  -- Aladhan calculation method id (3 = Muslim World League, 2 = ISNA,
-  -- 4 = Umm al-Qura, 5 = Egyptian) and school (0 = Shafi, 1 = Hanafi).
-  method             INTEGER     NOT NULL DEFAULT 3,
+  -- AlAdhan calculation method id (3 = Muslim World League, 2 = ISNA,
+  -- 4 = Umm al-Qura, 5 = Egyptian, 99 = custom). NULL means "let the API pick
+  -- the authority closest to this location", which is the better default.
+  method             INTEGER,
+  -- Asr calculation: 0 = standard (Shafi/Maliki/Hanbali), 1 = Hanafi.
   school             INTEGER     NOT NULL DEFAULT 0,
+  -- High-latitude handling for Fajr and Isha: 1 = middle of the night,
+  -- 2 = one seventh, 3 = angle based. NULL = the API's own default.
+  latitude_adjustment INTEGER,
+  -- Per-prayer minute offsets so the times line up with the local mosque,
+  -- e.g. {"fajr": -2, "isha": 5}.
+  tune               JSONB       NOT NULL DEFAULT '{}'::jsonb,
   timezone           TEXT        NOT NULL DEFAULT '',
   wake_time          TEXT        NOT NULL DEFAULT '05:00',
   sleep_time         TEXT        NOT NULL DEFAULT '23:00',
@@ -124,6 +132,14 @@ CREATE TABLE IF NOT EXISTS public.smart_time_period_log (
 );
 
 CREATE INDEX IF NOT EXISTS smart_time_period_log_user_idx ON public.smart_time_period_log (user_id, started_on DESC);
+
+-- Safe to re-run over an earlier copy of this migration: CREATE TABLE IF NOT
+-- EXISTS skips a table that is already there, so the columns added after the
+-- first version shipped are applied explicitly here.
+ALTER TABLE public.smart_time_prefs ADD COLUMN IF NOT EXISTS latitude_adjustment INTEGER;
+ALTER TABLE public.smart_time_prefs ADD COLUMN IF NOT EXISTS tune JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.smart_time_prefs ALTER COLUMN method DROP NOT NULL;
+ALTER TABLE public.smart_time_prefs ALTER COLUMN method DROP DEFAULT;
 
 ALTER TABLE public.smart_time_prefs      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.smart_time_tasks      ENABLE ROW LEVEL SECURITY;

@@ -67,14 +67,21 @@ export type ParseResult = {
   notes: string[];
 };
 
+/** Minute offsets per prayer, to match a local mosque's announced times. */
+export type Tune = Partial<Record<'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha', number>>;
+
 export type Prefs = {
   user_id: string;
   city: string;
   country: string;
   latitude: number | null;
   longitude: number | null;
-  method: number;
+  /** null = let AlAdhan pick the authority closest to the location. */
+  method: number | null;
   school: number;
+  /** 1 = middle of the night, 2 = one seventh, 3 = angle based, null = default. */
+  latitude_adjustment: number | null;
+  tune: Tune;
   timezone: string;
   wake_time: string;
   sleep_time: string;
@@ -93,8 +100,10 @@ export const DEFAULT_PREFS: Omit<Prefs, 'user_id'> = {
   country: '',
   latitude: null,
   longitude: null,
-  method: 3,
+  method: null,
   school: 0,
+  latitude_adjustment: null,
+  tune: {},
   timezone: '',
   wake_time: '05:00',
   sleep_time: '23:00',

@@ -8,7 +8,7 @@ import { HADITH_FIVE_BEFORE_FIVE, PRAYER_AR, PRAYER_ORDER } from '@/lib/smartTim
 import {
   CATEGORY_ICON, QUADRANT_META,
   type DayPlan, type DraftTask, type ParseResult,
-  type Prefs, type PrayerTimes, type Quadrant, type Task,
+  type Prefs, type PrayerTimes, type Quadrant, type Task, type Tune,
 } from '@/lib/smartTime/types';
 import DayPlanPanel from './DayPlanPanel';
 import ReviewPanel, { type Review } from './ReviewPanel';
@@ -45,14 +45,49 @@ type PeriodEntry = { id: number; started_on: string; ended_on: string | null };
 type Draft = DraftTask & { include: boolean };
 type Tab = 'dump' | 'board' | 'plan' | 'review' | 'settings';
 
-const CALC_METHODS = [
-  { value: 3, label: 'Muslim World League' },
-  { value: 2, label: 'ISNA (North America)' },
-  { value: 4, label: 'Umm al-Qura (Makkah)' },
-  { value: 5, label: 'Egyptian General Authority' },
-  { value: 1, label: 'University of Islamic Sciences, Karachi' },
-  { value: 8, label: 'Gulf Region' },
-  { value: 12, label: 'Union des Organisations Islamiques de France' },
+// The authorities AlAdhan supports, by its own method ids. An empty value
+// leaves the parameter off, which makes the API choose the authority closest to
+// the location — usually what you want.
+const CALC_METHODS: { value: number | null; label: string }[] = [
+  { value: null, label: 'Automatic — nearest authority' },
+  { value: 3,    label: 'Muslim World League' },
+  { value: 2,    label: 'Islamic Society of North America (ISNA)' },
+  { value: 5,    label: 'Egyptian General Authority of Survey' },
+  { value: 4,    label: 'Umm al-Qura University, Makkah' },
+  { value: 1,    label: 'University of Islamic Sciences, Karachi' },
+  { value: 8,    label: 'Gulf Region' },
+  { value: 9,    label: 'Kuwait' },
+  { value: 10,   label: 'Qatar' },
+  { value: 16,   label: 'Dubai' },
+  { value: 23,   label: 'Ministry of Awqaf, Jordan' },
+  { value: 21,   label: 'Morocco' },
+  { value: 18,   label: 'Tunisia' },
+  { value: 19,   label: 'Algeria' },
+  { value: 13,   label: 'Diyanet İşleri Başkanlığı, Turkey' },
+  { value: 14,   label: 'Spiritual Administration of Muslims of Russia' },
+  { value: 12,   label: 'Union des Organisations Islamiques de France' },
+  { value: 22,   label: 'Comunidade Islâmica de Lisboa' },
+  { value: 11,   label: 'Majlis Ugama Islam Singapura' },
+  { value: 17,   label: 'Jabatan Kemajuan Islam Malaysia (JAKIM)' },
+  { value: 20,   label: 'Kementerian Agama Republik Indonesia' },
+  { value: 15,   label: 'Moonsighting Committee Worldwide' },
+  { value: 7,    label: 'Institute of Geophysics, University of Tehran' },
+  { value: 0,    label: 'Shia Ithna-Ashari, Leva Institute, Qum' },
+];
+
+const LATITUDE_ADJUSTMENTS: { value: number | null; label: string }[] = [
+  { value: null, label: 'Automatic' },
+  { value: 3,    label: 'Angle based' },
+  { value: 1,    label: 'Middle of the night' },
+  { value: 2,    label: 'One seventh' },
+];
+
+const TUNE_PRAYERS: { key: keyof Tune; label: string }[] = [
+  { key: 'fajr',    label: 'Fajr' },
+  { key: 'dhuhr',   label: 'Dhuhr' },
+  { key: 'asr',     label: 'Asr' },
+  { key: 'maghrib', label: 'Maghrib' },
+  { key: 'isha',    label: 'Isha' },
 ];
 
 const PLACEHOLDER = `Just say it all, however it comes out. For example:
@@ -124,6 +159,7 @@ export default function SmartTimeClient({
   const [hijriDate, setHijriDate] = useState('');
   const [place, setPlace] = useState('');
   const [timezone, setTimezone] = useState('');
+  const [methodName, setMethodName] = useState('');
   const [nowHHMM, setNowHHMM] = useState('');
 
   const [planning, setPlanning] = useState(false);
@@ -170,17 +206,22 @@ export default function SmartTimeClient({
       return null;
     }
 
-    const params = new URLSearchParams({
-      method: String(prefs.method),
-      school: String(prefs.school),
-      date: today,
-    });
+    const params = new URLSearchParams({ school: String(prefs.school), date: today });
+    // Left off, the API picks the authority nearest the location.
+    if (prefs.method !== null) params.set('method', String(prefs.method));
+    if (prefs.latitude_adjustment !== null) {
+      params.set('latitudeAdjustment', String(prefs.latitude_adjustment));
+    }
+    if (prefs.tune && Object.values(prefs.tune).some(v => v)) {
+      params.set('tune', JSON.stringify(prefs.tune));
+    }
     if (prefs.latitude !== null && prefs.longitude !== null) {
       params.set('lat', String(prefs.latitude));
       params.set('lng', String(prefs.longitude));
     } else {
       params.set('city', prefs.city);
-      params.set('country', prefs.country);
+      // Sent only when known — a city alone goes through the address lookup.
+      if (prefs.country) params.set('country', prefs.country);
     }
 
     try {
@@ -193,12 +234,16 @@ export default function SmartTimeClient({
       setHijriDate(json.hijriDate ?? '');
       setPlace(json.place ?? '');
       setTimezone(json.timezone ?? '');
+      setMethodName(json.methodName ?? '');
       return { timings: json.timings ?? {}, hijri: json.hijriDate ?? '' };
     } catch (err) {
       setPrayerError(err instanceof Error ? err.message : 'Could not load prayer times.');
       return null;
     }
-  }, [prefs.city, prefs.country, prefs.latitude, prefs.longitude, prefs.method, prefs.school, today]);
+  }, [
+    prefs.city, prefs.country, prefs.latitude, prefs.longitude,
+    prefs.method, prefs.school, prefs.latitude_adjustment, prefs.tune, today,
+  ]);
 
   // ── Plan ────────────────────────────────────────────────────────────────────
   const regenerate = useCallback(async (opts?: { tasks?: Task[]; prefs?: Prefs; silent?: boolean }) => {
@@ -873,6 +918,7 @@ export default function SmartTimeClient({
           saving={busy === 'prefs'}
           place={place}
           hijriDate={hijriDate}
+          methodName={methodName}
           prayerError={prayerError}
           periodDay={periodDay}
           periods={periods}
@@ -1024,12 +1070,13 @@ function PriorityBoard({
 // ── Settings ─────────────────────────────────────────────────────────────────
 
 function SettingsPanel({
-  prefs, saving, place, hijriDate, prayerError, periodDay, periods, onSave, onUseLocation, onSetPeriod,
+  prefs, saving, place, hijriDate, methodName, prayerError, periodDay, periods, onSave, onUseLocation, onSetPeriod,
 }: {
   prefs: Prefs;
   saving: boolean;
   place: string;
   hijriDate: string;
+  methodName: string;
   prayerError: string;
   periodDay: number | null;
   periods: PeriodEntry[];
@@ -1063,7 +1110,7 @@ function SettingsPanel({
               <input className="fld-input" style={{ width: '100%' }} value={form.city} onChange={e => set('city', e.target.value)} placeholder="Cairo" />
             </div>
             <div>
-              <label className="st-lbl">Country</label>
+              <label className="st-lbl">Country (optional)</label>
               <input className="fld-input" style={{ width: '100%' }} value={form.country} onChange={e => set('country', e.target.value)} placeholder="Egypt" />
             </div>
           </div>
@@ -1090,9 +1137,19 @@ function SettingsPanel({
           <div className="st-fieldrow" style={{ marginTop: 12 }}>
             <div>
               <label className="st-lbl">Calculation method</label>
-              <select className="fld-input" style={{ width: '100%' }} value={form.method} onChange={e => set('method', Number(e.target.value))}>
-                {CALC_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              <select
+                className="fld-input"
+                style={{ width: '100%' }}
+                value={form.method ?? ''}
+                onChange={e => set('method', e.target.value === '' ? null : Number(e.target.value))}
+              >
+                {CALC_METHODS.map(m => (
+                  <option key={m.value ?? 'auto'} value={m.value ?? ''}>{m.label}</option>
+                ))}
               </select>
+              {form.method === null && methodName && (
+                <div className="st-why" style={{ fontStyle: 'normal' }}>Using {methodName}</div>
+              )}
             </div>
             <div>
               <label className="st-lbl">Asr calculation</label>
@@ -1100,6 +1157,46 @@ function SettingsPanel({
                 <option value={0}>Standard (Shafi, Maliki, Hanbali)</option>
                 <option value={1}>Hanafi</option>
               </select>
+            </div>
+            <div>
+              <label className="st-lbl">High-latitude Fajr and Isha</label>
+              <select
+                className="fld-input"
+                style={{ width: '100%' }}
+                value={form.latitude_adjustment ?? ''}
+                onChange={e => set('latitude_adjustment', e.target.value === '' ? null : Number(e.target.value))}
+              >
+                {LATITUDE_ADJUSTMENTS.map(l => (
+                  <option key={l.value ?? 'auto'} value={l.value ?? ''}>{l.label}</option>
+                ))}
+              </select>
+              <div className="st-why">Only matters far north or south, where Fajr and Isha drift.</div>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--line-2)', marginTop: 16, paddingTop: 14 }}>
+            <label className="st-lbl">Match your local mosque (minutes)</label>
+            <div className="st-why" style={{ marginTop: 0, marginBottom: 10 }}>
+              Calculated times often differ by a few minutes from what your mosque announces.
+              Nudge each one to match — the plan follows these adjusted times.
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {TUNE_PRAYERS.map(p => (
+                <div key={p.key} style={{ width: 92 }}>
+                  <label className="st-lbl" style={{ fontSize: 11 }}>{p.label}</label>
+                  <input
+                    className="fld-input"
+                    style={{ width: '100%' }}
+                    type="number"
+                    min={-60}
+                    max={60}
+                    value={form.tune?.[p.key] ?? 0}
+                    onChange={e =>
+                      set('tune', { ...(form.tune ?? {}), [p.key]: Number(e.target.value) || 0 })
+                    }
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
