@@ -60,7 +60,8 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'coaching',        label: 'Coaching + QA',        icon: '🎯', module: 'coaching' },
     ]},
     { head: 'AI', items: [
-      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'ai-agents',  label: 'AI Agents',  icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'smart-time', label: 'Smart Time', icon: '🧠', module: 'smart-time', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Strategy', items: [
       { id: 'planning',   label: 'Planning',             icon: '📈', module: 'planning' },
@@ -114,7 +115,8 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'kb',             label: 'Knowledge Base',        icon: '📚', module: 'kb' },
     ]},
     { head: 'AI', items: [
-      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'ai-agents',  label: 'AI Agents',  icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'smart-time', label: 'Smart Time', icon: '🧠', module: 'smart-time', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Strategy', items: [
       { id: 'planning',        label: 'Planning',              icon: '📈', module: 'planning' },
@@ -161,7 +163,8 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'policy',     label: 'Policy Engine',          icon: '⚙',  module: 'policy' },
     ]},
     { head: 'AI', items: [
-      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'ai-agents',  label: 'AI Agents',  icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'smart-time', label: 'Smart Time', icon: '🧠', module: 'smart-time', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Access', items: [
       { id: 'request-access', label: 'Request Access',    icon: '🔑' },
@@ -203,6 +206,9 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'planning',       label: 'Planning',                icon: '📈', module: 'planning' },
       { id: 'policy',         label: 'Policy Engine',           icon: '⚙',  module: 'policy' },
     ]},
+    { head: 'AI', items: [
+      { id: 'smart-time', label: 'Smart Time', icon: '🧠', module: 'smart-time', badge: 'NEW', badgeType: 'live' },
+    ]},
     { head: 'Access', items: [
       { id: 'request-access', label: 'Request Access',          icon: '🔑' },
     ]},
@@ -224,7 +230,8 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'kb',          label: 'Knowledge Base',         icon: '📚', module: 'kb' },
     ]},
     { head: 'AI', items: [
-      { id: 'ai-agents', label: 'AI Agents', icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'ai-agents',  label: 'AI Agents',  icon: '🤖', module: 'ai-agents', badge: 'NEW', badgeType: 'live' },
+      { id: 'smart-time', label: 'Smart Time', icon: '🧠', module: 'smart-time', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Extra Access', items: [
       { id: 'contracts',      label: 'My Contract',            icon: '📄', module: 'contracts', agentLabel: 'My Contract' },
@@ -264,6 +271,9 @@ const FULL_PORTALS: Record<string, { label: string; sections: Section[] }> = {
       { id: 'payroll',        label: 'Payroll',                icon: '💵', module: 'payroll' },
       { id: 'finance',        label: 'Finance',                icon: '$',  module: 'finance' },
       { id: 'wise',           label: 'WISE',                   icon: '💡', module: 'wise' },
+    ]},
+    { head: 'AI', items: [
+      { id: 'smart-time', label: 'Smart Time', icon: '🧠', module: 'smart-time', badge: 'NEW', badgeType: 'live' },
     ]},
     { head: 'Access', items: [
       { id: 'request-access', label: 'Request Access',         icon: '🔑' },

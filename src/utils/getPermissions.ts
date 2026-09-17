@@ -24,6 +24,9 @@ export const PERM_DEFAULTS: PermMatrix = {
   finance:    { owner: 'both', admin: 'admin', supervisor: 'none',  accountant: 'admin', sales: 'none',  cx: 'none' },
   wise:       { owner: 'both', admin: 'admin', supervisor: 'agent', accountant: 'none',  sales: 'none',  cx: 'none' },
   'ai-agents': { owner: 'both', admin: 'admin', supervisor: 'admin', accountant: 'none',  sales: 'agent', cx: 'none' },
+  // Smart Time is a personal workspace: every row is scoped to the signed-in
+  // user, so there is no admin view of anyone else's plan.
+  'smart-time': { owner: 'both', admin: 'agent', supervisor: 'agent', accountant: 'agent', sales: 'agent', cx: 'agent' },
 };
 
 // Normalise a raw value that might be a legacy boolean or a ViewType string

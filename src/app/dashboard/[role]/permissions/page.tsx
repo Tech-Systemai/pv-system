@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import PermissionsClient from './PermissionsClient';
 import { getPermMatrix } from '@/utils/getPermissions';
 
-const CATS  = ['tasks', 'schedule', 'reports', 'tickets', 'hr', 'contracts', 'inbox', 'attendance', 'monitoring', 'policy', 'targets', 'coaching', 'planning', 'kb', 'chat', 'payroll', 'finance', 'wise', 'ai-agents'];
+const CATS  = ['tasks', 'schedule', 'reports', 'tickets', 'hr', 'contracts', 'inbox', 'attendance', 'monitoring', 'policy', 'targets', 'coaching', 'planning', 'kb', 'chat', 'payroll', 'finance', 'wise', 'ai-agents', 'smart-time'];
 const ROLES = ['owner', 'admin', 'supervisor', 'accountant', 'sales', 'cx'];
 
 export default async function PermissionsPage() {

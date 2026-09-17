@@ -42,6 +42,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   collections:      { title: 'Collections',      sub: 'Active accounts and follow-up queue' },
   'personal-files':       { title: 'Personal Files',      sub: 'Confidential employee record · commendations & incidents · admins & owners only' },
   'ai-agents':            { title: 'AI Agents',           sub: 'Outreach and support agents · configuration and live run log' },
+  'smart-time':           { title: 'Smart Time',          sub: 'Dump it all in · sorted tasks, time estimates and a day planned around your prayers' },
 };
 
 export default function TopBarTitle({ role }: { role: string }) {

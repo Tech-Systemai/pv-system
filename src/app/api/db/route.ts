@@ -12,7 +12,18 @@ const ALLOWED_TABLES = [
   'personal_file_entries',
   'interview_modules', 'interview_invites', 'interview_sessions', 'interview_messages', 'interview_scorecards',
   'ai_agents', 'ai_agent_runs',
+  'smart_time_prefs', 'smart_time_tasks', 'smart_time_dumps', 'smart_time_plans',
+  'smart_time_reviews', 'smart_time_period_log',
 ];
+
+// Smart Time rows belong to exactly one person — their brain dumps, their day
+// plan, their period log. Writes are stamped with the caller's id and every
+// read, update and delete is filtered to it, so no request can reach another
+// user's rows even though /api/db runs as the service role.
+const PERSONAL_TABLES = new Set([
+  'smart_time_prefs', 'smart_time_tasks', 'smart_time_dumps', 'smart_time_plans',
+  'smart_time_reviews', 'smart_time_period_log',
+]);
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -20,11 +31,19 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { table, operation, data, filters, select: selectClause } = body;
+  const { table, operation, data, filters: rawFilters, select: selectClause } = body;
 
   if (!ALLOWED_TABLES.includes(table)) {
     return NextResponse.json({ error: 'Table not allowed' }, { status: 403 });
   }
+
+  const isPersonal = PERSONAL_TABLES.has(table);
+  if (isPersonal) {
+    for (const row of Array.isArray(data) ? data : data ? [data] : []) {
+      if (row && typeof row === 'object') row.user_id = user.id;
+    }
+  }
+  const filters = isPersonal ? { ...(rawFilters ?? {}), user_id: user.id } : rawFilters;
 
   const admin = createAdminClient();
 
