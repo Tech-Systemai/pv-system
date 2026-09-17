@@ -4,13 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbOp } from '@/utils/db';
 import { parseDump } from '@/lib/smartTime/parse';
 import { buildDayPlan, fmtClock, minutesLabel, planTotals, toMin } from '@/lib/smartTime/schedule';
-import { HADITH_FIVE_BEFORE_FIVE, PRAYER_AR, PRAYER_ORDER } from '@/lib/smartTime/islamic';
+import { HADITH_FIVE_BEFORE_FIVE, PRAYER_ORDER } from '@/lib/smartTime/islamic';
 import {
   CATEGORY_ICON, QUADRANT_META,
   type DayPlan, type DraftTask, type ParseResult,
   type Prefs, type PrayerTimes, type Quadrant, type Task, type Tune,
 } from '@/lib/smartTime/types';
 import DayPlanPanel from './DayPlanPanel';
+import CalendarPanel, { type StoredPlan } from './CalendarPanel';
+import PrayerBar from './PrayerBar';
 import ReviewPanel, { type Review } from './ReviewPanel';
 
 // Dictation runs on the browser's own speech recognition; it is still vendor
@@ -43,7 +45,7 @@ function speechRecognitionCtor(): (new () => SpeechRec) | null {
 type Dump = { id: number; raw_text: string; source: string; task_count: number; created_at: string };
 type PeriodEntry = { id: number; started_on: string; ended_on: string | null };
 type Draft = DraftTask & { include: boolean };
-type Tab = 'dump' | 'board' | 'plan' | 'review' | 'settings';
+type Tab = 'dump' | 'board' | 'plan' | 'calendar' | 'review' | 'settings';
 
 // The authorities AlAdhan supports, by its own method ids. An empty value
 // leaves the parameter off, which makes the API choose the authority closest to
@@ -132,13 +134,14 @@ function calibrationFrom(tasks: Task[]): { factor: number; samples: number } | n
 }
 
 export default function SmartTimeClient({
-  userId, initialPrefs, initialTasks, initialDumps, initialReviews, initialPeriods,
+  userId, initialPrefs, initialTasks, initialDumps, initialReviews, initialPlans, initialPeriods,
 }: {
   userId: string;
   initialPrefs: Prefs;
   initialTasks: Task[];
   initialDumps: Dump[];
   initialReviews: Review[];
+  initialPlans: StoredPlan[];
   initialPeriods: PeriodEntry[];
 }) {
   // A location ships as a default, so there is nothing to set up before use.
@@ -148,6 +151,7 @@ export default function SmartTimeClient({
   const [dumps, setDumps] = useState<Dump[]>(initialDumps);
   const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const [periods, setPeriods] = useState<PeriodEntry[]>(initialPeriods);
+  const [plans, setPlans] = useState<StoredPlan[]>(initialPlans);
 
   const [dumpText, setDumpText] = useState('');
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -246,9 +250,15 @@ export default function SmartTimeClient({
   ]);
 
   // ── Plan ────────────────────────────────────────────────────────────────────
-  const regenerate = useCallback(async (opts?: { tasks?: Task[]; prefs?: Prefs; silent?: boolean }) => {
+  const regenerate = useCallback(async (opts?: {
+    tasks?: Task[];
+    prefs?: Prefs;
+    silent?: boolean;
+    /** Times already in hand, so one page load makes one lookup. */
+    times?: { timings: PrayerTimes; hijri: string };
+  }) => {
     setPlanning(true);
-    const times = await loadPrayerTimes();
+    const times = opts?.times ?? await loadPrayerTimes();
     if (!times) { setPlanning(false); return; }
 
     const usePrefs = opts?.prefs ?? prefs;
@@ -273,6 +283,17 @@ export default function SmartTimeClient({
       generated_at: new Date().toISOString(),
     });
     noteDbError(saveError);
+    setPlans(prev => [
+      {
+        plan_date: today,
+        blocks: next.blocks,
+        prayer_times: next.prayer_times,
+        hijri_date: next.hijri_date,
+        period_mode: next.period_mode,
+        unscheduled: next.unscheduled,
+      },
+      ...prev.filter(pl => pl.plan_date !== today),
+    ]);
     setPlanning(false);
     if (!opts?.silent) flash('Plan rebuilt around today’s prayer times');
   }, [loadPrayerTimes, prefs, tasks, today, userId]);
@@ -284,9 +305,19 @@ export default function SmartTimeClient({
 
     (async () => {
       if (!prefs.city && prefs.latitude === null) return;
+
+      // Prayer times and the plan come first: neither needs the database, so a
+      // missing table must not leave the page blank — only saving is affected.
+      const times = await loadPrayerTimes();
+      if (cancelled || !times) return;
+
       const { data, error } = await dbOp('smart_time_plans', 'select', undefined, { plan_date: today });
       if (cancelled) return;
-      if (error) { noteDbError(error); return; }
+      if (error) {
+        noteDbError(error);
+        await regenerate({ silent: true, times });
+        return;
+      }
 
       const saved = data?.[0];
       if (saved) {
@@ -298,11 +329,8 @@ export default function SmartTimeClient({
           period_mode: saved.period_mode ?? false,
           unscheduled: saved.unscheduled ?? [],
         });
-        setPrayerTimes(saved.prayer_times ?? {});
-        setHijriDate(saved.hijri_date ?? '');
-        await loadPrayerTimes();
       } else {
-        await regenerate({ silent: true });
+        await regenerate({ silent: true, times });
       }
     })();
 
@@ -310,6 +338,41 @@ export default function SmartTimeClient({
     // Runs once per mount; later rebuilds are explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Builds a provisional plan for another day: that date's prayer times, with
+   * the tasks that are open and due by then. Not saved — the day gets its real
+   * plan when it arrives and today's tasks are known.
+   */
+  const previewDay = useCallback(async (date: string): Promise<DayPlan | null> => {
+    const params = new URLSearchParams({ school: String(prefs.school), date });
+    if (prefs.method !== null) params.set('method', String(prefs.method));
+    if (prefs.latitude_adjustment !== null) params.set('latitudeAdjustment', String(prefs.latitude_adjustment));
+    if (prefs.tune && Object.values(prefs.tune).some(v => v)) params.set('tune', JSON.stringify(prefs.tune));
+    if (prefs.latitude !== null && prefs.longitude !== null) {
+      params.set('lat', String(prefs.latitude));
+      params.set('lng', String(prefs.longitude));
+    } else {
+      params.set('city', prefs.city);
+      if (prefs.country) params.set('country', prefs.country);
+    }
+
+    try {
+      const res = await fetch(`/api/prayer-times?${params}`);
+      const json = await res.json();
+      if (!res.ok) return null;
+
+      return buildDayPlan({
+        prefs,
+        prayerTimes: json.timings ?? {},
+        tasks: tasks.filter(t => t.status === 'open' && (!t.due_on || t.due_on <= date)),
+        date,
+        hijriDate: json.hijriDate ?? '',
+      });
+    } catch {
+      return null;
+    }
+  }, [prefs, tasks]);
 
   // ── Dictation ───────────────────────────────────────────────────────────────
   const toggleMic = () => {
@@ -639,39 +702,21 @@ export default function SmartTimeClient({
         </div>
       </div>
 
-      {/* ── Prayer strip ── */}
-      {Object.keys(prayerTimes).length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <div className="st-strip">
-            {PRAYER_ORDER.map(name => {
-              const at = toMin(prayerTimes[name]);
-              const isNext = nextPrayer?.name === name;
-              const passed = at !== null && nowMin !== null && at < nowMin && !isNext;
-              return (
-                <div key={name} className={`st-pill${isNext ? ' next' : ''}${passed ? ' passed' : ''}`}>
-                  <div className="st-pill-n">
-                    <span>{name}</span>
-                    <span className="st-pill-ar">{PRAYER_AR[name]}</span>
-                  </div>
-                  <div className="st-pill-t">{fmtClock(prayerTimes[name] ?? '')}</div>
-                </div>
-              );
-            })}
-          </div>
-          {prefs.period_active && (
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 8 }}>
-              Period mode · these five slots hold Quran reading instead of Salah, and your breaks are Quran too.
-              <button
-                className="btn btn-sm btn-ghost"
-                style={{ marginLeft: 8 }}
-                onClick={() => setPeriod(false)}
-              >
-                My period ended
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* ── Prayer times ── */}
+      <PrayerBar
+        times={prayerTimes}
+        nowHHMM={nowHHMM}
+        place={place || [prefs.city, prefs.country].filter(Boolean).join(', ')}
+        hijriDate={hijriDate}
+        methodName={methodName}
+        timezone={timezone}
+        periodMode={prefs.period_active}
+        periodDay={periodDay}
+        loading={planning}
+        error={prayerError}
+        onEndPeriod={() => setPeriod(false)}
+        onOpenSettings={() => setTab('settings')}
+      />
 
       {/* ── Tabs ── */}
       <div className="tabs">
@@ -679,6 +724,7 @@ export default function SmartTimeClient({
           ['dump', 'Brain dump'],
           ['board', 'Priorities'],
           ['plan', "Today's plan"],
+          ['calendar', 'Calendar'],
           ['review', 'Weekly review'],
           ['settings', 'Settings'],
         ] as [Tab, string][]).map(([id, label]) => (
@@ -895,6 +941,18 @@ export default function SmartTimeClient({
           onRegenerate={() => regenerate()}
           onCompleteTask={completeTask}
           onOpenSettings={() => setTab('settings')}
+        />
+      )}
+
+      {/* ── Calendar ── */}
+      {tab === 'calendar' && (
+        <CalendarPanel
+          tasks={tasks}
+          plans={plans}
+          todayPlan={plan}
+          periods={periods}
+          today={today}
+          onPreview={previewDay}
         />
       )}
 
