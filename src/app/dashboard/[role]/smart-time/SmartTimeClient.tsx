@@ -132,7 +132,7 @@ function calibrationFrom(tasks: Task[]): { factor: number; samples: number } | n
 }
 
 export default function SmartTimeClient({
-  userId, initialPrefs, initialTasks, initialDumps, initialReviews, initialPeriods, prefsExist,
+  userId, initialPrefs, initialTasks, initialDumps, initialReviews, initialPeriods,
 }: {
   userId: string;
   initialPrefs: Prefs;
@@ -140,9 +140,9 @@ export default function SmartTimeClient({
   initialDumps: Dump[];
   initialReviews: Review[];
   initialPeriods: PeriodEntry[];
-  prefsExist: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>(prefsExist ? 'dump' : 'settings');
+  // A location ships as a default, so there is nothing to set up before use.
+  const [tab, setTab] = useState<Tab>('dump');
   const [prefs, setPrefs] = useState<Prefs>(initialPrefs);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [dumps, setDumps] = useState<Dump[]>(initialDumps);

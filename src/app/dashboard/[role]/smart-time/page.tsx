@@ -53,7 +53,6 @@ export default async function SmartTimePage() {
       initialDumps={dumps ?? []}
       initialReviews={reviews ?? []}
       initialPeriods={periods ?? []}
-      prefsExist={Boolean(prefs)}
     />
   );
 }

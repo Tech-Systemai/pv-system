@@ -95,16 +95,19 @@ export type Prefs = {
   period_started_on: string | null;
 };
 
+// Apollo Beach, Florida — the coordinates are carried as well as the city name
+// so the daily lookup never depends on the geocoder, which returns an
+// intermittent 503. Anyone can change all of this in Settings.
 export const DEFAULT_PREFS: Omit<Prefs, 'user_id'> = {
-  city: '',
-  country: '',
-  latitude: null,
-  longitude: null,
+  city: 'Apollo Beach',
+  country: 'United States',
+  latitude: 27.7731,
+  longitude: -82.4051,
   method: null,
   school: 0,
   latitude_adjustment: null,
   tune: {},
-  timezone: '',
+  timezone: 'America/New_York',
   wake_time: '05:00',
   sleep_time: '23:00',
   prayer_minutes: 15,
