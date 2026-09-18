@@ -25,7 +25,6 @@ export function FeedItem({ e, byId, onSelect }: { e: AgentEvent; byId: Record<st
         <span className="ag-feed-meta" suppressHydrationWarning>
           {EVENT_META[e.kind].label}
           {a ? ` · ${a.name}` : ''} · {timeAgo(e.created_at)}
-          {e.sim && <span className="ag-sample">sample</span>}
         </span>
       </span>
     </button>

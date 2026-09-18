@@ -5,6 +5,7 @@ import {
   ACTIVITY_META, TIER_LABEL, WORK_META, roleTag,
   type Activity, type Agent, type AgentEvent, type Department, type Run, type Work,
 } from '@/lib/aiAgents/types';
+import { LIVE_AGENTS, NEXT_UP } from '@/lib/aiAgents/org';
 import { FeedItem, timeAgo } from './LiveFeed';
 
 type Props = {
@@ -17,11 +18,9 @@ type Props = {
   events: AgentEvent[];
   runs: Run[];
   reports: Agent[];
-  canRequest: boolean;
   canManage: boolean;
   onSelect: (id: string) => void;
   onClose: () => void;
-  onRequest: (agentId: string, title: string, brief: string) => Promise<string | null>;
   onDecide: (w: Work, decision: 'approve' | 'revise', notes?: string) => Promise<string | null>;
   onEdit: () => void;
   onSetStatus: (s: 'active' | 'paused' | 'archived') => void;
@@ -54,7 +53,6 @@ export function WorkCard({ w, onDecide, showAgent }: { w: Work; onDecide: Props[
       <div className="ag-work-meta" suppressHydrationWarning>
         {showAgent ? `${showAgent} · ` : ''}Updated {timeAgo(w.updated_at)}
         {w.revision_count > 0 && <span className="ag-rev-pill">↺ {w.revision_count} revision{w.revision_count === 1 ? '' : 's'}</span>}
-        {w.sim && <span className="ag-sample">sample</span>}
       </div>
       {w.brief && <div className="ag-work-brief">{w.brief}</div>}
       {w.status === 'revision' && w.revision_notes && (
@@ -83,33 +81,15 @@ export function WorkCard({ w, onDecide, showAgent }: { w: Work; onDecide: Props[
 
 export default function AgentDetail({
   agent, byId, departments, activity, task, work, events, runs, reports,
-  canRequest, canManage, onSelect, onClose, onRequest, onDecide, onEdit, onSetStatus,
+  canManage, onSelect, onClose, onDecide, onEdit, onSetStatus,
 }: Props) {
-  const [title, setTitle] = useState('');
-  const [brief, setBrief] = useState('');
-  const [sending, setSending] = useState(false);
-  const [err, setErr] = useState('');
-  const [sent, setSent] = useState(false);
-
   const dept = departments.find(d => d.key === agent.department);
+  const liveDuty = agent.slug ? LIVE_AGENTS[agent.slug] : undefined;
   const boss = agent.reports_to ? byId[agent.reports_to] : undefined;
   const active = work.filter(w => ACTIVE.includes(w.status)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const queued = work.filter(w => w.status === 'queued');
   const done = work.filter(w => w.status === 'done').sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')).slice(0, 5);
   const meta = ACTIVITY_META[activity];
-
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-    setSending(true);
-    setErr('');
-    const res = await onRequest(agent.id, title.trim(), brief.trim());
-    setSending(false);
-    if (res) { setErr(res); return; }
-    setTitle('');
-    setBrief('');
-    setSent(true);
-  };
 
   return (
     <div className="ag-panel">
@@ -136,6 +116,9 @@ export default function AgentDetail({
       </div>
 
       <div className="ag-panel-body">
+        {liveDuty
+          ? <div className="ag-live-note"><b>● Live</b>{liveDuty}</div>
+          : <div className="ag-live-note planned"><b>Planned</b>{NEXT_UP[agent.slug ?? ''] ?? 'Not live yet. This agent is on the floor plan and will be built in a later step.'}</div>}
         {agent.purpose && <p className="ag-purpose">{agent.purpose}</p>}
 
         {(boss || reports.length > 0) && (
@@ -179,26 +162,6 @@ export default function AgentDetail({
             ))}
           </div>
         )}
-
-        <div className="ag-sec">
-          <div className="ag-sec-t">Send {agent.name} a request</div>
-          {agent.tier === 'ceo' && <div className="ag-hint">{agent.name} breaks it down and hands it to the right departments.</div>}
-          {canRequest ? (
-            <form onSubmit={send} className="ag-req">
-              <input value={title} onChange={e => { setTitle(e.target.value); setSent(false); }} placeholder="What do you need?" maxLength={160} />
-              <textarea rows={3} value={brief} onChange={e => setBrief(e.target.value)} placeholder="Details, niche, deadline, what good looks like…" />
-              <div className="ag-work-actions">
-                {sent && <span className="ag-ok">Queued ✓</span>}
-                <button type="submit" className="btn btn-sm btn-acc" disabled={sending || !title.trim()}>
-                  {sending ? <><span className="spin" />Sending…</> : 'Send request'}
-                </button>
-              </div>
-              {err && <div className="ag-err">{err}</div>}
-            </form>
-          ) : (
-            <div className="ag-hint">Requests open once the building is staffed.</div>
-          )}
-        </div>
 
         {done.length > 0 && (
           <div className="ag-sec">

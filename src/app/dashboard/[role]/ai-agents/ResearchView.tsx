@@ -122,7 +122,6 @@ export default function ResearchView({ agents, leads, outreach, niches, activity
                 <span className="rs-lead-h">
                   <b>{l.business_name}</b>
                   <span className="tb-sub">{niches.find(n => n.key === l.niche)?.name} · {l.city} · <span suppressHydrationWarning>{l.researched_at ? timeAgo(l.researched_at) : ''}</span></span>
-                  {l.sim && <span className="ag-sample">sample</span>}
                 </span>
                 <span className="rs-lead-row">
                   <ScoreBar score={l.wtp_score} />

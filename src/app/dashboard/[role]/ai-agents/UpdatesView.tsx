@@ -91,7 +91,7 @@ export default function UpdatesView({
         <button key={item.e.id} type="button" className="up-alert" onClick={() => a && onOpenAgent(a.id)}>
           <b>! {a?.name ?? 'Agent'}</b>
           <span>{item.e.message}</span>
-          <small suppressHydrationWarning>{timeAgo(item.e.created_at)}{item.e.sim ? ' · sample' : ''}</small>
+          <small suppressHydrationWarning>{timeAgo(item.e.created_at)}</small>
         </button>
       );
     }

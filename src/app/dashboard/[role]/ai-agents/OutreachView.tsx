@@ -15,13 +15,6 @@ const CALL_OUTCOMES: { status: OutreachStatus; label: string }[] = [
   { status: 'not_interested', label: 'Not interested' },
 ];
 
-const EMAIL_COLS: { status: OutreachStatus; label: string; hint: string }[] = [
-  { status: 'compliance', label: 'Compliance check', hint: 'Being checked before it can send' },
-  { status: 'blocked', label: 'Blocked', hint: 'Failed a compliance rule' },
-  { status: 'scheduled', label: 'Ready to send', hint: 'Cleared; sends once the niche template is approved' },
-  { status: 'sent', label: 'Sent', hint: 'Delivered, waiting for a reply' },
-];
-
 function CallCard({ o, lead, niche, onOpenLead, onLog }: {
   o: Outreach; lead?: Lead; niche?: Niche;
   onOpenLead: (id: string) => void;
@@ -42,7 +35,6 @@ function CallCard({ o, lead, niche, onOpenLead, onLog }: {
     <div className={`oc-call${o.status === 'callback' ? ' oc-callback' : ''}`}>
       <div className="oc-call-h">
         <button type="button" className="oc-biz" onClick={() => onOpenLead(lead.id)}>{lead.business_name}</button>
-        {o.sim && <span className="ag-sample">sample</span>}
         {o.status === 'callback' && <span className="pv-bdg pv-bdg-amber">CALL BACK</span>}
       </div>
       <div className="oc-call-meta">
@@ -63,17 +55,15 @@ function CallCard({ o, lead, niche, onOpenLead, onLog }: {
   );
 }
 
-export default function OutreachView({ leads, outreach, niches, onOpenLead, onLogCall, onOpenNiches }: {
+export default function OutreachView({ leads, outreach, niches, onOpenLead, onLogCall }: {
   leads: Lead[];
   outreach: Outreach[];
   niches: Niche[];
   onOpenLead: (id: string) => void;
   onLogCall: (id: string, status: OutreachStatus, notes: string) => Promise<string | null>;
-  onOpenNiches: () => void;
 }) {
   const [sub, setSub] = useState<Sub>('calls');
   const [nicheF, setNicheF] = useState('all');
-  const [open, setOpen] = useState<string | null>(null);
 
   const leadOf = Object.fromEntries(leads.map(l => [l.id, l]));
   const nicheOf = (o: Outreach) => niches.find(n => n.key === leadOf[o.lead_id]?.niche);
@@ -83,23 +73,27 @@ export default function OutreachView({ leads, outreach, niches, onOpenLead, onLo
   const toCall = calls.filter(o => o.status === 'to_call' || o.status === 'callback')
     .sort((a, b) => (leadOf[b.lead_id]?.wtp_score ?? 0) - (leadOf[a.lead_id]?.wtp_score ?? 0));
   const called = calls.filter(o => !['to_call', 'callback'].includes(o.status)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  const emails = outreach.filter(o => o.channel === 'email' && inNiche(o));
+  // Researched, qualified, email-first leads with nothing sent yet: the Email Writer's queue.
+  const contacted = new Set(outreach.map(o => o.lead_id));
+  const emailReady = leads
+    .filter(l => l.status === 'qualified' && l.contact_channel === 'email' && !contacted.has(l.id))
+    .filter(l => nicheF === 'all' || l.niche === nicheF)
+    .sort((a, b) => (b.wtp_score ?? 0) - (a.wtp_score ?? 0));
   const replies = outreach.filter(o => inNiche(o) && ['replied', 'interested', 'booked'].includes(o.status)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  const waitingNiches = [...new Set(emails.filter(o => o.status === 'scheduled').map(nicheOf).filter(n => n && !n.template_approved).map(n => n!.name))];
 
   return (
     <div className="tb-wrap">
       <div className="oc-top">
         <div className="ag-filters">
           <button type="button" className={sub === 'calls' ? 'on' : ''} onClick={() => setSub('calls')}>Your call list ({toCall.length})</button>
-          <button type="button" className={sub === 'emails' ? 'on' : ''} onClick={() => setSub('emails')}>Emails ({emails.length})</button>
+          <button type="button" className={sub === 'emails' ? 'on' : ''} onClick={() => setSub('emails')}>Email-first leads ({emailReady.length})</button>
           <button type="button" className={sub === 'replies' ? 'on' : ''} onClick={() => setSub('replies')}>Replies &amp; interest ({replies.length})</button>
         </div>
         <select className="fld-input" value={nicheF} onChange={e => setNicheF(e.target.value)}>
           <option value="all">All niches</option>
           {niches.map(n => <option key={n.key} value={n.key}>{n.name}</option>)}
         </select>
-        <span className="oc-gmail" title="Sending through Gmail is wired up in Phase 3">✉ Gmail: not connected yet</span>
+        <span className="oc-gmail" title="The outreach inbox is connected in the email step">✉ Outreach inbox: not connected yet</span>
       </div>
 
       {sub === 'calls' && (
@@ -128,36 +122,25 @@ export default function OutreachView({ leads, outreach, niches, onOpenLead, onLo
 
       {sub === 'emails' && (
         <>
-          {waitingNiches.length > 0 && (
-            <div className="up-await">
-              Emails are ready for {waitingNiches.join(', ')} but won&apos;t send until you approve {waitingNiches.length === 1 ? 'that niche\'s' : 'those niches\''} template.{' '}
-              <button type="button" className="ag-link" onClick={onOpenNiches}>Review templates →</button>
+          <div className="up-await">
+            These leads are researched and qualified, and email is the best way to reach them. The Email Writer goes live next:
+            it will write each one from scratch using what Research found, and nothing sends until you approve it.
+          </div>
+          {emailReady.length === 0 ? <div className="card"><div className="empty">No email-first leads yet.</div></div> : (
+            <div className="card tb-card">
+              {emailReady.slice(0, 50).map(l => (
+                <div key={l.id} className="oc-reply" onClick={() => onOpenLead(l.id)}>
+                  <span>✉</span>
+                  <span className="oc-reply-t">
+                    <b>{l.business_name}</b> <span className="tb-sub">{niches.find(n => n.key === l.niche)?.name} · {l.city} · {l.email}</span>
+                    <span>{l.signals.research_notes || l.wtp_reasons[0]?.text}</span>
+                  </span>
+                  <ScoreBar score={l.wtp_score} />
+                  <span className="tb-sub">{l.owner_name || 'Owner unknown'}</span>
+                </div>
+              ))}
             </div>
           )}
-          <div className="oc-board">
-            {EMAIL_COLS.map(c => {
-              const items = emails.filter(o => o.status === c.status || (c.status === 'sent' && o.status === 'bounced'));
-              return (
-                <div key={c.status} className={`oc-col oc-col-${c.status}`}>
-                  <div className="up-lane-h" title={c.hint}>{c.label} <span>{items.length}</span></div>
-                  {items.slice(0, 20).map(o => {
-                    const lead = leadOf[o.lead_id];
-                    const isOpen = open === o.id;
-                    return (
-                      <div key={o.id} className="oc-mail" onClick={() => setOpen(isOpen ? null : o.id)}>
-                        <b>{lead?.business_name}</b>
-                        <span className="tb-sub">{nicheOf(o)?.name} · {lead?.email || 'no email'}</span>
-                        <span className="oc-subj">{o.subject}</span>
-                        {o.compliance_issues.length > 0 && <span className="oc-issue">⚠ {o.compliance_issues[0]}</span>}
-                        {isOpen && <pre className="oc-body">{o.body}</pre>}
-                      </div>
-                    );
-                  })}
-                  {items.length > 20 && <div className="up-more">+{items.length - 20} more</div>}
-                </div>
-              );
-            })}
-          </div>
         </>
       )}
 

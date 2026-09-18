@@ -51,7 +51,6 @@ export default async function AiAgentsPage() {
       integrations={{
         apify: !!process.env.APIFY_TOKEN && !!process.env.APIFY_WEBHOOK_SECRET,
         claude: !!process.env.ANTHROPIC_API_KEY,
-        sender: !!process.env.OUTREACH_SENDER_ADDRESS,
       }}
       canManage={canManage}
       currentUserId={user.id}

@@ -63,7 +63,7 @@ export default function LeadDrawer({ lead, niche, outreach, researcher, onClose 
       <aside className="ld-drawer" onClick={e => e.stopPropagation()}>
         <div className="ld-dh">
           <div>
-            <div className="ld-dname">{lead.business_name}{lead.sim && <span className="ag-sample">sample</span>}</div>
+            <div className="ld-dname">{lead.business_name}</div>
             <div className="ld-dsub">{niche?.name ?? lead.niche} · {lead.city}{lead.state ? `, ${lead.state}` : ''} · found {timeAgo(lead.created_at)} via {lead.source.replace('_', ' ')}</div>
           </div>
           <button type="button" className="ag-link" onClick={onClose}>✕</button>

@@ -3,11 +3,13 @@
 import { useLayoutEffect, useRef } from 'react';
 import { ACTIVITY_META, EVENT_META, roleTag, type Activity, type Agent, type Department, type EventKind } from '@/lib/aiAgents/types';
 
-export type Bubble = { id: string; agentId: string; kind: EventKind; text: string; sim?: boolean };
+export type Bubble = { id: string; agentId: string; kind: EventKind; text: string };
 
 type Props = {
   departments: Department[];
   agents: Agent[];
+  /** Agents that run on real APIs; the rest show as planned. */
+  liveIds: Set<string>;
   activityOf: (id: string) => Activity | 'offline';
   taskOf: (id: string) => string;
   revisionCount: Record<string, number>;
@@ -23,7 +25,7 @@ type Props = {
 const TIER_RANK = { ceo: 0, exec: 1, manager: 2, specialist: 3 } as const;
 
 export default function BuildingView({
-  departments, agents, activityOf, taskOf, revisionCount, selectedId, onSelect, bubbles, elevator, canHire, onHire,
+  departments, agents, liveIds, activityOf, taskOf, revisionCount, selectedId, onSelect, bubbles, elevator, canHire, onHire,
 }: Props) {
   const floors = [...departments].sort((a, b) => a.arm_order - b.arm_order);
   const n = floors.length;
@@ -45,18 +47,19 @@ export default function BuildingView({
     const task = taskOf(a.id);
     const revs = revisionCount[a.id] ?? 0;
     const lead = a.tier !== 'specialist';
+    const live = liveIds.has(a.id);
     const bubble = bubbles.filter(b => b.agentId === a.id).at(-1);
     return (
       <button
         key={a.id}
         type="button"
-        className={`bd-desk bd-${act}${lead ? ' bd-lead' : ''}${selectedId === a.id ? ' sel' : ''}`}
+        className={`bd-desk bd-${live ? act : 'planned'}${lead ? ' bd-lead' : ''}${selectedId === a.id ? ' sel' : ''}`}
         onClick={() => onSelect(a.id)}
         title={`${a.name} — ${a.title}`}
       >
         {bubble && (
           <span key={bubble.id} className={`bd-bubble bd-bubble-${bubble.kind}`}>
-            <b>{EVENT_META[bubble.kind].icon} {EVENT_META[bubble.kind].label}{bubble.sim ? ' · sample' : ''}</b>
+            <b>{EVENT_META[bubble.kind].icon} {EVENT_META[bubble.kind].label}</b>
             {bubble.text}
           </span>
         )}
@@ -68,9 +71,10 @@ export default function BuildingView({
             <i style={{ background: meta.color }} />
             {a.name}
             {lead && <em>{a.tier === 'manager' ? 'MGR' : roleTag(a)}</em>}
+            {live && <em className="bd-live">LIVE</em>}
           </span>
           <span className="bd-title">{a.title}</span>
-          <span className="bd-task">{task || meta.label}</span>
+          <span className="bd-task">{live ? (task || meta.label) : 'Planned — not live yet'}</span>
         </span>
         {revs > 0 && <span className="bd-rev" title={`${revs} in revision`}>↺{revs}</span>}
       </button>
@@ -92,6 +96,7 @@ export default function BuildingView({
                 .filter(a => a.department === f.key)
                 .sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier] || a.sort_order - b.sort_order);
               const busy = staff.filter(a => { const x = activityOf(a.id); return x !== 'idle' && x !== 'offline'; }).length;
+              const liveCount = staff.filter(a => liveIds.has(a.id)).length;
               return (
                 <section key={f.key} className="bd-floor" style={{ ['--hue' as string]: f.hue }}>
                   <div className="bd-plate">
@@ -100,7 +105,7 @@ export default function BuildingView({
                       <b>{f.name}</b>
                       <small>{f.blurb}</small>
                       <span className="bd-meter"><span style={{ width: `${staff.length ? (busy / staff.length) * 100 : 0}%` }} /></span>
-                      <small>{busy} of {staff.length} working</small>
+                      <small>{liveCount ? `${liveCount} live · ${busy} working now` : 'Planned floor'}</small>
                     </span>
                     {canHire && <button type="button" className="bd-hire" title={`Hire into ${f.name}`} onClick={() => onHire(f.key)}>+</button>}
                   </div>

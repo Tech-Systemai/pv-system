@@ -1,15 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
-import { QUALIFY_AT, channelStats, checkEmail, identifyChannel, personalize, scoreWillingness, talkingPoints } from '../pipeline';
+import { QUALIFY_AT, channelStats, identifyChannel, scoreWillingness, talkingPoints } from '../pipeline';
 import type { Lead, LeadSignals, Niche, Outreach } from '../types';
 import { pickEmail } from './apify';
 import { admin, agentId, logEvent, setDesk } from './runtime';
 
 // Research: read the lead's website and Google reviews, have Claude pull out
-// the facts, then run the same scoring / channel / compliance rules the rest of
-// the HQ uses. Qualified leads land on the founder's call list or as a
-// compliance-checked email draft.
+// the facts, then run the same scoring and call-or-email rules the rest of the
+// HQ uses. Qualified call-first leads land on the founder's call list;
+// email-first leads wait for the Email Writer.
 
 const MODEL = 'claude-opus-5';
 const PAGE_CHARS = 12_000;
@@ -196,20 +196,9 @@ async function researchOne(db: Db, lead: Lead, niche: Niche | undefined, researc
     return 'call';
   }
 
-  // Email: personalise the niche template, then the compliance gate decides.
-  const sender = { name: process.env.OUTREACH_SENDER_NAME || '{sender_name}', address: process.env.OUTREACH_SENDER_ADDRESS || '{sender_address}' };
-  const copy = { name: niche?.name ?? lead.niche, ghl_url: niche?.ghl_url ?? '' };
-  const subject = personalize(niche?.template_subject ?? '', scored, copy, sender);
-  const body = personalize(niche?.template_body ?? '', scored, copy, sender);
-  const issues = checkEmail(subject, body);
-  await db.from('ai_outreach').insert({
-    lead_id: lead.id, channel: 'email', status: issues.length ? 'blocked' : 'scheduled',
-    subject, body, compliance_issues: issues, agent_id: await agentId(db, 'outreach-writer'),
-  });
-  await logEvent(db, 'outreach-writer', 'handoff', `{agent} drafted an email to ${lead.business_name} — sent to Compliance`);
-  await logEvent(db, 'compliance-email', issues.length ? 'alert' : 'progress', issues.length
-    ? `{agent} blocked the email to ${lead.business_name}: ${issues[0]}`
-    : `{agent} cleared the email to ${lead.business_name}${niche?.template_approved ? '' : ` — waiting on your ${niche?.name ?? ''} template approval to send`}`);
+  // Email-first leads wait, researched and qualified, for the Email Writer,
+  // which writes each one from scratch (not from a template).
+  await logEvent(db, 'research-qualifier', 'progress', `${lead.business_name} is ready for a custom email once the Email Writer is live`);
   return 'email';
 }
 

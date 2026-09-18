@@ -47,8 +47,6 @@ export type Work = {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
-  /** Produced by the in-browser simulation, never stored. */
-  sim?: boolean;
 };
 
 export type AgentEvent = {
@@ -59,7 +57,6 @@ export type AgentEvent = {
   kind: EventKind;
   message: string;
   created_at: string;
-  sim?: boolean;
 };
 
 export type Run = {
@@ -213,7 +210,6 @@ export type Lead = {
   researched_at: string | null;
   created_at: string;
   updated_at: string;
-  sim?: boolean;
 };
 
 /** One scored reason: positive pushes toward (score up / this channel), negative away. */
@@ -237,7 +233,6 @@ export type Outreach = {
   replied_at: string | null;
   created_at: string;
   updated_at: string;
-  sim?: boolean;
 };
 
 export const LEAD_STATUS_META: Record<LeadStatus, { label: string; badge: string }> = {

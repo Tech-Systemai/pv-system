@@ -1,11 +1,10 @@
 'use client';
 
-export type Integrations = { apify: boolean; claude: boolean; sender: boolean };
+export type Integrations = { apify: boolean; claude: boolean };
 
 const ITEMS: { key: keyof Integrations; label: string; needs: string; unlocks: string }[] = [
   { key: 'apify', label: 'Apify (Google Maps)', needs: 'APIFY_TOKEN and APIFY_WEBHOOK_SECRET', unlocks: 'Lead Generation can pull real businesses' },
   { key: 'claude', label: 'Claude (research)', needs: 'ANTHROPIC_API_KEY', unlocks: 'Research reads each lead\'s site and reviews and qualifies it' },
-  { key: 'sender', label: 'Sender details', needs: 'OUTREACH_SENDER_NAME and OUTREACH_SENDER_ADDRESS', unlocks: 'Emails carry the postal address the law requires, so they pass compliance' },
 ];
 
 /** Shown to managers until every outside service the agents need is connected. */

@@ -1,17 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbOp } from '@/utils/db';
 import { createClient } from '@/utils/supabase/client';
-import { DEFAULT_DEPARTMENTS, DEFAULT_NICHES, RETIRED_DEPTS, RETIRED_SLUGS, previewAgents, staffingRows } from '@/lib/aiAgents/org';
-import { newSimState, seedSim, simDecide, simOverlay, stepSim, type SimOverlay } from '@/lib/aiAgents/simulate';
-import { newPipeState, pipelineOverlay, seedPipeline, simLogCall, stepPipeline } from '@/lib/aiAgents/simPipeline';
+import { DEFAULT_AGENTS, DEFAULT_DEPARTMENTS, DEFAULT_NICHES, LIVE_AGENTS, RETIRED_DEPTS, RETIRED_SLUGS, staffingRows } from '@/lib/aiAgents/org';
 import {
   effectiveActivity, normalizeAgent,
   type Activity, type Agent, type AgentEvent, type Department, type EventKind, type Lead, type Niche,
   type Outreach, type OutreachStatus, type Run, type Work,
 } from '@/lib/aiAgents/types';
 import BuildingView, { type Bubble } from './BuildingView';
+import LiveStrip from './LiveStrip';
 import UpdatesView from './UpdatesView';
 import LeadsView from './LeadsView';
 import ResearchView from './ResearchView';
@@ -22,10 +21,13 @@ import AgentDetail from './AgentDetail';
 import AgentEditor, { type AgentDraft } from './AgentEditor';
 import SetupChecklist, { type Integrations } from './SetupChecklist';
 
+// Everything on this page is real: agents, their desks, leads and outreach all
+// come from the database and update over realtime as the agents work.
+
 type Tab = 'building' | 'updates' | 'leads' | 'research' | 'outreach' | 'niches';
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'building', label: 'Simulation' },
+  { key: 'building', label: 'Building' },
   { key: 'updates', label: 'Updates' },
   { key: 'leads', label: 'Leads' },
   { key: 'research', label: 'Research' },
@@ -33,19 +35,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'niches', label: 'Niches' },
 ];
 
-const SIM_KEY = 'ag-hq-sim';
-const SIM_TICK_MS = 1600;
 const MAX_BUBBLES = 5;
-
-function readSavedSim(): boolean | null {
-  try {
-    const v = window.localStorage.getItem(SIM_KEY);
-    return v === 'on' ? true : v === 'off' ? false : null;
-  } catch {
-    return null; // storage blocked: fall back to the default
-  }
-}
-const noSubscribe = () => () => {};
 
 function upsertById<T extends { id: string | number }>(list: T[], row: T): T[] {
   const i = list.findIndex(x => x.id === row.id);
@@ -80,7 +70,7 @@ export default function AiAgentsClient({
   const [work, setWork] = useState<Work[]>(initialWork);
   const [events, setEvents] = useState<AgentEvent[]>(initialEvents);
   const [runs] = useState<Run[]>(initialRuns);
-  const [niches, setNiches] = useState<Niche[]>(() => (initialNiches.length ? initialNiches : DEFAULT_NICHES));
+  const [niches, setNiches] = useState<Niche[]>(initialNiches);
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [outreach, setOutreach] = useState<Outreach[]>(initialOutreach);
   const seenEvents = useRef(new Set(initialEvents.map(e => String(e.id))));
@@ -93,53 +83,21 @@ export default function AiAgentsClient({
   const [staffing, setStaffing] = useState(false);
   const [notice, setNotice] = useState('');
 
-  // ── The org on show: the real floor plan once staffed, the default one before ──
+  const ready = schemaReady && pipelineReady;
   const staffed = DEFAULT_DEPARTMENTS.every(d => departments.some(x => x.key === d.key)) && agents.some(a => a.tier === 'ceo');
-  const preview = !staffed;
-  const shownAgents = useMemo(() => (preview ? previewAgents() : agents), [preview, agents]);
-  const shownDepts = useMemo(
-    () => (preview ? DEFAULT_DEPARTMENTS : [...departments].sort((a, b) => a.arm_order - b.arm_order)),
-    [preview, departments],
-  );
-  const byId = useMemo(() => Object.fromEntries(shownAgents.map(a => [a.id, a])), [shownAgents]);
+  const floors = useMemo(() => [...departments].sort((a, b) => a.arm_order - b.arm_order), [departments]);
+  const byId = useMemo(() => Object.fromEntries(agents.map(a => [a.id, a])), [agents]);
+  const liveIds = useMemo(() => new Set(agents.filter(a => a.slug && LIVE_AGENTS[a.slug]).map(a => a.id)), [agents]);
   const floorOf = useCallback((agentId: string | null) => {
     const d = agentId ? byId[agentId]?.department : undefined;
-    return Math.max(0, shownDepts.findIndex(x => x.key === d));
-  }, [byId, shownDepts]);
-
-  // ── Simulation: on by default until real activity arrives ──
-  const [hasRecentReal] = useState(() => {
-    const cutoff = Date.now() - 7 * 86_400_000;
-    return initialEvents.some(e => new Date(e.created_at).getTime() > cutoff) || initialLeads.length > 0;
-  });
-  const savedSim = useSyncExternalStore(noSubscribe, readSavedSim, () => null);
-  const [simChoice, setSimChoice] = useState<boolean | null>(null);
-  const simOn = simChoice ?? savedSim ?? !hasRecentReal;
-  const toggleSim = () => {
-    const next = !simOn;
-    setSimChoice(next);
-    try { window.localStorage.setItem(SIM_KEY, next ? 'on' : 'off'); } catch { /* ignore */ }
-  };
-
-  const sim = useRef(newSimState());
-  const pipe = useRef(newPipeState());
-  const simAgents = useRef(shownAgents);
-  const simNiches = useRef(niches);
-  useEffect(() => { simAgents.current = shownAgents; }, [shownAgents]);
-  useEffect(() => { simNiches.current = niches; }, [niches]);
-  const rosterKey = shownAgents.map(a => `${a.id}:${a.status}:${a.reports_to}:${a.department}`).join('|');
-
-  const [overlay, setOverlay] = useState<SimOverlay>({});
-  const [simWork, setSimWork] = useState<Work[]>([]);
-  const [simEvents, setSimEvents] = useState<AgentEvent[]>([]);
-  const [simLeads, setSimLeads] = useState<Lead[]>([]);
-  const [simOutreach, setSimOutreach] = useState<Outreach[]>([]);
+    return Math.max(0, floors.findIndex(x => x.key === d));
+  }, [byId, floors]);
 
   // ── Pop a notification at the desk and send the elevator to its floor ──
   const emit = useCallback((evs: AgentEvent[]) => {
     const withAgent = evs.filter(e => e.agent_id);
     if (!withAgent.length) return;
-    const nb: Bubble[] = withAgent.map(e => ({ id: String(e.id), agentId: e.agent_id!, kind: e.kind, text: e.message, sim: e.sim }));
+    const nb: Bubble[] = withAgent.map(e => ({ id: String(e.id), agentId: e.agent_id!, kind: e.kind, text: e.message }));
     setBubbles(b => {
       const next = [...b, ...nb];
       while (next.length > MAX_BUBBLES) {
@@ -148,52 +106,14 @@ export default function AiAgentsClient({
       }
       return next;
     });
-    for (const b of nb) window.setTimeout(() => setBubbles(x => x.filter(y => y !== b)), b.kind === 'revision' ? 7500 : 4200);
+    for (const b of nb) window.setTimeout(() => setBubbles(x => x.filter(y => y !== b)), b.kind === 'revision' ? 7500 : 5000);
     const last = withAgent[withAgent.length - 1];
     if (last.kind !== 'progress') setElevator({ floor: floorOf(last.agent_id), kind: last.kind });
   }, [floorOf]);
 
-  const syncSim = useCallback(() => {
-    const busy = pipelineOverlay(pipe.current);
-    const base = simOverlay(sim.current, simAgents.current);
-    for (const [id, task] of Object.entries(busy)) base[id] = { activity: 'working', task };
-    setOverlay(base);
-    setSimWork([...sim.current.work]);
-    setSimLeads([...pipe.current.leads]);
-    setSimOutreach([...pipe.current.outreach]);
-  }, []);
-
-  const pushSimEvents = useCallback((evs: AgentEvent[]) => {
-    syncSim();
-    if (evs.length) {
-      setSimEvents(prev => [...evs.slice().reverse(), ...prev].slice(0, 200));
-      emit(evs);
-    }
-  }, [syncSim, emit]);
-
+  // ── Realtime from the agents ──
   useEffect(() => {
-    if (!simOn) return;
-    sim.current = newSimState();
-    pipe.current = newPipeState();
-    const opening = seedSim(sim.current, simAgents.current);
-    seedPipeline(pipe.current, simAgents.current, simNiches.current);
-    syncSim();
-    setSimEvents(opening);
-    let odd = false;
-    const id = window.setInterval(() => {
-      if (document.hidden) return;
-      odd = !odd;
-      // Alternate agent work and the lead pipeline so both keep moving.
-      pushSimEvents(odd
-        ? stepPipeline(pipe.current, simAgents.current, simNiches.current)
-        : stepSim(sim.current, simAgents.current));
-    }, SIM_TICK_MS);
-    return () => window.clearInterval(id);
-  }, [simOn, rosterKey, pushSimEvents, syncSim]);
-
-  // ── Realtime from the agent runtime ──
-  useEffect(() => {
-    if (!schemaReady) return;
+    if (!ready) return;
     const supabase = createClient();
     const ch = supabase
       .channel('agent-hq')
@@ -211,53 +131,40 @@ export default function AiAgentsClient({
         seenEvents.current.add(String(ev.id));
         setEvents(prev => [ev, ...prev].slice(0, 300));
         emit([ev]);
-      });
-    if (pipelineReady) {
-      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'ai_leads' }, payload => {
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_leads' }, payload => {
         if (payload.eventType !== 'DELETE') setLeads(prev => upsertById(prev, payload.new as Lead));
-      }).on('postgres_changes', { event: '*', schema: 'public', table: 'ai_outreach' }, payload => {
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_outreach' }, payload => {
         if (payload.eventType !== 'DELETE') setOutreach(prev => upsertById(prev, payload.new as Outreach));
-      });
-    }
-    ch.subscribe();
+      })
+      .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [schemaReady, pipelineReady, emit]);
+  }, [ready, emit]);
 
-  // ── Derived views ──
-  const allWork = useMemo(() => (simOn ? [...work, ...simWork] : work), [simOn, work, simWork]);
-  const allLeads = useMemo(() => (simOn ? [...leads, ...simLeads] : leads), [simOn, leads, simLeads]);
-  const allOutreach = useMemo(() => (simOn ? [...outreach, ...simOutreach] : outreach), [simOn, outreach, simOutreach]);
-  const feed = useMemo(
-    () => (simOn ? [...events, ...simEvents] : events).slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 300),
-    [simOn, events, simEvents],
-  );
+  const feed = useMemo(() => [...events].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 300), [events]);
 
   const activityOf = useCallback((id: string): Activity | 'offline' => {
     const a = byId[id];
-    if (!a) return 'idle';
-    if (a.status !== 'active') return 'offline';
-    if (simOn && overlay[id]) return overlay[id].activity;
-    return effectiveActivity(a);
-  }, [byId, simOn, overlay]);
+    return a ? effectiveActivity(a) : 'idle';
+  }, [byId]);
 
   const taskOf = useCallback((id: string) => {
-    if (simOn && overlay[id]?.task) return overlay[id].task;
     const a = byId[id];
     if (a?.current_task) return a.current_task;
     return work.find(w => w.agent_id === id && w.status === 'in_progress')?.title ?? '';
-  }, [byId, simOn, overlay, work]);
+  }, [byId, work]);
 
   const revisionCount = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const w of allWork) if (w.status === 'revision') out[w.agent_id] = (out[w.agent_id] ?? 0) + 1;
+    for (const w of work) if (w.status === 'revision') out[w.agent_id] = (out[w.agent_id] ?? 0) + 1;
     return out;
-  }, [allWork]);
+  }, [work]);
 
   const openAgent = (id: string) => { setSelectedId(id); setTab('building'); };
+  const canWrite = canManage && ready && staffed;
 
   // ── Founder actions ──
-  const canWrite = canManage && !preview && schemaReady;
-
   const logEvent = async (ev: Omit<AgentEvent, 'id' | 'created_at'>) => {
     const { data } = await dbOp('ai_agent_events', 'insert', ev);
     const row = data?.[0] as AgentEvent | undefined;
@@ -268,20 +175,7 @@ export default function AiAgentsClient({
     }
   };
 
-  const sendRequest = async (agentId: string, title: string, brief: string): Promise<string | null> => {
-    const { data, error } = await dbOp('ai_agent_work', 'insert', { agent_id: agentId, title, brief, status: 'queued', requested_by: currentUserId });
-    if (error) return error;
-    const row = data?.[0] as Work | undefined;
-    if (row) setWork(prev => upsertById(prev, row));
-    await logEvent({ agent_id: agentId, to_agent_id: null, work_id: row?.id ?? null, kind: 'request', message: `Founder → ${byId[agentId]?.name ?? 'agent'}: ${title}` });
-    return null;
-  };
-
   const decide = async (w: Work, decision: 'approve' | 'revise', notes = ''): Promise<string | null> => {
-    if (w.sim) {
-      pushSimEvents(simDecide(sim.current, simAgents.current, w.id, decision, notes));
-      return null;
-    }
     const a = byId[w.agent_id];
     const now = new Date().toISOString();
     const patch = decision === 'approve'
@@ -297,13 +191,8 @@ export default function AiAgentsClient({
   };
 
   const logCall = async (id: string, status: OutreachStatus, notes: string): Promise<string | null> => {
-    const o = allOutreach.find(x => x.id === id);
+    const o = outreach.find(x => x.id === id);
     if (!o) return 'Call not found';
-    if (o.sim) {
-      simLogCall(pipe.current, id, status, notes);
-      syncSim();
-      return null;
-    }
     const now = new Date().toISOString();
     const r = await dbOp('ai_outreach', 'update', { status, notes, sent_at: o.sent_at ?? now, updated_at: now }, { id });
     if (r.error) return r.error;
@@ -315,10 +204,8 @@ export default function AiAgentsClient({
   };
 
   const saveNiche = async (n: Niche): Promise<string | null> => {
-    if (pipelineReady && canManage) {
-      const { error } = await dbOp('ai_niches', 'upsert', { ...n, updated_at: new Date().toISOString() });
-      if (error) return error;
-    }
+    const { error } = await dbOp('ai_niches', 'upsert', { ...n, updated_at: new Date().toISOString() });
+    if (error) return error;
     setNiches(prev => prev.map(x => (x.key === n.key ? n : x)));
     return null;
   };
@@ -335,12 +222,10 @@ export default function AiAgentsClient({
     for (const old of agents.filter(x => x.slug && RETIRED_SLUGS.includes(x.slug))) {
       await dbOp('ai_agents', 'update', { status: 'archived', updated_at: new Date().toISOString() }, { id: old.id });
     }
-    if (pipelineReady) {
-      const missing = DEFAULT_NICHES.filter(n => !initialNiches.some(x => x.key === n.key));
-      if (missing.length) {
-        const nres = await dbOp('ai_niches', 'upsert', missing);
-        if (nres.error) return fail(nres.error);
-      }
+    const missing = DEFAULT_NICHES.filter(n => !initialNiches.some(x => x.key === n.key));
+    if (missing.length) {
+      const nres = await dbOp('ai_niches', 'upsert', missing);
+      if (nres.error) return fail(nres.error);
     }
     // Start clean from the database so every desk has its real id.
     window.location.reload();
@@ -370,8 +255,7 @@ export default function AiAgentsClient({
     return null;
   };
 
-  // ── Real agent runs (Phase 2) ──
-  const canRun = canManage && !preview && pipelineReady;
+  // ── Running the live agents ──
   const post = async (url: string, body: object) => {
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const json = await res.json().catch(() => ({}));
@@ -385,33 +269,40 @@ export default function AiAgentsClient({
     const r = await post('/api/agents/research', { limit: 5 });
     if (!r.ok) return r.error;
     const { researched, qualified, failed } = r.json as { researched: number; qualified: number; failed: number };
-    return researched === 0 ? 'No new leads waiting for research.' : `Researched ${researched}: ${qualified} qualified${failed ? `, ${failed} failed (see Alerts)` : ''}.`;
+    return researched === 0 ? 'No new leads waiting for research.' : `Researched ${researched}: ${qualified} qualified${failed ? `, ${failed} failed (see Updates → Alerts)` : ''}.`;
   };
 
+  // ── Before the building exists: set-up steps, nothing made up ──
+  if (!ready || !staffed) {
+    const steps = [
+      { done: schemaReady, text: <>Run <code>supabase/schema_v91_agent_hq.sql</code> in the Supabase SQL Editor</> },
+      { done: pipelineReady, text: <>Run <code>supabase/schema_v92_agent_pipeline.sql</code> in the Supabase SQL Editor</> },
+      { done: staffed, text: <>Staff the building: {DEFAULT_AGENTS.length} agents across {DEFAULT_DEPARTMENTS.length} floors, and the {DEFAULT_NICHES.length} niches</> },
+    ];
+    return (
+      <div className="page-fade ag-page">
+        <div className="ag-gate">
+          <b>Set up the Octopus Engines HQ</b>
+          <ol>
+            {steps.map((s, i) => <li key={i} className={s.done ? 'done' : ''}><span>{s.done ? '✓' : i + 1}</span>{s.text}</li>)}
+          </ol>
+          {ready && !staffed && (canManage ? (
+            <button className="btn btn-acc" onClick={staffBuilding} disabled={staffing}>
+              {staffing ? <><span className="spin" />Staffing…</> : agents.length ? 'Move my agents to the floor plan' : 'Staff the building'}
+            </button>
+          ) : <span className="tb-sub">An owner or admin needs to staff the building.</span>)}
+          {!ready && <span className="tb-sub">Refresh this page after running the SQL.</span>}
+          {notice && <div className="ag-err">{notice}</div>}
+        </div>
+      </div>
+    );
+  }
+
   const selected = selectedId ? byId[selectedId] : null;
-  const openLead = leadId ? allLeads.find(l => l.id === leadId) : undefined;
+  const openLead = leadId ? leads.find(l => l.id === leadId) : undefined;
 
   return (
     <div className="page-fade ag-page">
-      {!schemaReady || !pipelineReady ? (
-        <div className="ag-banner">
-          <span>
-            Run {!schemaReady && <><code>supabase/schema_v91_agent_hq.sql</code> then </>}<code>supabase/schema_v92_agent_pipeline.sql</code> in
-            the Supabase SQL Editor to save niches, leads and outreach. Until then this is a preview.
-          </span>
-        </div>
-      ) : preview && canManage ? (
-        <div className="ag-banner ag-banner-acc">
-          <span>
-            {agents.length ? 'Your agents are still on the old octopus layout. ' : ''}
-            Staff the building to give all {previewAgents().length} agents across {DEFAULT_DEPARTMENTS.length} floors a real desk.
-            {agents.length ? ' Agents that carry over keep their settings; retired ones are archived, not deleted.' : ''}
-          </span>
-          <button className="btn btn-acc btn-sm" onClick={staffBuilding} disabled={staffing}>
-            {staffing ? <><span className="spin" />Staffing…</> : agents.length ? 'Move to the floor plan' : 'Staff the building'}
-          </button>
-        </div>
-      ) : null}
       {notice && <div className="ag-banner" onClick={() => setNotice('')}>{notice}</div>}
 
       <div className="ag-tabbar">
@@ -420,102 +311,93 @@ export default function AiAgentsClient({
             <button key={t.key} className={`tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>
-        <button type="button" className={`ag-sim-toggle${simOn ? ' on' : ''}`} onClick={toggleSim}
-          title="Sample activity generated in your browser. Nothing is written or sent.">
-          <i />{simOn ? 'Simulation on · sample data' : 'Simulation off'}
-        </button>
       </div>
 
+      {canManage && tab !== 'building' && tab !== 'updates' && <SetupChecklist integrations={integrations} />}
+
       {tab === 'building' && (
-        <div className={`ag-bld-layout${selected ? ' with-detail' : ''}`}>
-          <BuildingView
-            departments={shownDepts}
-            agents={shownAgents}
-            activityOf={activityOf}
-            taskOf={taskOf}
-            revisionCount={revisionCount}
-            selectedId={selectedId}
-            onSelect={id => setSelectedId(id === selectedId ? null : id)}
-            bubbles={bubbles}
-            elevator={elevator}
-            canHire={canWrite}
-            onHire={dept => setEditing({
-              name: '', title: '', tier: 'specialist', department: dept, reports_to: '',
-              purpose: '', channel: 'other', status: 'active', model: '', system_prompt: '',
-            })}
-          />
-          {selected && (
-            <div className="ag-side">
-              <AgentDetail
-                key={selected.id}
-                agent={selected}
-                byId={byId}
-                departments={shownDepts}
-                activity={activityOf(selected.id)}
-                task={taskOf(selected.id)}
-                work={allWork.filter(w => w.agent_id === selected.id)}
-                events={feed.filter(e => e.agent_id === selected.id || e.to_agent_id === selected.id).slice(0, 25)}
-                runs={runs.filter(r => r.agent_id === selected.id)}
-                reports={shownAgents.filter(a => a.reports_to === selected.id)}
-                canRequest={canWrite}
-                canManage={canWrite}
-                onSelect={setSelectedId}
-                onClose={() => setSelectedId(null)}
-                onRequest={sendRequest}
-                onDecide={decide}
-                onEdit={() => setEditing({
-                  id: selected.id, name: selected.name, title: selected.title, tier: selected.tier,
-                  department: selected.department, reports_to: selected.reports_to ?? '', purpose: selected.purpose,
-                  channel: selected.channel, status: selected.status, model: selected.model, system_prompt: selected.system_prompt,
-                })}
-                onSetStatus={s => setAgentStatus(selected, s)}
-              />
-            </div>
-          )}
-        </div>
+        <>
+          <LiveStrip agents={agents} activityOf={activityOf} taskOf={taskOf} onOpen={setSelectedId} />
+          <div className={`ag-bld-layout${selected ? ' with-detail' : ''}`}>
+            <BuildingView
+              departments={floors}
+              agents={agents}
+              liveIds={liveIds}
+              activityOf={activityOf}
+              taskOf={taskOf}
+              revisionCount={revisionCount}
+              selectedId={selectedId}
+              onSelect={id => setSelectedId(id === selectedId ? null : id)}
+              bubbles={bubbles}
+              elevator={elevator}
+              canHire={canWrite}
+              onHire={dept => setEditing({
+                name: '', title: '', tier: 'specialist', department: dept, reports_to: '',
+                purpose: '', channel: 'other', status: 'active', model: '', system_prompt: '',
+              })}
+            />
+            {selected && (
+              <div className="ag-side">
+                <AgentDetail
+                  key={selected.id}
+                  agent={selected}
+                  byId={byId}
+                  departments={floors}
+                  activity={activityOf(selected.id)}
+                  task={taskOf(selected.id)}
+                  work={work.filter(w => w.agent_id === selected.id)}
+                  events={feed.filter(e => e.agent_id === selected.id || e.to_agent_id === selected.id).slice(0, 25)}
+                  runs={runs.filter(r => r.agent_id === selected.id)}
+                  reports={agents.filter(a => a.reports_to === selected.id)}
+                  canManage={canWrite}
+                  onSelect={setSelectedId}
+                  onClose={() => setSelectedId(null)}
+                  onDecide={decide}
+                  onEdit={() => setEditing({
+                    id: selected.id, name: selected.name, title: selected.title, tier: selected.tier,
+                    department: selected.department, reports_to: selected.reports_to ?? '', purpose: selected.purpose,
+                    channel: selected.channel, status: selected.status, model: selected.model, system_prompt: selected.system_prompt,
+                  })}
+                  onSetStatus={s => setAgentStatus(selected, s)}
+                />
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {tab === 'updates' && (
-        <UpdatesView departments={shownDepts} agents={shownAgents} work={allWork} events={feed}
+        <UpdatesView departments={floors} agents={agents} work={work} events={feed}
           activityOf={activityOf} taskOf={taskOf} onDecide={decide} onOpenAgent={openAgent} />
       )}
-      {(tab === 'leads' || tab === 'research' || tab === 'outreach') && canManage && pipelineReady && (
-        <SetupChecklist integrations={integrations} />
+      {tab === 'leads' && (
+        <LeadsView leads={leads} niches={niches} onOpenLead={setLeadId}
+          canPull={canWrite && integrations.apify} onPull={pullLeads} />
       )}
-      {tab === 'leads' && <LeadsView leads={allLeads} niches={niches} onOpenLead={setLeadId}
-        canPull={canRun && integrations.apify} onPull={pullLeads} />}
       {tab === 'research' && (
-        <ResearchView agents={shownAgents} leads={allLeads} outreach={allOutreach} niches={niches}
+        <ResearchView agents={agents} leads={leads} outreach={outreach} niches={niches}
           activityOf={activityOf} taskOf={taskOf} onOpenLead={setLeadId} onOpenAgent={openAgent} onOpenNiches={() => setTab('niches')}
-          canResearch={canRun && integrations.claude} onResearch={runResearch} />
+          canResearch={canWrite && integrations.claude} onResearch={runResearch} />
       )}
       {tab === 'outreach' && (
-        <OutreachView leads={allLeads} outreach={allOutreach} niches={niches}
-          onOpenLead={setLeadId} onLogCall={logCall} onOpenNiches={() => setTab('niches')} />
+        <OutreachView leads={leads} outreach={outreach} niches={niches} onOpenLead={setLeadId} onLogCall={logCall} />
       )}
       {tab === 'niches' && (
-        <NichesView niches={niches} leads={allLeads} outreach={allOutreach} canEdit={canManage}
-          saveHint={pipelineReady ? 'Saved' : 'Saved for this session — run schema_v92 to keep it'} onSave={saveNiche} />
+        <NichesView niches={niches} leads={leads} outreach={outreach} canEdit={canManage} onSave={saveNiche} />
       )}
 
       {openLead && (
         <LeadDrawer
           lead={openLead}
           niche={niches.find(n => n.key === openLead.niche)}
-          outreach={allOutreach.filter(o => o.lead_id === openLead.id)}
+          outreach={outreach.filter(o => o.lead_id === openLead.id)}
           researcher={openLead.researched_by ? byId[openLead.researched_by] : undefined}
           onClose={() => setLeadId(null)}
         />
       )}
 
       {editing && (
-        <AgentEditor
-          draft={editing}
-          agents={agents}
-          departments={shownDepts}
-          onCancel={() => setEditing(null)}
-          onSave={saveAgent}
-        />
+        <AgentEditor draft={editing} agents={agents} departments={floors} onCancel={() => setEditing(null)} onSave={saveAgent} />
       )}
     </div>
   );

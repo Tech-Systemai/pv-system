@@ -122,7 +122,7 @@ export default function LeadsView({ leads, niches, onOpenLead, canPull, onPull }
                 {shown.slice(0, limit).map(l => (
                   <tr key={l.id} className="tb-row" onClick={() => onOpenLead(l.id)}>
                     <td>
-                      <b>{l.business_name}</b>{l.sim && <span className="ag-sample">sample</span>}
+                      <b>{l.business_name}</b>
                       <div className="tb-sub">{l.city}{l.owner_name ? ` · ${l.owner_name}` : ''}</div>
                     </td>
                     <td>{nicheName(l.niche)}</td>
