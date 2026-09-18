@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import {
-  ACTIVITY_META, TIER_LABEL, WORK_META,
+  ACTIVITY_META, TIER_LABEL, WORK_META, roleTag,
   type Activity, type Agent, type AgentEvent, type Department, type Run, type Work,
 } from '@/lib/aiAgents/types';
-import { roleTag } from './HqCanvas';
 import { FeedItem, timeAgo } from './LiveFeed';
 
 type Props = {
@@ -30,7 +29,7 @@ type Props = {
 
 const ACTIVE: Work['status'][] = ['in_progress', 'in_review', 'revision'];
 
-function WorkCard({ w, onDecide }: { w: Work; onDecide: Props['onDecide'] }) {
+export function WorkCard({ w, onDecide, showAgent }: { w: Work; onDecide: Props['onDecide']; showAgent?: string }) {
   const [revising, setRevising] = useState(false);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,7 +52,7 @@ function WorkCard({ w, onDecide }: { w: Work; onDecide: Props['onDecide'] }) {
         <span className={`pv-bdg ${WORK_META[w.status].badge}`}>{WORK_META[w.status].label.toUpperCase()}</span>
       </div>
       <div className="ag-work-meta" suppressHydrationWarning>
-        Updated {timeAgo(w.updated_at)}
+        {showAgent ? `${showAgent} · ` : ''}Updated {timeAgo(w.updated_at)}
         {w.revision_count > 0 && <span className="ag-rev-pill">↺ {w.revision_count} revision{w.revision_count === 1 ? '' : 's'}</span>}
         {w.sim && <span className="ag-sample">sample</span>}
       </div>
@@ -115,7 +114,7 @@ export default function AgentDetail({
   return (
     <div className="ag-panel">
       <div className="ag-panel-h ag-detail-h">
-        <button type="button" className="ag-link" onClick={onClose}>← Live feed</button>
+        <button type="button" className="ag-link" onClick={onClose}>✕ Close</button>
         <div className="ag-id">
           <div className="ag-avatar" style={{ borderColor: meta.color, boxShadow: `0 0 0 4px ${meta.color}22` }}>
             {agent.name.slice(0, 1)}

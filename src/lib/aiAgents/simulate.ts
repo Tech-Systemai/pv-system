@@ -19,14 +19,19 @@ export type SimState = {
 export type SimOverlay = Record<string, { activity: Activity; task: string }>;
 
 const OUTPUTS: Record<string, string[]> = {
-  'lead-gen':  ['142 contacts found · 96 with direct lines · 31 running ads with no answering service.', 'Sequence drafted: 3 steps, 84–110 words each, missed-call cost as the hook.', '38 dials · 11 conversations · 4 interested, 2 asked for a demo.'],
-  content:     ['5 ad variants drafted, lead line: "Every missed call is a job your competitor books."', 'Landing page v1: hero, 3 proof blocks, calculator, booking widget.', '3 reel scripts, 20–30s each, owner-on-a-roof framing.'],
-  sales:       ['6 demos booked for this week, 2 same-day.', 'Proposal drafted: answering + text-back bundle, 12-month term.', 'Follow-ups sent to 9 warm leads; 3 replied.'],
-  answering:   ['41 calls answered · 29 booked · 0 dropped · avg pickup 1.4s.', 'Overnight: 7 emergency calls, 5 dispatched, 2 scheduled for 7am.', 'Scored 25 calls: 88 avg; pricing objection is the weak spot.'],
-  textback:    ['19 missed calls texted back in under 10s · 12 replied · 7 booked.', '14 threads moved to booked jobs.', '22 review requests sent · 6 new 5-star reviews.'],
-  success:     ['Number ported, forwarding live, script v1 loaded, calendar connected.', '3 accounts flagged for low usage; outreach drafted.', '5 tickets resolved, median 6 minutes.'],
-  billing:     ['18 invoices issued · $6,840 billed.', '4 of 6 failed cards recovered on retry.', 'Dunning texts sent to 3 overdue accounts.'],
-  finance:     ['Payouts reconciled to the cent; 2 refunds matched.', 'CAC by niche: roofing lowest, pest control highest.', 'Found $410/mo in unused seats and a duplicate number pool.'],
+  exec:       ['Weekly priorities set: roofing volume up, plumbing call list cleared first.', 'Scorecard reviewed: cost per booked demo down 12%.'],
+  ops:        ['Stand-up done: research backlog 14 leads, outreach on schedule.', 'Spot-checked 10 scores: 9 agree, 1 re-scored.', 'Capacity plan: add a second inbox for roofing next week.'],
+  marketing:  ['5 ad variants drafted, lead line: "Every missed call is a job your competitor books."', '3 reel scripts, 20–30s each, owner-on-a-roof framing.', 'Case study drafted with before/after call numbers.'],
+  funnels:    ['GHL page v1: hero, 3 proof blocks, missed-call calculator, booking widget.', 'Headline test: variant B +18% form starts.', 'FAQ section written in trade language.'],
+  leadgen:    ['142 businesses pulled · 96 with direct lines · 31 running ads.', 'Owner emails found for 38 of 90 listings.', 'Removed 22 duplicates and 4 closed businesses.'],
+  research:   ['12 leads scored: 7 qualified, 5 passed.', 'Channel split this batch: 8 call, 4 email.', '6 call sheets written with openers from reviews.'],
+  compliance: ['24 emails checked: 23 clear, 1 blocked for a "Re:" subject.', 'Call list checked against do-not-call: 2 removed.', 'Suppression list updated with 3 opt-outs.'],
+  outreach:   ['18 emails personalised from the approved template.', 'Sent 40 within daily limit; bounce rate 1.2%.', 'Day-3 follow-ups queued for 22 non-replies.'],
+  sales:      ['6 replies handled: 3 interested, 2 not now, 1 no.', '4 demos booked for this week.', 'Proposal drafted: answering + text-back bundle, 12-month term.'],
+  onboarding: ['GHL sub-account, calendar and contacts set up.', 'Answering script built from intake form.', 'Number ported and forwarding live.'],
+  delivery:   ['41 calls answered · 29 booked · 0 dropped.', '19 missed calls texted back in under 10s · 7 booked.', 'Scored 25 calls: pricing objection is the weak spot.'],
+  success:    ['3 accounts flagged for low usage; outreach drafted.', 'Monthly reports sent: 212 calls saved across clients.', '22 review requests sent · 6 new 5-star reviews.'],
+  finance:    ['18 invoices issued · $6,840 billed.', '4 of 6 failed cards recovered.', 'Cost per booked demo by niche: roofing lowest.'],
 };
 
 const REVISION_NOTES = [

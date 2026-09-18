@@ -3,22 +3,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { dbOp } from '@/utils/db';
 import { createClient } from '@/utils/supabase/client';
-import { buildLayout } from '@/lib/aiAgents/layout';
-import { DEFAULT_DEPARTMENTS, previewAgents, staffingRows } from '@/lib/aiAgents/org';
+import { DEFAULT_DEPARTMENTS, DEFAULT_NICHES, RETIRED_DEPTS, RETIRED_SLUGS, previewAgents, staffingRows } from '@/lib/aiAgents/org';
 import { newSimState, seedSim, simDecide, simOverlay, stepSim, type SimOverlay } from '@/lib/aiAgents/simulate';
+import { newPipeState, pipelineOverlay, seedPipeline, simLogCall, stepPipeline } from '@/lib/aiAgents/simPipeline';
 import {
   effectiveActivity, normalizeAgent,
-  type Activity, type Agent, type AgentEvent, type Department, type Run, type Work,
+  type Activity, type Agent, type AgentEvent, type Department, type EventKind, type Lead, type Niche,
+  type Outreach, type OutreachStatus, type Run, type Work,
 } from '@/lib/aiAgents/types';
-import HqCanvas, { type BubbleSpec, type CanvasFocus, type PulseSpec } from './HqCanvas';
-import RosterPanel from './RosterPanel';
-import LiveFeed from './LiveFeed';
+import BuildingView, { type Bubble } from './BuildingView';
+import UpdatesView from './UpdatesView';
+import LeadsView from './LeadsView';
+import ResearchView from './ResearchView';
+import OutreachView from './OutreachView';
+import NichesView from './NichesView';
+import LeadDrawer from './LeadDrawer';
 import AgentDetail from './AgentDetail';
 import AgentEditor, { type AgentDraft } from './AgentEditor';
 
+type Tab = 'building' | 'updates' | 'leads' | 'research' | 'outreach' | 'niches';
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'building', label: 'Simulation' },
+  { key: 'updates', label: 'Updates' },
+  { key: 'leads', label: 'Leads' },
+  { key: 'research', label: 'Research' },
+  { key: 'outreach', label: 'Outreach' },
+  { key: 'niches', label: 'Niches' },
+];
+
 const SIM_KEY = 'ag-hq-sim';
-const SIM_TICK_MS = 2300;
-const MAX_BUBBLES = 4;
+const SIM_TICK_MS = 1600;
+const MAX_BUBBLES = 5;
 
 function readSavedSim(): boolean | null {
   try {
@@ -39,54 +55,60 @@ function upsertById<T extends { id: string | number }>(list: T[], row: T): T[] {
 }
 
 export default function AiAgentsClient({
-  initialAgents,
-  initialRuns,
-  initialDepartments,
-  initialWork,
-  initialEvents,
-  schemaReady,
-  canManage,
-  currentUserId,
+  initialAgents, initialRuns, initialDepartments, initialWork, initialEvents,
+  initialNiches, initialLeads, initialOutreach,
+  schemaReady, pipelineReady, canManage, currentUserId,
 }: {
   initialAgents: Record<string, unknown>[];
   initialRuns: Run[];
   initialDepartments: Department[];
   initialWork: Work[];
   initialEvents: AgentEvent[];
+  initialNiches: Niche[];
+  initialLeads: Lead[];
+  initialOutreach: Outreach[];
   schemaReady: boolean;
+  pipelineReady: boolean;
   canManage: boolean;
   currentUserId: string;
 }) {
+  const [tab, setTab] = useState<Tab>('building');
   const [agents, setAgents] = useState<Agent[]>(() => initialAgents.map(normalizeAgent));
-  const [departments, setDepartments] = useState<Department[]>(initialDepartments);
+  const [departments] = useState<Department[]>(initialDepartments);
   const [work, setWork] = useState<Work[]>(initialWork);
   const [events, setEvents] = useState<AgentEvent[]>(initialEvents);
   const [runs] = useState<Run[]>(initialRuns);
-  // Events already on screen, so a realtime echo of our own write does not pop twice.
+  const [niches, setNiches] = useState<Niche[]>(() => (initialNiches.length ? initialNiches : DEFAULT_NICHES));
+  const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [outreach, setOutreach] = useState<Outreach[]>(initialOutreach);
   const seenEvents = useRef(new Set(initialEvents.map(e => String(e.id))));
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [focus, setFocus] = useState<{ target: CanvasFocus; nonce: number } | null>(null);
-  const [pulses, setPulses] = useState<PulseSpec[]>([]);
-  const [bubbles, setBubbles] = useState<BubbleSpec[]>([]);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [elevator, setElevator] = useState<{ floor: number; kind: EventKind | null }>({ floor: 0, kind: null });
   const [editing, setEditing] = useState<AgentDraft | null>(null);
   const [staffing, setStaffing] = useState(false);
   const [notice, setNotice] = useState('');
 
-  // ── What the building shows: the real org, or the default org as a preview ──
-  const preview = departments.length === 0 && !agents.some(a => a.tier === 'ceo');
-  const shownAgents = useMemo(
-    () => (preview ? [...previewAgents(), ...agents] : agents),
-    [preview, agents],
+  // ── The org on show: the real floor plan once staffed, the default one before ──
+  const staffed = DEFAULT_DEPARTMENTS.every(d => departments.some(x => x.key === d.key)) && agents.some(a => a.tier === 'ceo');
+  const preview = !staffed;
+  const shownAgents = useMemo(() => (preview ? previewAgents() : agents), [preview, agents]);
+  const shownDepts = useMemo(
+    () => (preview ? DEFAULT_DEPARTMENTS : [...departments].sort((a, b) => a.arm_order - b.arm_order)),
+    [preview, departments],
   );
-  const shownDepts = preview ? DEFAULT_DEPARTMENTS : departments;
   const byId = useMemo(() => Object.fromEntries(shownAgents.map(a => [a.id, a])), [shownAgents]);
-  const layout = useMemo(() => buildLayout(shownAgents, shownDepts), [shownAgents, shownDepts]);
+  const floorOf = useCallback((agentId: string | null) => {
+    const d = agentId ? byId[agentId]?.department : undefined;
+    return Math.max(0, shownDepts.findIndex(x => x.key === d));
+  }, [byId, shownDepts]);
 
-  // ── Simulation: on by default until real events start arriving ──
+  // ── Simulation: on by default until real activity arrives ──
   const [hasRecentReal] = useState(() => {
     const cutoff = Date.now() - 7 * 86_400_000;
-    return initialEvents.some(e => new Date(e.created_at).getTime() > cutoff);
+    return initialEvents.some(e => new Date(e.created_at).getTime() > cutoff) || initialLeads.length > 0;
   });
   const savedSim = useSyncExternalStore(noSubscribe, readSavedSim, () => null);
   const [simChoice, setSimChoice] = useState<boolean | null>(null);
@@ -98,71 +120,76 @@ export default function AiAgentsClient({
   };
 
   const sim = useRef(newSimState());
-  // The simulation reads the roster through a ref and only restarts when who is
-  // on the floor changes, not on every realtime tick of an agent's state.
+  const pipe = useRef(newPipeState());
   const simAgents = useRef(shownAgents);
+  const simNiches = useRef(niches);
   useEffect(() => { simAgents.current = shownAgents; }, [shownAgents]);
+  useEffect(() => { simNiches.current = niches; }, [niches]);
   const rosterKey = shownAgents.map(a => `${a.id}:${a.status}:${a.reports_to}:${a.department}`).join('|');
+
   const [overlay, setOverlay] = useState<SimOverlay>({});
   const [simWork, setSimWork] = useState<Work[]>([]);
   const [simEvents, setSimEvents] = useState<AgentEvent[]>([]);
+  const [simLeads, setSimLeads] = useState<Lead[]>([]);
+  const [simOutreach, setSimOutreach] = useState<Outreach[]>([]);
 
-  // ── Pop a notification: a pulse through the octopus and a bubble at the desk ──
+  // ── Pop a notification at the desk and send the elevator to its floor ──
   const emit = useCallback((evs: AgentEvent[]) => {
-    if (evs.length === 0) return;
-    const newPulses: PulseSpec[] = [];
-    const newBubbles: BubbleSpec[] = [];
-    for (const e of evs) {
-      if (!e.agent_id) continue;
-      const id = `${e.id}`;
-      if (e.kind !== 'progress' && e.kind !== 'alert') newPulses.push({ id, agentId: e.agent_id, kind: e.kind });
-      newBubbles.push({ id, agentId: e.agent_id, kind: e.kind, text: e.message, sim: e.sim });
-    }
-    if (newPulses.length) {
-      setPulses(p => [...p, ...newPulses]);
-      window.setTimeout(() => setPulses(p => p.filter(x => !newPulses.includes(x))), 4200);
-    }
-    if (newBubbles.length) {
-      setBubbles(b => {
-        const next = [...b, ...newBubbles];
-        // Revisions stay put; routine bubbles make room first.
-        while (next.length > MAX_BUBBLES) {
-          const i = next.findIndex(x => x.kind !== 'revision');
-          next.splice(i >= 0 ? i : 0, 1);
-        }
-        return next;
-      });
-      for (const nb of newBubbles) {
-        window.setTimeout(() => setBubbles(b => b.filter(x => x !== nb)), nb.kind === 'revision' ? 7500 : 4600);
+    const withAgent = evs.filter(e => e.agent_id);
+    if (!withAgent.length) return;
+    const nb: Bubble[] = withAgent.map(e => ({ id: String(e.id), agentId: e.agent_id!, kind: e.kind, text: e.message, sim: e.sim }));
+    setBubbles(b => {
+      const next = [...b, ...nb];
+      while (next.length > MAX_BUBBLES) {
+        const i = next.findIndex(x => x.kind !== 'revision');
+        next.splice(i >= 0 ? i : 0, 1);
       }
-    }
+      return next;
+    });
+    for (const b of nb) window.setTimeout(() => setBubbles(x => x.filter(y => y !== b)), b.kind === 'revision' ? 7500 : 4200);
+    const last = withAgent[withAgent.length - 1];
+    if (last.kind !== 'progress') setElevator({ floor: floorOf(last.agent_id), kind: last.kind });
+  }, [floorOf]);
+
+  const syncSim = useCallback(() => {
+    const busy = pipelineOverlay(pipe.current);
+    const base = simOverlay(sim.current, simAgents.current);
+    for (const [id, task] of Object.entries(busy)) base[id] = { activity: 'working', task };
+    setOverlay(base);
+    setSimWork([...sim.current.work]);
+    setSimLeads([...pipe.current.leads]);
+    setSimOutreach([...pipe.current.outreach]);
   }, []);
 
   const pushSimEvents = useCallback((evs: AgentEvent[]) => {
-    setOverlay(simOverlay(sim.current, simAgents.current));
-    setSimWork([...sim.current.work]);
+    syncSim();
     if (evs.length) {
-      setSimEvents(prev => [...evs.slice().reverse(), ...prev].slice(0, 120));
+      setSimEvents(prev => [...evs.slice().reverse(), ...prev].slice(0, 200));
       emit(evs);
     }
-  }, [emit]);
+  }, [syncSim, emit]);
 
   useEffect(() => {
     if (!simOn) return;
-    // A fresh run each time it is switched on, sized to whoever is on the floor.
     sim.current = newSimState();
+    pipe.current = newPipeState();
     const opening = seedSim(sim.current, simAgents.current);
-    setOverlay(simOverlay(sim.current, simAgents.current));
-    setSimWork([...sim.current.work]);
+    seedPipeline(pipe.current, simAgents.current, simNiches.current);
+    syncSim();
     setSimEvents(opening);
+    let odd = false;
     const id = window.setInterval(() => {
       if (document.hidden) return;
-      pushSimEvents(stepSim(sim.current, simAgents.current));
+      odd = !odd;
+      // Alternate agent work and the lead pipeline so both keep moving.
+      pushSimEvents(odd
+        ? stepPipeline(pipe.current, simAgents.current, simNiches.current)
+        : stepSim(sim.current, simAgents.current));
     }, SIM_TICK_MS);
     return () => window.clearInterval(id);
-  }, [simOn, rosterKey, pushSimEvents]);
+  }, [simOn, rosterKey, pushSimEvents, syncSim]);
 
-  // ── Realtime: agent state, work and events from the runtime ──
+  // ── Realtime from the agent runtime ──
   useEffect(() => {
     if (!schemaReady) return;
     const supabase = createClient();
@@ -174,27 +201,32 @@ export default function AiAgentsClient({
         setAgents(prev => (row.status === 'archived' ? prev.filter(a => a.id !== row.id) : upsertById(prev, row)));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_agent_work' }, payload => {
-        if (payload.eventType === 'DELETE') return;
-        setWork(prev => upsertById(prev, payload.new as Work));
+        if (payload.eventType !== 'DELETE') setWork(prev => upsertById(prev, payload.new as Work));
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_agent_events' }, payload => {
         const ev = payload.new as AgentEvent;
         if (seenEvents.current.has(String(ev.id))) return;
         seenEvents.current.add(String(ev.id));
-        setEvents(prev => [ev, ...prev].slice(0, 200));
+        setEvents(prev => [ev, ...prev].slice(0, 300));
         emit([ev]);
-      })
-      .subscribe();
+      });
+    if (pipelineReady) {
+      ch.on('postgres_changes', { event: '*', schema: 'public', table: 'ai_leads' }, payload => {
+        if (payload.eventType !== 'DELETE') setLeads(prev => upsertById(prev, payload.new as Lead));
+      }).on('postgres_changes', { event: '*', schema: 'public', table: 'ai_outreach' }, payload => {
+        if (payload.eventType !== 'DELETE') setOutreach(prev => upsertById(prev, payload.new as Outreach));
+      });
+    }
+    ch.subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [schemaReady, emit]);
+  }, [schemaReady, pipelineReady, emit]);
 
   // ── Derived views ──
   const allWork = useMemo(() => (simOn ? [...work, ...simWork] : work), [simOn, work, simWork]);
+  const allLeads = useMemo(() => (simOn ? [...leads, ...simLeads] : leads), [simOn, leads, simLeads]);
+  const allOutreach = useMemo(() => (simOn ? [...outreach, ...simOutreach] : outreach), [simOn, outreach, simOutreach]);
   const feed = useMemo(
-    () => (simOn ? [...events, ...simEvents] : events)
-      .slice()
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-      .slice(0, 150),
+    () => (simOn ? [...events, ...simEvents] : events).slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 300),
     [simOn, events, simEvents],
   );
 
@@ -219,29 +251,11 @@ export default function AiAgentsClient({
     return out;
   }, [allWork]);
 
-  const queuedCount = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const w of work) if (w.status === 'queued') out[w.agent_id] = (out[w.agent_id] ?? 0) + 1;
-    return out;
-  }, [work]);
-
-  const hueOf = useCallback((id: string) => {
-    const a = byId[id];
-    if (!a) return 268;
-    if (a.tier === 'ceo') return 300;
-    if (a.tier === 'exec') return layout.arms.find(arm => arm.execId === id)?.dept.hue ?? 268;
-    return shownDepts.find(d => d.key === a.department)?.hue ?? 250;
-  }, [byId, layout, shownDepts]);
-
-  // ── Navigation ──
-  const select = useCallback((id: string | null) => {
-    setSelectedId(id);
-    if (id) setFocus({ target: { kind: 'agent', id }, nonce: Date.now() });
-  }, []);
-  const focusArm = (index: number) => setFocus({ target: { kind: 'arm', index }, nonce: Date.now() });
-  const fitAll = () => setFocus({ target: { kind: 'fit' }, nonce: Date.now() });
+  const openAgent = (id: string) => { setSelectedId(id); setTab('building'); };
 
   // ── Founder actions ──
+  const canWrite = canManage && !preview && schemaReady;
+
   const logEvent = async (ev: Omit<AgentEvent, 'id' | 'created_at'>) => {
     const { data } = await dbOp('ai_agent_events', 'insert', ev);
     const row = data?.[0] as AgentEvent | undefined;
@@ -253,14 +267,11 @@ export default function AiAgentsClient({
   };
 
   const sendRequest = async (agentId: string, title: string, brief: string): Promise<string | null> => {
-    const a = byId[agentId];
-    const { data, error } = await dbOp('ai_agent_work', 'insert', {
-      agent_id: agentId, title, brief, status: 'queued', requested_by: currentUserId,
-    });
+    const { data, error } = await dbOp('ai_agent_work', 'insert', { agent_id: agentId, title, brief, status: 'queued', requested_by: currentUserId });
     if (error) return error;
     const row = data?.[0] as Work | undefined;
     if (row) setWork(prev => upsertById(prev, row));
-    await logEvent({ agent_id: agentId, to_agent_id: null, work_id: row?.id ?? null, kind: 'request', message: `Founder → ${a?.name ?? 'agent'}: ${title}` });
+    await logEvent({ agent_id: agentId, to_agent_id: null, work_id: row?.id ?? null, kind: 'request', message: `Founder → ${byId[agentId]?.name ?? 'agent'}: ${title}` });
     return null;
   };
 
@@ -283,18 +294,63 @@ export default function AiAgentsClient({
     return null;
   };
 
+  const logCall = async (id: string, status: OutreachStatus, notes: string): Promise<string | null> => {
+    const o = allOutreach.find(x => x.id === id);
+    if (!o) return 'Call not found';
+    if (o.sim) {
+      simLogCall(pipe.current, id, status, notes);
+      syncSim();
+      return null;
+    }
+    const now = new Date().toISOString();
+    const r = await dbOp('ai_outreach', 'update', { status, notes, sent_at: o.sent_at ?? now, updated_at: now }, { id });
+    if (r.error) return r.error;
+    if (r.data?.[0]) setOutreach(prev => upsertById(prev, r.data![0] as Outreach));
+    const leadStatus = status === 'booked' ? 'booked' : status === 'not_interested' ? 'not_interested' : status === 'interested' ? 'replied' : 'contacted';
+    const l = await dbOp('ai_leads', 'update', { status: leadStatus, updated_at: now }, { id: o.lead_id });
+    if (l.data?.[0]) setLeads(prev => upsertById(prev, l.data![0] as Lead));
+    return null;
+  };
+
+  const saveNiche = async (n: Niche): Promise<string | null> => {
+    if (pipelineReady && canManage) {
+      const { error } = await dbOp('ai_niches', 'upsert', { ...n, updated_at: new Date().toISOString() });
+      if (error) return error;
+    }
+    setNiches(prev => prev.map(x => (x.key === n.key ? n : x)));
+    return null;
+  };
+
   const staffBuilding = async () => {
     setStaffing(true);
     setNotice('');
+    const fail = (e: string) => { setNotice(e); setStaffing(false); };
     const d = await dbOp('ai_departments', 'upsert', DEFAULT_DEPARTMENTS);
-    if (d.error) { setNotice(d.error); setStaffing(false); return; }
-    const a = await dbOp('ai_agents', 'insert', staffingRows(currentUserId));
-    if (a.error) { setNotice(a.error); setStaffing(false); return; }
-    setDepartments((d.data as Department[]) ?? DEFAULT_DEPARTMENTS);
-    setAgents(prev => [...prev, ...((a.data ?? []) as Record<string, unknown>[]).map(normalizeAgent)]);
-    setSelectedId(null);
-    setStaffing(false);
-    setNotice('The building is staffed. Every agent now has a real desk you can send requests to.');
+    if (d.error) return fail(d.error);
+    for (const key of RETIRED_DEPTS) await dbOp('ai_departments', 'delete', undefined, { key });
+    const a = await dbOp('ai_agents', 'upsert', staffingRows(agents, currentUserId));
+    if (a.error) return fail(a.error);
+    for (const old of agents.filter(x => x.slug && RETIRED_SLUGS.includes(x.slug))) {
+      await dbOp('ai_agents', 'update', { status: 'archived', updated_at: new Date().toISOString() }, { id: old.id });
+    }
+    if (pipelineReady) {
+      const missing = DEFAULT_NICHES.filter(n => !initialNiches.some(x => x.key === n.key));
+      if (missing.length) {
+        const nres = await dbOp('ai_niches', 'upsert', missing);
+        if (nres.error) return fail(nres.error);
+      }
+    }
+    // Start clean from the database so every desk has its real id.
+    window.location.reload();
+  };
+
+  const setAgentStatus = async (agent: Agent, s: 'active' | 'paused' | 'archived') => {
+    const before = agent.status;
+    setAgents(prev => (s === 'archived' ? prev.filter(x => x.id !== agent.id) : prev.map(x => (x.id === agent.id ? { ...x, status: s } : x))));
+    if (s === 'archived') setSelectedId(null);
+    const { error } = await dbOp('ai_agents', 'update', { status: s, updated_at: new Date().toISOString() }, { id: agent.id });
+    // Roll back the optimistic change if the write did not land.
+    if (error) setAgents(prev => (s === 'archived' ? [...prev, agent] : prev.map(x => (x.id === agent.id ? { ...x, status: before } : x))));
   };
 
   const saveAgent = async (draft: AgentDraft): Promise<string | null> => {
@@ -303,126 +359,135 @@ export default function AiAgentsClient({
       reports_to: draft.reports_to || null, purpose: draft.purpose.trim(), channel: draft.channel,
       status: draft.status, model: draft.model.trim(), system_prompt: draft.system_prompt.trim(),
     };
-    if (!draft.id) {
-      const { data, error } = await dbOp('ai_agents', 'insert', { ...payload, created_by: currentUserId, sort_order: agents.length });
-      if (error) return error;
-      if (data?.[0]) setAgents(prev => upsertById(prev, normalizeAgent(data[0])));
-    } else {
-      const { data, error } = await dbOp('ai_agents', 'update', { ...payload, updated_at: new Date().toISOString() }, { id: draft.id });
-      if (error) return error;
-      if (data?.[0]) setAgents(prev => upsertById(prev, normalizeAgent(data[0])));
-    }
+    const r = draft.id
+      ? await dbOp('ai_agents', 'update', { ...payload, updated_at: new Date().toISOString() }, { id: draft.id })
+      : await dbOp('ai_agents', 'insert', { ...payload, created_by: currentUserId, sort_order: agents.length });
+    if (r.error) return r.error;
+    if (r.data?.[0]) setAgents(prev => upsertById(prev, normalizeAgent(r.data![0])));
     setEditing(null);
     return null;
   };
 
-  const setStatus = async (a: Agent, status: 'active' | 'paused' | 'archived') => {
-    const before = a.status;
-    setAgents(prev => (status === 'archived' ? prev.filter(x => x.id !== a.id) : prev.map(x => (x.id === a.id ? { ...x, status } : x))));
-    if (status === 'archived') setSelectedId(null);
-    const { error } = await dbOp('ai_agents', 'update', { status, updated_at: new Date().toISOString() }, { id: a.id });
-    // Roll back the optimistic change if the write did not land.
-    if (error) setAgents(prev => (status === 'archived' ? [...prev, a] : prev.map(x => (x.id === a.id ? { ...x, status: before } : x))));
-  };
-
   const selected = selectedId ? byId[selectedId] : null;
-  const canWrite = canManage && !preview && schemaReady;
+  const openLead = leadId ? allLeads.find(l => l.id === leadId) : undefined;
 
   return (
     <div className="page-fade ag-page">
-      {!schemaReady && (
+      {!schemaReady || !pipelineReady ? (
         <div className="ag-banner">
           <span>
-            Run <code>supabase/schema_v91_agent_hq.sql</code> in the Supabase SQL Editor to switch on the org chart,
-            requests and live feed. Until then this is a preview of the default org.
+            Run {!schemaReady && <><code>supabase/schema_v91_agent_hq.sql</code> then </>}<code>supabase/schema_v92_agent_pipeline.sql</code> in
+            the Supabase SQL Editor to save niches, leads and outreach. Until then this is a preview.
           </span>
         </div>
-      )}
-      {schemaReady && preview && canManage && (
+      ) : preview && canManage ? (
         <div className="ag-banner ag-banner-acc">
-          <span>This is the default Octopus Engines org, previewed. Staff the building to give every agent a real desk.</span>
+          <span>
+            {agents.length ? 'Your agents are still on the old octopus layout. ' : ''}
+            Staff the building to give all {previewAgents().length} agents across {DEFAULT_DEPARTMENTS.length} floors a real desk.
+            {agents.length ? ' Agents that carry over keep their settings; retired ones are archived, not deleted.' : ''}
+          </span>
           <button className="btn btn-acc btn-sm" onClick={staffBuilding} disabled={staffing}>
-            {staffing ? <><span className="spin" />Staffing…</> : 'Staff the building'}
+            {staffing ? <><span className="spin" />Staffing…</> : agents.length ? 'Move to the floor plan' : 'Staff the building'}
           </button>
         </div>
-      )}
+      ) : null}
       {notice && <div className="ag-banner" onClick={() => setNotice('')}>{notice}</div>}
 
-      <div className="ag-hq">
-        <RosterPanel
-          agents={shownAgents}
-          departments={shownDepts}
-          layout={layout}
-          activityOf={activityOf}
-          taskOf={taskOf}
-          revisionCount={revisionCount}
-          selectedId={selectedId}
-          onSelect={select}
-          onFocusArm={focusArm}
-          onFitAll={fitAll}
-          canCreate={canWrite}
-          onCreate={() => setEditing({
-            name: '', title: '', tier: 'specialist', department: shownDepts[0]?.key ?? '', reports_to: '',
-            purpose: '', channel: 'other', status: 'active', model: '', system_prompt: '',
-          })}
-        />
+      <div className="ag-tabbar">
+        <div className="tabs">
+          {TABS.map(t => (
+            <button key={t.key} className={`tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
+          ))}
+        </div>
+        <button type="button" className={`ag-sim-toggle${simOn ? ' on' : ''}`} onClick={toggleSim}
+          title="Sample activity generated in your browser. Nothing is written or sent.">
+          <i />{simOn ? 'Simulation on · sample data' : 'Simulation off'}
+        </button>
+      </div>
 
-        <HqCanvas
-          layout={layout}
-          agents={byId}
-          hueOf={hueOf}
-          activityOf={activityOf}
-          taskOf={taskOf}
-          revisionCount={revisionCount}
-          queuedCount={queuedCount}
-          selectedId={selectedId}
-          onSelect={select}
-          focus={focus}
-          pulses={pulses}
-          bubbles={bubbles}
-          simOn={simOn}
-          simAvailable
-          onToggleSim={toggleSim}
-          preview={preview}
-        />
-
-        <div className="ag-side">
-          {selected ? (
-            <AgentDetail
-              key={selected.id}
-              agent={selected}
-              byId={byId}
-              departments={shownDepts}
-              activity={activityOf(selected.id)}
-              task={taskOf(selected.id)}
-              work={allWork.filter(w => w.agent_id === selected.id)}
-              events={feed.filter(e => e.agent_id === selected.id || e.to_agent_id === selected.id).slice(0, 25)}
-              runs={runs.filter(r => r.agent_id === selected.id)}
-              reports={shownAgents.filter(a => a.reports_to === selected.id)}
-              canRequest={canWrite}
-              canManage={canWrite}
-              onSelect={select}
-              onClose={() => { setSelectedId(null); fitAll(); }}
-              onRequest={sendRequest}
-              onDecide={decide}
-              onEdit={() => setEditing({
-                id: selected.id, name: selected.name, title: selected.title, tier: selected.tier,
-                department: selected.department, reports_to: selected.reports_to ?? '', purpose: selected.purpose,
-                channel: selected.channel, status: selected.status, model: selected.model, system_prompt: selected.system_prompt,
-              })}
-              onSetStatus={s => setStatus(selected, s)}
-            />
-          ) : (
-            <LiveFeed events={feed} byId={byId} onSelect={select} />
+      {tab === 'building' && (
+        <div className={`ag-bld-layout${selected ? ' with-detail' : ''}`}>
+          <BuildingView
+            departments={shownDepts}
+            agents={shownAgents}
+            activityOf={activityOf}
+            taskOf={taskOf}
+            revisionCount={revisionCount}
+            selectedId={selectedId}
+            onSelect={id => setSelectedId(id === selectedId ? null : id)}
+            bubbles={bubbles}
+            elevator={elevator}
+            canHire={canWrite}
+            onHire={dept => setEditing({
+              name: '', title: '', tier: 'specialist', department: dept, reports_to: '',
+              purpose: '', channel: 'other', status: 'active', model: '', system_prompt: '',
+            })}
+          />
+          {selected && (
+            <div className="ag-side">
+              <AgentDetail
+                key={selected.id}
+                agent={selected}
+                byId={byId}
+                departments={shownDepts}
+                activity={activityOf(selected.id)}
+                task={taskOf(selected.id)}
+                work={allWork.filter(w => w.agent_id === selected.id)}
+                events={feed.filter(e => e.agent_id === selected.id || e.to_agent_id === selected.id).slice(0, 25)}
+                runs={runs.filter(r => r.agent_id === selected.id)}
+                reports={shownAgents.filter(a => a.reports_to === selected.id)}
+                canRequest={canWrite}
+                canManage={canWrite}
+                onSelect={setSelectedId}
+                onClose={() => setSelectedId(null)}
+                onRequest={sendRequest}
+                onDecide={decide}
+                onEdit={() => setEditing({
+                  id: selected.id, name: selected.name, title: selected.title, tier: selected.tier,
+                  department: selected.department, reports_to: selected.reports_to ?? '', purpose: selected.purpose,
+                  channel: selected.channel, status: selected.status, model: selected.model, system_prompt: selected.system_prompt,
+                })}
+                onSetStatus={s => setAgentStatus(selected, s)}
+              />
+            </div>
           )}
         </div>
-      </div>
+      )}
+
+      {tab === 'updates' && (
+        <UpdatesView departments={shownDepts} agents={shownAgents} work={allWork} events={feed}
+          activityOf={activityOf} taskOf={taskOf} onDecide={decide} onOpenAgent={openAgent} />
+      )}
+      {tab === 'leads' && <LeadsView leads={allLeads} niches={niches} onOpenLead={setLeadId} />}
+      {tab === 'research' && (
+        <ResearchView agents={shownAgents} leads={allLeads} outreach={allOutreach} niches={niches}
+          activityOf={activityOf} taskOf={taskOf} onOpenLead={setLeadId} onOpenAgent={openAgent} onOpenNiches={() => setTab('niches')} />
+      )}
+      {tab === 'outreach' && (
+        <OutreachView leads={allLeads} outreach={allOutreach} niches={niches}
+          onOpenLead={setLeadId} onLogCall={logCall} onOpenNiches={() => setTab('niches')} />
+      )}
+      {tab === 'niches' && (
+        <NichesView niches={niches} leads={allLeads} outreach={allOutreach} canEdit={canManage}
+          saveHint={pipelineReady ? 'Saved' : 'Saved for this session — run schema_v92 to keep it'} onSave={saveNiche} />
+      )}
+
+      {openLead && (
+        <LeadDrawer
+          lead={openLead}
+          niche={niches.find(n => n.key === openLead.niche)}
+          outreach={allOutreach.filter(o => o.lead_id === openLead.id)}
+          researcher={openLead.researched_by ? byId[openLead.researched_by] : undefined}
+          onClose={() => setLeadId(null)}
+        />
+      )}
 
       {editing && (
         <AgentEditor
           draft={editing}
           agents={agents}
-          departments={departments}
+          departments={shownDepts}
           onCancel={() => setEditing(null)}
           onSave={saveAgent}
         />

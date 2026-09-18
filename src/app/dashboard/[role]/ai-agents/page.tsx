@@ -16,6 +16,9 @@ export default async function AiAgentsPage() {
     { data: departments, error: deptError },
     { data: work },
     { data: events },
+    { data: niches, error: nicheError },
+    { data: leads },
+    { data: outreach },
   ] = await Promise.all([
     admin.from('profiles').select('role').eq('id', user.id).single(),
     admin.from('ai_agents').select('*').neq('status', 'archived').order('created_at', { ascending: true }),
@@ -23,6 +26,9 @@ export default async function AiAgentsPage() {
     admin.from('ai_departments').select('*').order('arm_order', { ascending: true }),
     admin.from('ai_agent_work').select('*').order('updated_at', { ascending: false }).limit(300),
     admin.from('ai_agent_events').select('*').order('created_at', { ascending: false }).limit(150),
+    admin.from('ai_niches').select('*').order('sort_order', { ascending: true }),
+    admin.from('ai_leads').select('*').order('created_at', { ascending: false }).limit(1000),
+    admin.from('ai_outreach').select('*').order('updated_at', { ascending: false }).limit(1000),
   ]);
 
   const canManage = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
@@ -34,8 +40,13 @@ export default async function AiAgentsPage() {
       initialDepartments={departments ?? []}
       initialWork={work ?? []}
       initialEvents={events ?? []}
+      initialNiches={niches ?? []}
+      initialLeads={leads ?? []}
+      initialOutreach={outreach ?? []}
       // v91 adds the departments table; until it is run the HQ can only preview.
       schemaReady={!deptError}
+      // v92 adds niches, leads and outreach.
+      pipelineReady={!nicheError}
       canManage={canManage}
       currentUserId={user.id}
     />
