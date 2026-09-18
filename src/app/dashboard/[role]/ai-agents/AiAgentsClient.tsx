@@ -20,6 +20,7 @@ import NichesView from './NichesView';
 import LeadDrawer from './LeadDrawer';
 import AgentDetail from './AgentDetail';
 import AgentEditor, { type AgentDraft } from './AgentEditor';
+import SetupChecklist, { type Integrations } from './SetupChecklist';
 
 type Tab = 'building' | 'updates' | 'leads' | 'research' | 'outreach' | 'niches';
 
@@ -57,7 +58,7 @@ function upsertById<T extends { id: string | number }>(list: T[], row: T): T[] {
 export default function AiAgentsClient({
   initialAgents, initialRuns, initialDepartments, initialWork, initialEvents,
   initialNiches, initialLeads, initialOutreach,
-  schemaReady, pipelineReady, canManage, currentUserId,
+  schemaReady, pipelineReady, integrations, canManage, currentUserId,
 }: {
   initialAgents: Record<string, unknown>[];
   initialRuns: Run[];
@@ -69,6 +70,7 @@ export default function AiAgentsClient({
   initialOutreach: Outreach[];
   schemaReady: boolean;
   pipelineReady: boolean;
+  integrations: Integrations;
   canManage: boolean;
   currentUserId: string;
 }) {
@@ -368,6 +370,24 @@ export default function AiAgentsClient({
     return null;
   };
 
+  // ── Real agent runs (Phase 2) ──
+  const canRun = canManage && !preview && pipelineReady;
+  const post = async (url: string, body: object) => {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const json = await res.json().catch(() => ({}));
+    return res.ok ? { ok: true as const, json } : { ok: false as const, error: String(json.error ?? `Request failed (${res.status})`) };
+  };
+  const pullLeads = async (niche: string, city: string, max: number): Promise<string> => {
+    const r = await post('/api/agents/leads/pull', { niche, city, max });
+    return r.ok ? 'Scout is on it. Leads appear here when Google Maps finishes (usually 1–3 minutes), then Research starts on them.' : r.error;
+  };
+  const runResearch = async (): Promise<string> => {
+    const r = await post('/api/agents/research', { limit: 5 });
+    if (!r.ok) return r.error;
+    const { researched, qualified, failed } = r.json as { researched: number; qualified: number; failed: number };
+    return researched === 0 ? 'No new leads waiting for research.' : `Researched ${researched}: ${qualified} qualified${failed ? `, ${failed} failed (see Alerts)` : ''}.`;
+  };
+
   const selected = selectedId ? byId[selectedId] : null;
   const openLead = leadId ? allLeads.find(l => l.id === leadId) : undefined;
 
@@ -459,10 +479,15 @@ export default function AiAgentsClient({
         <UpdatesView departments={shownDepts} agents={shownAgents} work={allWork} events={feed}
           activityOf={activityOf} taskOf={taskOf} onDecide={decide} onOpenAgent={openAgent} />
       )}
-      {tab === 'leads' && <LeadsView leads={allLeads} niches={niches} onOpenLead={setLeadId} />}
+      {(tab === 'leads' || tab === 'research' || tab === 'outreach') && canManage && pipelineReady && (
+        <SetupChecklist integrations={integrations} />
+      )}
+      {tab === 'leads' && <LeadsView leads={allLeads} niches={niches} onOpenLead={setLeadId}
+        canPull={canRun && integrations.apify} onPull={pullLeads} />}
       {tab === 'research' && (
         <ResearchView agents={shownAgents} leads={allLeads} outreach={allOutreach} niches={niches}
-          activityOf={activityOf} taskOf={taskOf} onOpenLead={setLeadId} onOpenAgent={openAgent} onOpenNiches={() => setTab('niches')} />
+          activityOf={activityOf} taskOf={taskOf} onOpenLead={setLeadId} onOpenAgent={openAgent} onOpenNiches={() => setTab('niches')}
+          canResearch={canRun && integrations.claude} onResearch={runResearch} />
       )}
       {tab === 'outreach' && (
         <OutreachView leads={allLeads} outreach={allOutreach} niches={niches}

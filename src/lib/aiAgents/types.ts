@@ -174,6 +174,14 @@ export type LeadSignals = {
   staff_estimate?: number;
   office_staff?: boolean;
   missed_call_reviews?: boolean;
+  place_id?: string;
+  category?: string;
+  /** Up to 10 Google review texts from the Maps pull. */
+  reviews_sample?: string[];
+  /** Where the ad signal came from, e.g. "Google Ads tag on site". */
+  ads_evidence?: string;
+  /** One-line summary from the research agent. */
+  research_notes?: string;
   years_in_business?: number;
 };
 

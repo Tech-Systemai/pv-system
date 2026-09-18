@@ -47,6 +47,12 @@ export default async function AiAgentsPage() {
       schemaReady={!deptError}
       // v92 adds niches, leads and outreach.
       pipelineReady={!nicheError}
+      // Which outside services are configured (names only; keys never leave the server).
+      integrations={{
+        apify: !!process.env.APIFY_TOKEN && !!process.env.APIFY_WEBHOOK_SECRET,
+        claude: !!process.env.ANTHROPIC_API_KEY,
+        sender: !!process.env.OUTREACH_SENDER_ADDRESS,
+      }}
       canManage={canManage}
       currentUserId={user.id}
     />

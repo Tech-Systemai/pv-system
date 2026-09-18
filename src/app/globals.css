@@ -1348,3 +1348,17 @@ a { color: inherit; text-decoration: none; }
   .oc-board { grid-template-columns: 1fr; }
   .nc-grid, .oc-calls, .rs-list { grid-template-columns: 1fr; }
 }
+
+/* ── AI AGENTS · live agent controls ── */
+.ld-pull { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); border: 1px solid var(--accent-line); }
+.ld-pull > b { font-size: 12.5px; color: var(--accent-ink); margin-right: 4px; }
+.ld-pull .fld-input { width: auto; }
+.ld-pull .ag-search { width: 220px; }
+.ld-pull-msg { flex-basis: 100%; font-size: 12px; color: var(--ink-2); }
+.sc-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line-strong); }
+.sc-card > b { font-size: 13px; color: var(--ink); }
+.sc-card code { font-family: var(--mono); font-size: 11px; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+.sc-card ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.sc-card li { display: flex; gap: 8px; font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+.sc-card li > span:first-child { width: 14px; color: var(--ink-4); font-weight: 800; }
+.sc-card li.ok > span:first-child { color: oklch(0.5 0.12 155); }

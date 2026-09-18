@@ -1,0 +1,23 @@
+name: Agent Research
+
+# Every 15 minutes, have the Research floor score the next few new leads.
+# Needs the repository secret CRON_SECRET (same value as in Vercel).
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Research new leads
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET repository secret is not set"; exit 0; fi
+          curl -X POST https://portal.octopusengines.com/api/cron/agent-research \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            --fail-with-body \
+            --max-time 310

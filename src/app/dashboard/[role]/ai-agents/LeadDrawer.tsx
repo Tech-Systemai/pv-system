@@ -50,7 +50,7 @@ export default function LeadDrawer({ lead, niche, outreach, researcher, onClose 
   const facts: [string, string][] = [
     ['Email found', s.email_type === 'owner' ? 'Owner\'s direct email' : s.email_type === 'generic' ? 'Generic inbox only' : 'None'],
     ['Website', s.has_website ? 'Yes' : 'No'],
-    ['Running ads', s.runs_ads ? 'Yes' : 'No'],
+    ['Running ads', s.runs_ads ? (s.ads_evidence || 'Yes') : 'No'],
     ['24/7 service', s.hours_24_7 ? 'Advertised' : 'No'],
     ['Team size', s.staff_estimate ? `~${s.staff_estimate}` : 'Unknown'],
     ['Office staff', s.office_staff ? 'Yes' : 'No'],
@@ -100,6 +100,7 @@ export default function LeadDrawer({ lead, niche, outreach, researcher, onClose 
 
           {lead.researched_at && <div className="ag-sec">
             <div className="ag-sec-t">What research found</div>
+            {s.research_notes && <p className="ag-purpose">{s.research_notes}</p>}
             <div className="ld-facts">{facts.map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}</div>
             {researcher && <div className="ag-hint" style={{ marginTop: 8 }}>Researched by {researcher.name} · {timeAgo(lead.researched_at)}</div>}
           </div>}

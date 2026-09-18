@@ -7,10 +7,45 @@ import { timeAgo } from './LiveFeed';
 
 const STATUS_ORDER: LeadStatus[] = ['new', 'researching', 'qualified', 'contacted', 'replied', 'booked', 'disqualified', 'not_interested'];
 
-export default function LeadsView({ leads, niches, onOpenLead }: {
+function PullPanel({ niches, onPull }: { niches: Niche[]; onPull: (niche: string, city: string, max: number) => Promise<string> }) {
+  const active = niches.filter(n => n.active);
+  const [niche, setNiche] = useState(active[0]?.key ?? '');
+  const [city, setCity] = useState('');
+  const [max, setMax] = useState(20);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const n = niches.find(x => x.key === niche);
+  const suggestions = (n?.cities ?? '').split(',').map(c => c.trim()).filter(Boolean);
+  const go = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!niche || !city.trim()) return;
+    setBusy(true);
+    setMsg(await onPull(niche, city.trim(), max));
+    setBusy(false);
+  };
+  return (
+    <form className="ld-pull" onSubmit={go}>
+      <b>Pull leads from Google Maps</b>
+      <select className="fld-input" value={niche} onChange={e => setNiche(e.target.value)}>
+        {active.map(x => <option key={x.key} value={x.key}>{x.name}</option>)}
+      </select>
+      <input className="ag-search" list="ld-cities" placeholder="City, State (e.g. Tampa, FL)" value={city} onChange={e => setCity(e.target.value)} />
+      <datalist id="ld-cities">{suggestions.map(c => <option key={c} value={c} />)}</datalist>
+      <select className="fld-input" value={max} onChange={e => setMax(Number(e.target.value))}>
+        {[10, 20, 40, 60, 100].map(v => <option key={v} value={v}>Up to {v}</option>)}
+      </select>
+      <button type="submit" className="btn btn-acc btn-sm" disabled={busy || !city.trim()}>{busy ? <><span className="spin" />Starting…</> : 'Pull'}</button>
+      {msg && <span className="ld-pull-msg">{msg}</span>}
+    </form>
+  );
+}
+
+export default function LeadsView({ leads, niches, onOpenLead, canPull, onPull }: {
   leads: Lead[];
   niches: Niche[];
   onOpenLead: (id: string) => void;
+  canPull: boolean;
+  onPull: (niche: string, city: string, max: number) => Promise<string>;
 }) {
   const [niche, setNiche] = useState('all');
   const [status, setStatus] = useState<LeadStatus | 'all'>('all');
@@ -40,6 +75,7 @@ export default function LeadsView({ leads, niches, onOpenLead }: {
 
   return (
     <div className="tb-wrap">
+      {canPull && <PullPanel niches={niches} onPull={onPull} />}
       <div className="ld-niches">
         <button type="button" className={niche === 'all' ? 'on' : ''} onClick={() => setNiche('all')}>
           All niches <b>{leads.length}</b>

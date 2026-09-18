@@ -8,7 +8,7 @@ import { timeAgo } from './LiveFeed';
 
 const BASIS_LABEL = { locked: 'Locked', results: 'From results', research: 'From research', trade: 'Trade default' } as const;
 
-export default function ResearchView({ agents, leads, outreach, niches, activityOf, taskOf, onOpenLead, onOpenAgent, onOpenNiches }: {
+export default function ResearchView({ agents, leads, outreach, niches, activityOf, taskOf, onOpenLead, onOpenAgent, onOpenNiches, canResearch, onResearch }: {
   agents: Agent[];
   leads: Lead[];
   outreach: Outreach[];
@@ -18,8 +18,18 @@ export default function ResearchView({ agents, leads, outreach, niches, activity
   onOpenLead: (id: string) => void;
   onOpenAgent: (id: string) => void;
   onOpenNiches: () => void;
+  canResearch: boolean;
+  onResearch: () => Promise<string>;
 }) {
   const [show, setShow] = useState<'qualified' | 'passed'>('qualified');
+  const [running, setRunning] = useState(false);
+  const [runMsg, setRunMsg] = useState('');
+  const run = async () => {
+    setRunning(true);
+    setRunMsg('');
+    setRunMsg(await onResearch());
+    setRunning(false);
+  };
   const team = agents.filter(a => a.department === 'research').sort((a, b) => (a.tier === 'manager' ? -1 : b.tier === 'manager' ? 1 : a.sort_order - b.sort_order));
   const researched = leads.filter(l => l.researched_at).sort((a, b) => (b.researched_at ?? '').localeCompare(a.researched_at ?? ''));
   const qualified = researched.filter(l => (l.wtp_score ?? 0) >= QUALIFY_AT);
@@ -44,9 +54,18 @@ export default function ResearchView({ agents, leads, outreach, niches, activity
             </button>
           );
         })}
-        <div className="rs-stat"><b>{waiting}</b><span>waiting for research</span></div>
+        <div className="rs-stat">
+          <b>{waiting}</b><span>waiting for research</span>
+          {canResearch && waiting > 0 && (
+            <button type="button" className="btn btn-acc btn-sm" style={{ marginTop: 6 }} disabled={running} onClick={run}>
+              {running ? <><span className="spin" />Researching…</> : 'Research next 5'}
+            </button>
+          )}
+        </div>
         <div className="rs-stat"><b>{researched.length ? Math.round((qualified.length / researched.length) * 100) : 0}%</b><span>qualify rate</span></div>
       </div>
+
+      {runMsg && <div className="up-await">{runMsg}</div>}
 
       <div className="card tb-card">
         <div className="rs-h">
