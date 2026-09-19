@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { OUTREACH_STATUS_META, type Lead, type Niche, type Outreach, type OutreachStatus } from '@/lib/aiAgents/types';
 import { ScoreBar } from './LeadDrawer';
 import { timeAgo } from './LiveFeed';
+import EmailsPanel, { type EmailAction, type InboxStatus } from './EmailsPanel';
+import type { OutreachSettings } from '@/lib/aiAgents/types';
 
 type Sub = 'calls' | 'emails' | 'replies';
 
@@ -55,12 +57,16 @@ function CallCard({ o, lead, niche, onOpenLead, onLog }: {
   );
 }
 
-export default function OutreachView({ leads, outreach, niches, onOpenLead, onLogCall }: {
+export default function OutreachView({ leads, outreach, niches, onOpenLead, onLogCall, settings, inbox, onSettings, onEmailAction }: {
   leads: Lead[];
   outreach: Outreach[];
   niches: Niche[];
   onOpenLead: (id: string) => void;
   onLogCall: (id: string, status: OutreachStatus, notes: string) => Promise<string | null>;
+  settings: OutreachSettings | null;
+  inbox: InboxStatus;
+  onSettings: (s: OutreachSettings) => void;
+  onEmailAction: EmailAction;
 }) {
   const [sub, setSub] = useState<Sub>('calls');
   const [nicheF, setNicheF] = useState('all');
@@ -86,14 +92,14 @@ export default function OutreachView({ leads, outreach, niches, onOpenLead, onLo
       <div className="oc-top">
         <div className="ag-filters">
           <button type="button" className={sub === 'calls' ? 'on' : ''} onClick={() => setSub('calls')}>Your call list ({toCall.length})</button>
-          <button type="button" className={sub === 'emails' ? 'on' : ''} onClick={() => setSub('emails')}>Email-first leads ({emailReady.length})</button>
+          <button type="button" className={sub === 'emails' ? 'on' : ''} onClick={() => setSub('emails')}>Emails ({emailReady.length + outreach.filter(o => o.channel === 'email' && o.status === 'draft').length} to handle)</button>
           <button type="button" className={sub === 'replies' ? 'on' : ''} onClick={() => setSub('replies')}>Replies &amp; interest ({replies.length})</button>
         </div>
         <select className="fld-input" value={nicheF} onChange={e => setNicheF(e.target.value)}>
           <option value="all">All niches</option>
           {niches.map(n => <option key={n.key} value={n.key}>{n.name}</option>)}
         </select>
-        <span className="oc-gmail" title="The outreach inbox is connected in the email step">✉ Outreach inbox: not connected yet</span>
+        <span className="oc-gmail">✉ {inbox.email ?? 'Outreach inbox not connected'}</span>
       </div>
 
       {sub === 'calls' && (
@@ -121,27 +127,8 @@ export default function OutreachView({ leads, outreach, niches, onOpenLead, onLo
       )}
 
       {sub === 'emails' && (
-        <>
-          <div className="up-await">
-            These leads are researched and qualified, and email is the best way to reach them. The Email Writer goes live next:
-            it will write each one from scratch using what Research found, and nothing sends until you approve it.
-          </div>
-          {emailReady.length === 0 ? <div className="card"><div className="empty">No email-first leads yet.</div></div> : (
-            <div className="card tb-card">
-              {emailReady.slice(0, 50).map(l => (
-                <div key={l.id} className="oc-reply" onClick={() => onOpenLead(l.id)}>
-                  <span>✉</span>
-                  <span className="oc-reply-t">
-                    <b>{l.business_name}</b> <span className="tb-sub">{niches.find(n => n.key === l.niche)?.name} · {l.city} · {l.email}</span>
-                    <span>{l.signals.research_notes || l.wtp_reasons[0]?.text}</span>
-                  </span>
-                  <ScoreBar score={l.wtp_score} />
-                  <span className="tb-sub">{l.owner_name || 'Owner unknown'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+        <EmailsPanel leads={leads} outreach={outreach} niches={niches} nicheFilter={nicheF}
+          settings={settings} inbox={inbox} onSettings={onSettings} onAction={onEmailAction} onOpenLead={onOpenLead} />
       )}
 
       {sub === 'replies' && (

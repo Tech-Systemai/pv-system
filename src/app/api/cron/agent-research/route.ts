@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { researchBatch } from '@/lib/aiAgents/server/research';
+import { checkReplies, sendBatch } from '@/lib/aiAgents/server/sender';
+import { writeBatch } from '@/lib/aiAgents/server/writer';
 
-// Keeps Research working through the backlog without anyone pressing a button.
-// Called every 15 minutes by .github/workflows/agent-research.yml. It spends
-// Claude credit, so it requires the CRON_SECRET bearer token.
+// The live agents' heartbeat, every 15 minutes from
+// .github/workflows/agent-research.yml: Research scores new leads, Quill writes
+// emails for qualified email-first leads, Post sends the approved queue (within
+// hours and warm-up limits) and checks threads for replies. Spends API credit,
+// so it requires the CRON_SECRET bearer token.
 
 export const maxDuration = 300;
 
@@ -12,6 +16,15 @@ export async function POST(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ skipped: 'ANTHROPIC_API_KEY not set' });
-  return NextResponse.json(await researchBatch(6));
+  const out: Record<string, unknown> = {};
+  const step = async (name: string, run: () => Promise<unknown>) => {
+    try { out[name] = await run(); } catch (e) { out[name] = { error: (e as Error).message }; }
+  };
+  if (process.env.ANTHROPIC_API_KEY) {
+    await step('research', () => researchBatch(6));
+    await step('write', () => writeBatch(4));
+  }
+  await step('send', sendBatch);
+  await step('replies', checkReplies);
+  return NextResponse.json(out);
 }

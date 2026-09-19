@@ -216,7 +216,7 @@ export type Lead = {
 export type Reason = { text: string; weight: number; toward?: Channel };
 
 export type OutreachStatus =
-  | 'draft' | 'compliance' | 'blocked' | 'scheduled' | 'sent' | 'replied' | 'bounced'
+  | 'draft' | 'compliance' | 'blocked' | 'scheduled' | 'sent' | 'replied' | 'bounced' | 'skipped' | 'failed'
   | 'to_call' | 'no_answer' | 'callback' | 'interested' | 'booked' | 'not_interested';
 
 export type Outreach = {
@@ -233,6 +233,24 @@ export type Outreach = {
   replied_at: string | null;
   created_at: string;
   updated_at: string;
+  gmail_thread_id?: string | null;
+  from_email?: string;
+  personal_hook?: string;
+  approved_at?: string | null;
+  error?: string;
+};
+
+/** What Quill writes with, and how Post sends (one row, id 'default'). */
+export type OutreachSettings = {
+  id: string;
+  sender_name: string;
+  sender_title: string;
+  postal_address: string;
+  offer: string;
+  proof: string;
+  call_to_action: string;
+  daily_limit: number;
+  auto_send: boolean;
 };
 
 export const LEAD_STATUS_META: Record<LeadStatus, { label: string; badge: string }> = {
@@ -247,10 +265,12 @@ export const LEAD_STATUS_META: Record<LeadStatus, { label: string; badge: string
 };
 
 export const OUTREACH_STATUS_META: Record<OutreachStatus, { label: string; badge: string }> = {
-  draft:          { label: 'Draft',            badge: 'pv-bdg-gray' },
+  draft:          { label: 'Awaiting approval', badge: 'pv-bdg-amber' },
+  skipped:        { label: 'Skipped',          badge: 'pv-bdg-gray' },
+  failed:         { label: 'Failed',           badge: 'pv-bdg-red' },
   compliance:     { label: 'Compliance check', badge: 'pv-bdg-indigo' },
   blocked:        { label: 'Blocked',          badge: 'pv-bdg-red' },
-  scheduled:      { label: 'Scheduled',        badge: 'pv-bdg-amber' },
+  scheduled:      { label: 'Approved · queued', badge: 'pv-bdg-indigo' },
   sent:           { label: 'Sent',             badge: 'pv-bdg-indigo' },
   replied:        { label: 'Replied',          badge: 'pv-bdg-green' },
   bounced:        { label: 'Bounced',          badge: 'pv-bdg-red' },

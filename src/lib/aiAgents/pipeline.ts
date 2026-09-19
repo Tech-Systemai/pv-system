@@ -193,8 +193,8 @@ const SPAM_WORDS = ['100% free', 'act now', 'guarantee', 'risk-free', 'no obliga
 export function checkEmail(subject: string, body: string): string[] {
   const issues: string[] = [];
   const text = `${subject}\n${body}`.toLowerCase();
-  if (!/(reply\s+"?stop|unsubscribe|opt[\s-]?out)/i.test(body)) issues.push('No way to opt out (CAN-SPAM requires one)');
-  if (/\{sender_address\}/.test(body) || !/\d{2,}.*\b(st|street|ave|avenue|rd|road|blvd|suite|ste|dr|drive|fl)\b/i.test(body)) {
+  if (!/(reply\s+["“]?(stop|no thanks)|unsubscribe|opt[\s-]?out)/i.test(body)) issues.push('No way to opt out (CAN-SPAM requires one)');
+  if (/\{sender_address\}/.test(body) || !/(\d{2,}.*\b(st|street|ave|avenue|rd|road|blvd|suite|ste|dr|drive|way|ln|lane|ct|court|pkwy|hwy|unit)\b|\bp\.?\s?o\.?\s?box\s+\d+)/i.test(body)) {
     issues.push('Missing a real postal address (CAN-SPAM requires one)');
   }
   if (/^\s*(re|fwd?):/i.test(subject)) issues.push('Subject pretends to be a reply or forward');

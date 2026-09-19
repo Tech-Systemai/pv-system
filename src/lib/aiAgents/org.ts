@@ -183,13 +183,15 @@ export const LIVE_AGENTS: Record<string, string> = {
   'leadgen-maps': 'Pulls businesses for a niche and city from Google Maps (Apify) when you click Pull on the Leads tab.',
   'research-qualifier': 'Reads each new lead’s website and Google reviews with Claude, scores willingness to pay (0–100) and decides call or email. Starts right after every pull and checks for new leads every 15 minutes.',
   'research-callprep': 'Puts every qualified call-first lead on your call list with talking points drawn from the research.',
+  'outreach-writer': 'Writes a one-off email for each qualified email-first lead from its research, built to get one easy reply. Waits for your approval.',
+  'compliance-email': 'Checks every email for an opt-out line, your postal address, an honest subject and spam triggers before you can approve it.',
+  'outreach-sender': 'Sends approved emails from olivia@octopusengines.com on weekdays within a warm-up limit, and marks replies, bounces and opt-outs.',
 };
 
 /** The next agents to switch on, in order. */
 export const NEXT_UP: Record<string, string> = {
-  'outreach-writer': 'Next: writes a one-off email for each email-first lead from its research, built to get a reply.',
-  'compliance-email': 'Next: checks every email for opt-out, address and honest subject before it can send.',
-  'outreach-sender': 'Next: sends approved emails from your outreach inbox within safe daily limits and tracks replies.',
+  'sales-replies': 'Next: reads each reply, drafts your answer and books interested owners onto your calendar.',
+  'outreach-followup': 'Next: sends one polite follow-up to people who did not reply, written from the same research.',
 };
 
 // ── Niches ─────────────────────────────────────────────────────────────────────

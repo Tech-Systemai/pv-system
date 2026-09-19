@@ -7,8 +7,9 @@ import { DEFAULT_AGENTS, DEFAULT_DEPARTMENTS, DEFAULT_NICHES, LIVE_AGENTS, RETIR
 import {
   effectiveActivity, normalizeAgent,
   type Activity, type Agent, type AgentEvent, type Department, type EventKind, type Lead, type Niche,
-  type Outreach, type OutreachStatus, type Run, type Work,
+  type Outreach, type OutreachSettings, type OutreachStatus, type Run, type Work,
 } from '@/lib/aiAgents/types';
+import type { EmailAction, InboxStatus } from './EmailsPanel';
 import BuildingView, { type Bubble } from './BuildingView';
 import LiveStrip from './LiveStrip';
 import UpdatesView from './UpdatesView';
@@ -47,7 +48,7 @@ function upsertById<T extends { id: string | number }>(list: T[], row: T): T[] {
 
 export default function AiAgentsClient({
   initialAgents, initialRuns, initialDepartments, initialWork, initialEvents,
-  initialNiches, initialLeads, initialOutreach,
+  initialNiches, initialLeads, initialOutreach, initialSettings, inbox, inboxResult,
   schemaReady, pipelineReady, integrations, canManage, currentUserId,
 }: {
   initialAgents: Record<string, unknown>[];
@@ -58,13 +59,18 @@ export default function AiAgentsClient({
   initialNiches: Niche[];
   initialLeads: Lead[];
   initialOutreach: Outreach[];
+  initialSettings: OutreachSettings | null;
+  inbox: InboxStatus;
+  inboxResult: string;
   schemaReady: boolean;
   pipelineReady: boolean;
   integrations: Integrations;
   canManage: boolean;
   currentUserId: string;
 }) {
-  const [tab, setTab] = useState<Tab>('building');
+  // Coming back from Google's sign-in lands on the Outreach tab with the result.
+  const [tab, setTab] = useState<Tab>(inboxResult ? 'outreach' : 'building');
+  const [settings, setSettings] = useState<OutreachSettings | null>(initialSettings);
   const [agents, setAgents] = useState<Agent[]>(() => initialAgents.map(normalizeAgent));
   const [departments] = useState<Department[]>(initialDepartments);
   const [work, setWork] = useState<Work[]>(initialWork);
@@ -81,7 +87,9 @@ export default function AiAgentsClient({
   const [elevator, setElevator] = useState<{ floor: number; kind: EventKind | null }>({ floor: 0, kind: null });
   const [editing, setEditing] = useState<AgentDraft | null>(null);
   const [staffing, setStaffing] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(() => !inboxResult ? ''
+    : inboxResult.startsWith('connected:') ? `Connected ${inboxResult.slice(10)}. Post will send your approved emails from it, starting slowly to warm it up.`
+    : `Could not connect the inbox: ${inboxResult}`);
 
   const ready = schemaReady && pipelineReady;
   const staffed = DEFAULT_DEPARTMENTS.every(d => departments.some(x => x.key === d.key)) && agents.some(a => a.tier === 'ceo');
@@ -265,6 +273,12 @@ export default function AiAgentsClient({
     const r = await post('/api/agents/leads/pull', { niche, city, max });
     return r.ok ? 'Scout is on it. Leads appear here when Google Maps finishes (usually 1–3 minutes), then Research starts on them.' : r.error;
   };
+  const emailAction: EmailAction = async payload => {
+    const r = await post('/api/agents/emails', payload);
+    const row = r.ok ? (r.json.outreach as Outreach | undefined) : undefined;
+    if (row) setOutreach(prev => upsertById(prev, row));
+    return r.ok ? { ok: true, json: r.json as Record<string, unknown> } : r;
+  };
   const runResearch = async (): Promise<string> => {
     const r = await post('/api/agents/research', { limit: 5 });
     if (!r.ok) return r.error;
@@ -380,7 +394,8 @@ export default function AiAgentsClient({
           canResearch={canWrite && integrations.claude} onResearch={runResearch} />
       )}
       {tab === 'outreach' && (
-        <OutreachView leads={leads} outreach={outreach} niches={niches} onOpenLead={setLeadId} onLogCall={logCall} />
+        <OutreachView leads={leads} outreach={outreach} niches={niches} onOpenLead={setLeadId} onLogCall={logCall}
+          settings={settings} inbox={inbox} onSettings={setSettings} onEmailAction={emailAction} />
       )}
       {tab === 'niches' && (
         <NichesView niches={niches} leads={leads} outreach={outreach} canEdit={canManage} onSave={saveNiche} />
