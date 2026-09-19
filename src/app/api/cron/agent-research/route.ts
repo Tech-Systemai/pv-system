@@ -7,12 +7,13 @@ import { writeBatch } from '@/lib/aiAgents/server/writer';
 // .github/workflows/agent-research.yml: Research scores new leads, Quill writes
 // emails for qualified email-first leads, Post sends the approved queue (within
 // hours and warm-up limits) and checks threads for replies. Spends API credit,
-// so it requires the CRON_SECRET bearer token.
+// so it requires the AGENT_CRON_SECRET bearer token (separate from the
+// CRON_SECRET the older portal jobs use).
 
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
+  const secret = process.env.AGENT_CRON_SECRET;
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
