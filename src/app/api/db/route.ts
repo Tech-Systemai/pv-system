@@ -11,7 +11,7 @@ const ALLOWED_TABLES = [
   'fim_fault_codes', 'fim_sops', 'daily_task_responses',
   'personal_file_entries',
   'interview_modules', 'interview_invites', 'interview_sessions', 'interview_messages', 'interview_scorecards',
-  'ai_agents', 'ai_agent_runs', 'ai_departments', 'ai_agent_work', 'ai_agent_events', 'ai_niches', 'ai_leads', 'ai_outreach',
+  'ai_agents', 'ai_agent_runs', 'ai_departments', 'ai_agent_work', 'ai_agent_events', 'ai_niches', 'ai_leads', 'ai_outreach', 'ai_agent_messages',
   'smart_time_prefs', 'smart_time_tasks', 'smart_time_dumps', 'smart_time_plans',
   'smart_time_reviews', 'smart_time_period_log',
 ];

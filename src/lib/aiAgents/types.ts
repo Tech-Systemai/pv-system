@@ -21,6 +21,8 @@ export type Agent = {
   current_task: string;
   last_active_at: string | null;
   sort_order: number;
+  /** On the office floor, as opposed to only on the building's floor plan. */
+  in_office: boolean;
   config: Record<string, unknown>;
   created_at: string;
 };
@@ -56,6 +58,16 @@ export type AgentEvent = {
   work_id: string | null;
   kind: EventKind;
   message: string;
+  created_at: string;
+};
+
+/** A line of conversation between the founder and an agent. */
+export type AgentMessage = {
+  id: number;
+  agent_id: string;
+  role: 'founder' | 'agent';
+  text: string;
+  work_id: string | null;
   created_at: string;
 };
 
@@ -131,6 +143,7 @@ export function normalizeAgent(raw: Record<string, unknown>): Agent {
     current_task: r.current_task ?? '',
     last_active_at: r.last_active_at ?? null,
     sort_order: r.sort_order ?? 0,
+    in_office: r.in_office ?? false,
     config: (r.config as Record<string, unknown>) ?? {},
     created_at: r.created_at ?? new Date().toISOString(),
   };

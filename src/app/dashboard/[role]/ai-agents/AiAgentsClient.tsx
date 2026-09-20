@@ -6,11 +6,13 @@ import { createClient } from '@/utils/supabase/client';
 import { DEFAULT_AGENTS, DEFAULT_DEPARTMENTS, DEFAULT_NICHES, LIVE_AGENTS, RETIRED_DEPTS, RETIRED_SLUGS, staffingRows } from '@/lib/aiAgents/org';
 import {
   effectiveActivity, normalizeAgent,
-  type Activity, type Agent, type AgentEvent, type Department, type EventKind, type Lead, type Niche,
+  type Activity, type Agent, type AgentEvent, type AgentMessage, type Department, type EventKind, type Lead, type Niche,
   type Outreach, type OutreachSettings, type OutreachStatus, type Run, type Work,
 } from '@/lib/aiAgents/types';
 import type { EmailAction, InboxStatus } from './EmailsPanel';
 import BuildingView, { type Bubble } from './BuildingView';
+import OfficeView from './OfficeView';
+import OfficeAgentPanel from './OfficeAgentPanel';
 import LiveStrip from './LiveStrip';
 import UpdatesView from './UpdatesView';
 import LeadsView from './LeadsView';
@@ -25,10 +27,11 @@ import SetupChecklist, { type Integrations } from './SetupChecklist';
 // Everything on this page is real: agents, their desks, leads and outreach all
 // come from the database and update over realtime as the agents work.
 
-type Tab = 'building' | 'updates' | 'leads' | 'research' | 'outreach' | 'niches';
+type Tab = 'building' | 'office' | 'updates' | 'leads' | 'research' | 'outreach' | 'niches';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'building', label: 'Building' },
+  { key: 'office', label: 'Office' },
   { key: 'updates', label: 'Updates' },
   { key: 'leads', label: 'Leads' },
   { key: 'research', label: 'Research' },
@@ -82,6 +85,8 @@ export default function AiAgentsClient({
   const seenEvents = useRef(new Set(initialEvents.map(e => String(e.id))));
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Record<string, AgentMessage[]>>({});
+  const [talking, setTalking] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [elevator, setElevator] = useState<{ floor: number; kind: EventKind | null }>({ floor: 0, kind: null });
@@ -169,7 +174,38 @@ export default function AiAgentsClient({
     return out;
   }, [work]);
 
+  const post = async (url: string, body: object) => {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const json = await res.json().catch(() => ({}));
+    return res.ok ? { ok: true as const, json } : { ok: false as const, error: String(json.error ?? `Request failed (${res.status})`) };
+  };
+
   const openAgent = (id: string) => { setSelectedId(id); setTab('building'); };
+
+  // ── The office: conversations, assignments and who is on the floor ──
+  const loadMessages = useCallback(async (agentId: string) => {
+    const { data } = await dbOp('ai_agent_messages', 'select', undefined, { agent_id: agentId });
+    setMessages(prev => ({ ...prev, [agentId]: (data ?? []) as AgentMessage[] }));
+  }, []);
+
+  const talk = async (agentId: string, text: string): Promise<string | null> => {
+    setTalking(true);
+    const r = await post('/api/agents/talk', { agentId, text });
+    setTalking(false);
+    if (!r.ok) return r.error;
+    const said = (r.json.messages ?? []) as AgentMessage[];
+    setMessages(prev => ({ ...prev, [agentId]: [...(prev[agentId] ?? []), ...said] }));
+    const w = r.json.work as Work | undefined;
+    if (w) setWork(prev => upsertById(prev, w));
+    return null;
+  };
+
+  const setOffice = async (agent: Agent, inOffice: boolean) => {
+    setAgents(prev => prev.map(a => (a.id === agent.id ? { ...a, in_office: inOffice } : a)));
+    if (!inOffice && selectedId === agent.id) setSelectedId(null);
+    const { error } = await dbOp('ai_agents', 'update', { in_office: inOffice, updated_at: new Date().toISOString() }, { id: agent.id });
+    if (error) setAgents(prev => prev.map(a => (a.id === agent.id ? { ...a, in_office: !inOffice } : a)));
+  };
   const canWrite = canManage && ready && staffed;
 
   // ── Founder actions ──
@@ -264,11 +300,6 @@ export default function AiAgentsClient({
   };
 
   // ── Running the live agents ──
-  const post = async (url: string, body: object) => {
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const json = await res.json().catch(() => ({}));
-    return res.ok ? { ok: true as const, json } : { ok: false as const, error: String(json.error ?? `Request failed (${res.status})`) };
-  };
   const pullLeads = async (niche: string, city: string, max: number): Promise<string> => {
     const r = await post('/api/agents/leads/pull', { niche, city, max });
     return r.ok ? 'Scout is on it. Leads appear here when Google Maps finishes (usually 1–3 minutes), then Research starts on them.' : r.error;
@@ -378,6 +409,38 @@ export default function AiAgentsClient({
             )}
           </div>
         </>
+      )}
+
+      {tab === 'office' && (
+        <div className={`ag-bld-layout${selected ? ' with-detail' : ''}`}>
+          <OfficeView
+            agents={agents}
+            activityOf={activityOf}
+            taskOf={taskOf}
+            selectedId={selectedId}
+            onSelect={id => { setSelectedId(id); if (id && !messages[id]) void loadMessages(id); }}
+            canManage={canWrite}
+            onSetOffice={setOffice}
+          />
+          {selected && (
+            <div className="ag-side">
+              <OfficeAgentPanel
+                key={selected.id}
+                agent={selected}
+                department={floors.find(f => f.key === selected.department)}
+                activity={activityOf(selected.id)}
+                task={taskOf(selected.id)}
+                work={work.filter(w => w.agent_id === selected.id)}
+                messages={messages[selected.id] ?? []}
+                canManage={canWrite}
+                sending={talking}
+                onSend={t => talk(selected.id, t)}
+                onSetOffice={setOffice}
+                onClose={() => setSelectedId(null)}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {tab === 'updates' && (
