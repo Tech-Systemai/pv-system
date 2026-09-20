@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isWorkHours } from '@/lib/aiAgents/hours';
 import { researchBatch } from '@/lib/aiAgents/server/research';
 import { checkReplies, sendBatch } from '@/lib/aiAgents/server/sender';
 import { writeBatch } from '@/lib/aiAgents/server/writer';
@@ -17,6 +18,8 @@ export async function POST(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  // The team works 9–5 in the founder's time zone and is off outside that.
+  if (!isWorkHours()) return NextResponse.json({ skipped: 'outside office hours (9–5 ET)' });
   const out: Record<string, unknown> = {};
   const step = async (name: string, run: () => Promise<unknown>) => {
     try { out[name] = await run(); } catch (e) { out[name] = { error: (e as Error).message }; }

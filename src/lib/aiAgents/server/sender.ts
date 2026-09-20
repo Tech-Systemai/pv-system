@@ -1,3 +1,4 @@
+import { isWorkHours } from '../hours';
 import type { OutreachSettings } from '../types';
 import { buildMime, firstReply, mailbox, sendMessage } from './gmail';
 import { admin, logEvent, setDesk } from './runtime';
@@ -5,24 +6,16 @@ import { loadSettings, settingsReady } from './writer';
 
 // Post sends from the connected inbox and watches for replies. Because the
 // inbox is on the main octopusengines.com domain, sending is deliberately
-// slow: a warm-up ramp, weekday business hours only, a couple per run, and
-// never the same address twice.
+// slow: a warm-up ramp, office hours only, a couple per run, and never the
+// same address twice.
 
 const PER_RUN = 2;
-const TZ = 'America/New_York';
 
 /** How many a day the inbox may send, growing as it earns reputation. */
 export function warmupCap(connectedAt: string, limit: number) {
   const days = Math.floor((Date.now() - new Date(connectedAt).getTime()) / 86_400_000);
   const ramp = days < 7 ? 8 : days < 14 ? 15 : days < 21 ? 25 : limit;
   return Math.min(ramp, limit, 50);
-}
-
-function inSendingHours(now = new Date()) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short', hour: 'numeric', minute: 'numeric', hour12: false })
-    .formatToParts(now).map(p => [p.type, p.value]));
-  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-  return !['Sat', 'Sun'].includes(parts.weekday) && minutes >= 8 * 60 + 30 && minutes <= 17 * 60;
 }
 
 export async function sentLast24h(db: ReturnType<typeof admin>, email: string) {
@@ -36,7 +29,7 @@ export async function sendBatch() {
   const db = admin();
   const settings = await loadSettings(db);
   if (!settingsReady(settings)) return { sent: 0, reason: 'settings' };
-  if (!inSendingHours()) return { sent: 0, reason: 'outside sending hours (weekdays 8:30–5:00 ET)' };
+  if (!isWorkHours()) return { sent: 0, reason: 'outside office hours (9–5 ET)' };
   const box = await mailbox();
   if (!box) return { sent: 0, reason: 'no inbox connected' };
 

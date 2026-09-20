@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { hoursLabel } from '@/lib/aiAgents/hours';
 import { DEFAULT_AGENTS, LIVE_AGENTS, NEXT_UP } from '@/lib/aiAgents/org';
 import { ACTIVITY_META, type Activity, type Agent } from '@/lib/aiAgents/types';
 
@@ -10,6 +12,12 @@ export default function LiveStrip({ agents, activityOf, taskOf, onOpen }: {
   taskOf: (id: string) => string;
   onOpen: (id: string) => void;
 }) {
+  // The agents work 9–5 Eastern; the clock ticks so the badge stays honest.
+  const [hours, setHours] = useState(() => hoursLabel());
+  useEffect(() => {
+    const id = window.setInterval(() => setHours(hoursLabel()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
   const bySlug = Object.fromEntries(agents.filter(a => a.slug).map(a => [a.slug!, a]));
   const live = Object.keys(LIVE_AGENTS).map(s => bySlug[s]).filter((a): a is Agent => !!a);
   const next = Object.keys(NEXT_UP).map(s => ({ slug: s, a: bySlug[s], title: DEFAULT_AGENTS.find(d => d.slug === s)?.title ?? s }));
@@ -17,7 +25,11 @@ export default function LiveStrip({ agents, activityOf, taskOf, onOpen }: {
   return (
     <div className="lv-wrap">
       <div className="lv-col">
-        <div className="lv-h"><span className="lv-dot" />Live now <small>{live.length} of {agents.length} agents run on real APIs</small></div>
+        <div className="lv-h">
+          <span className={`lv-dot${hours.open ? '' : ' off'}`} />Live now
+          <small>{live.length} of {agents.length} agents run on real APIs</small>
+          <span className={`lv-hours${hours.open ? ' on' : ''}`} suppressHydrationWarning>{hours.text}</span>
+        </div>
         <div className="lv-list">
           {live.map(a => {
             const act = activityOf(a.id);
