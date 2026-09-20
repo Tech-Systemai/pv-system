@@ -4,28 +4,150 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LIVE_AGENTS } from '@/lib/aiAgents/org';
 import { ACTIVITY_META, type Activity, type Agent } from '@/lib/aiAgents/types';
 
-// A live picture of the floor. Nothing here is invented: an agent sits at a
-// desk when it is actually working, and roams when it is idle. The walking,
-// chatting and hellos are just how that state is drawn.
+// An isometric picture of the floor. Nothing here is invented: an agent sits at
+// a desk when it is actually working and walks around when it is not. The
+// walking, chatting and hellos are only how that real state is drawn.
 
 type Spot = { x: number; y: number };
 
-const DESK_COLS = 3;
-const GREETINGS = ['Hey 👋', 'Morning!', 'Hi — need anything?', 'Welcome back', 'Hey boss'];
-const CHATTER = ['…', 'ha', 'coffee?', 'nice one'];
+// Isometric projection: one floor tile is TILE wide and TILE/2 tall on screen.
+const TILE = 74;
+const ROOM = { w: 12, h: 9 };
+const iso = (x: number, y: number, z = 0) => ({ sx: (x - y) * (TILE / 2), sy: (x + y) * (TILE / 4) - z });
+const pt = (x: number, y: number, z = 0) => { const p = iso(x, y, z); return `${p.sx},${p.sy}`; };
 
-/** Desks sit on the left; the lounge is on the right. Percentages of the room. */
-function deskSpot(i: number): Spot {
-  const col = i % DESK_COLS;
-  const row = Math.floor(i / DESK_COLS);
-  return { x: 9 + col * 17, y: 20 + row * 26 };
-}
+const DESKS: Spot[] = [
+  { x: 2.2, y: 1.6 }, { x: 4.4, y: 1.6 }, { x: 6.6, y: 1.6 },
+  { x: 2.2, y: 4.4 }, { x: 4.4, y: 4.4 }, { x: 6.6, y: 4.4 },
+  { x: 2.2, y: 7.2 }, { x: 4.4, y: 7.2 }, { x: 6.6, y: 7.2 },
+];
+/** Where someone sits: just in front of the desk. */
+const seatOf = (d: Spot): Spot => ({ x: d.x - 0.15, y: d.y + 1.05 });
 
-function loungeSpot(rnd = Math.random): Spot {
-  return { x: 62 + rnd() * 32, y: 14 + rnd() * 70 };
-}
+const GREETINGS = ['Hey 👋', 'Morning!', 'Need anything?', 'Welcome back', 'Hey boss'];
+const CHATTER = ['…', 'coffee?', 'ha', 'nice one'];
+const SCREEN_COLORS = ['#38bdf8', '#fb923c', '#a78bfa', '#34d399', '#f472b6', '#facc15'];
 
 const isBusy = (a: Activity | 'offline') => a === 'working' || a === 'reviewing' || a === 'revising';
+const loungeSpot = (rnd = Math.random): Spot => ({ x: 8.8 + rnd() * 2.6, y: 1.4 + rnd() * 6.2 });
+
+// ── Scene pieces ───────────────────────────────────────────────────────────────
+
+function Desk({ at, screen }: { at: Spot; screen: string }) {
+  const { x, y } = at;
+  const H = 30;            // desk height
+  const T = 5;             // how thick the top looks
+  const leg = (lx: number, ly: number) => (
+    <polygon key={`${lx}-${ly}`} points={`${pt(lx - 0.04, ly, H - T)} ${pt(lx + 0.04, ly, H - T)} ${pt(lx + 0.04, ly, 0)} ${pt(lx - 0.04, ly, 0)}`} fill="#c2ccd8" />
+  );
+  return (
+    <g className="of-desk-g">
+      {[leg(x - 0.8, y - 0.42), leg(x + 0.8, y - 0.42), leg(x - 0.8, y + 0.42), leg(x + 0.8, y + 0.42)]}
+      {/* top */}
+      <polygon points={`${pt(x - 0.9, y - 0.5, H)} ${pt(x + 0.9, y - 0.5, H)} ${pt(x + 0.9, y + 0.5, H)} ${pt(x - 0.9, y + 0.5, H)}`} fill="#fbfdff" />
+      <polygon points={`${pt(x - 0.9, y + 0.5, H)} ${pt(x + 0.9, y + 0.5, H)} ${pt(x + 0.9, y + 0.5, H - T)} ${pt(x - 0.9, y + 0.5, H - T)}`} fill="#e3e9f1" />
+      <polygon points={`${pt(x + 0.9, y - 0.5, H)} ${pt(x + 0.9, y + 0.5, H)} ${pt(x + 0.9, y + 0.5, H - T)} ${pt(x + 0.9, y - 0.5, H - T)}`} fill="#d5dde8" />
+      {/* monitor: foot, stem, screen */}
+      <polygon points={`${pt(x - 0.18, y - 0.44, H)} ${pt(x + 0.18, y - 0.44, H)} ${pt(x + 0.18, y - 0.3, H)} ${pt(x - 0.18, y - 0.3, H)}`} fill="#cbd5e1" />
+      <polygon points={`${pt(x - 0.03, y - 0.38, H + 12)} ${pt(x + 0.03, y - 0.38, H + 12)} ${pt(x + 0.03, y - 0.38, H)} ${pt(x - 0.03, y - 0.38, H)}`} fill="#b9c4d2" />
+      <polygon points={`${pt(x - 0.42, y - 0.38, H + 40)} ${pt(x + 0.42, y - 0.38, H + 40)} ${pt(x + 0.42, y - 0.38, H + 12)} ${pt(x - 0.42, y - 0.38, H + 12)}`} fill="#eef2f7" />
+      <polygon points={`${pt(x - 0.37, y - 0.385, H + 37)} ${pt(x + 0.37, y - 0.385, H + 37)} ${pt(x + 0.37, y - 0.385, H + 15)} ${pt(x - 0.37, y - 0.385, H + 15)}`} fill={screen} opacity={0.8} />
+      {/* keyboard */}
+      <polygon points={`${pt(x - 0.4, y + 0.05, H)} ${pt(x + 0.25, y + 0.05, H)} ${pt(x + 0.25, y + 0.28, H)} ${pt(x - 0.4, y + 0.28, H)}`} fill="#e6ecf3" />
+    </g>
+  );
+}
+
+function Chair({ at, taken }: { at: Spot; taken: boolean }) {
+  const { x, y } = at;
+  const seat = 22;
+  return (
+    <g opacity={taken ? 1 : 0.9}>
+      {/* star base and stem */}
+      <polygon points={`${pt(x - 0.22, y, 3)} ${pt(x, y - 0.22, 3)} ${pt(x + 0.22, y, 3)} ${pt(x, y + 0.22, 3)}`} fill="#c7d0dc" />
+      <polygon points={`${pt(x - 0.04, y, seat)} ${pt(x + 0.04, y, seat)} ${pt(x + 0.04, y, 3)} ${pt(x - 0.04, y, 3)}`} fill="#b3bdca" />
+      {/* seat pad */}
+      <polygon points={`${pt(x - 0.28, y - 0.26, seat)} ${pt(x + 0.28, y - 0.26, seat)} ${pt(x + 0.28, y + 0.26, seat)} ${pt(x - 0.28, y + 0.26, seat)}`} fill="#dbe3ec" />
+      <polygon points={`${pt(x - 0.28, y + 0.26, seat)} ${pt(x + 0.28, y + 0.26, seat)} ${pt(x + 0.28, y + 0.26, seat - 4)} ${pt(x - 0.28, y + 0.26, seat - 4)}`} fill="#c3cddb" />
+      {/* low back, behind the sitter */}
+      <polygon points={`${pt(x - 0.26, y + 0.28, seat + 22)} ${pt(x + 0.26, y + 0.28, seat + 22)} ${pt(x + 0.26, y + 0.28, seat)} ${pt(x - 0.26, y + 0.28, seat)}`} fill="#cdd7e3" />
+    </g>
+  );
+}
+
+function Cabinet({ at, w = 1.1, h = 46, fill = '#eef2f7' }: { at: Spot; w?: number; h?: number; fill?: string }) {
+  const { x, y } = at;
+  return (
+    <g>
+      <polygon points={`${pt(x - w / 2, y - 0.4, h)} ${pt(x + w / 2, y - 0.4, h)} ${pt(x + w / 2, y + 0.4, h)} ${pt(x - w / 2, y + 0.4, h)}`} fill={fill} />
+      <polygon points={`${pt(x - w / 2, y + 0.4, h)} ${pt(x + w / 2, y + 0.4, h)} ${pt(x + w / 2, y + 0.4, 0)} ${pt(x - w / 2, y + 0.4, 0)}`} fill="#dde5ee" />
+      <polygon points={`${pt(x + w / 2, y - 0.4, h)} ${pt(x + w / 2, y + 0.4, h)} ${pt(x + w / 2, y + 0.4, 0)} ${pt(x + w / 2, y - 0.4, 0)}`} fill="#cbd5e1" />
+    </g>
+  );
+}
+
+function Plant({ at }: { at: Spot }) {
+  const { x, y } = at;
+  const top = iso(x, y, 30);
+  return (
+    <g>
+      <polygon points={`${pt(x - 0.22, y - 0.22, 16)} ${pt(x + 0.22, y - 0.22, 16)} ${pt(x + 0.22, y + 0.22, 16)} ${pt(x - 0.22, y + 0.22, 16)}`} fill="#e2e8f0" />
+      <polygon points={`${pt(x - 0.22, y + 0.22, 16)} ${pt(x + 0.22, y + 0.22, 16)} ${pt(x + 0.22, y + 0.22, 0)} ${pt(x - 0.22, y + 0.22, 0)}`} fill="#cbd5e1" />
+      <ellipse cx={top.sx} cy={top.sy - 4} rx={16} ry={14} fill="#4ea15c" />
+      <ellipse cx={top.sx - 8} cy={top.sy + 2} rx={10} ry={9} fill="#5fb86d" />
+      <ellipse cx={top.sx + 9} cy={top.sy + 3} rx={9} ry={8} fill="#43904f" />
+    </g>
+  );
+}
+
+function Couch({ at }: { at: Spot }) {
+  const { x, y } = at;
+  return (
+    <g>
+      <polygon points={`${pt(x - 0.8, y - 0.9, 20)} ${pt(x + 0.8, y - 0.9, 20)} ${pt(x + 0.8, y + 0.9, 20)} ${pt(x - 0.8, y + 0.9, 20)}`} fill="#cfd9e6" />
+      <polygon points={`${pt(x - 0.8, y + 0.9, 20)} ${pt(x + 0.8, y + 0.9, 20)} ${pt(x + 0.8, y + 0.9, 0)} ${pt(x - 0.8, y + 0.9, 0)}`} fill="#bac7d8" />
+      <polygon points={`${pt(x + 0.8, y - 0.9, 46)} ${pt(x + 0.8, y + 0.9, 46)} ${pt(x + 0.8, y + 0.9, 20)} ${pt(x + 0.8, y - 0.9, 20)}`} fill="#aebdd0" />
+    </g>
+  );
+}
+
+/** One agent, drawn standing or sitting, with their name and what they are on. */
+function Person({
+  agent, at, seated, color, task, bubble, selected, onSelect,
+}: {
+  agent: Agent; at: Spot; seated: boolean; color: string; task: string; bubble?: string; selected: boolean; onSelect: () => void;
+}) {
+  const p = iso(at.x, at.y, 0);
+  const lift = seated ? 10 : 0;
+  return (
+    <g
+      className={`of-person${seated ? ' seated' : ''}${selected ? ' sel' : ''}`}
+      style={{ transform: `translate(${p.sx}px, ${p.sy}px)` }}
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter') onSelect(); }}
+    >
+      <ellipse cx={0} cy={0} rx={15} ry={7} fill="#0f172a" opacity={0.12} />
+      <g className="of-body" transform={`translate(0, ${-lift})`}>
+        <path d={`M -9 -4 Q -9 -30 0 -30 Q 9 -30 9 -4 Z`} fill={color} />
+        <circle cx={0} cy={-38} r={9} fill="#f6d7bd" />
+        <path d="M -9 -41 Q 0 -50 9 -41 Q 0 -46 -9 -41 Z" fill="#3f3a4d" />
+        {selected && <circle cx={0} cy={-20} r={26} fill="none" stroke="#7c3aed" strokeWidth={2} strokeDasharray="4 4" className="of-ring" />}
+      </g>
+      <text className="of-name" y={seated ? -lift - 56 : 16} textAnchor="middle">{agent.name}</text>
+      {seated && task && <text className="of-task" y={-lift - 44} textAnchor="middle">{task.length > 26 ? `${task.slice(0, 26)}…` : task}</text>}
+      {bubble && (
+        <g className="of-bubble" transform={`translate(0, ${-lift - (seated ? 84 : 58)})`}>
+          <rect x={-Math.max(26, bubble.length * 4.2)} y={-15} width={Math.max(52, bubble.length * 8.4)} height={24} rx={12} fill="#fff" stroke="#e2e8f0" />
+          <text y={2} textAnchor="middle">{bubble}</text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+// ── The floor ──────────────────────────────────────────────────────────────────
 
 export default function OfficeView({
   agents, activityOf, taskOf, selectedId, onSelect, canManage, onSetOffice,
@@ -48,14 +170,15 @@ export default function OfficeView({
   const [bubbles, setBubbles] = useState<Record<string, string>>({});
   const [hiring, setHiring] = useState(false);
 
-  // Seats are stable: the nth busy agent takes the nth desk.
-  const seats = useMemo(() => {
+  // Seats are stable: the nth working agent takes the nth desk.
+  const { busyIds, seats } = useMemo(() => {
+    const ids = staff.filter(a => isBusy(activityOf(a.id))).map(a => a.id);
     const out: Record<string, Spot> = {};
-    staff.filter(a => isBusy(activityOf(a.id))).forEach((a, i) => { out[a.id] = deskSpot(i); });
-    return out;
+    ids.forEach((id, i) => { out[id] = seatOf(DESKS[i % DESKS.length]); });
+    return { busyIds: ids, seats: out };
   }, [staff, activityOf]);
 
-  const say = useCallback((id: string, text: string, ms = 3200) => {
+  const say = useCallback((id: string, text: string, ms = 3400) => {
     setBubbles(b => ({ ...b, [id]: text }));
     window.setTimeout(() => setBubbles(b => {
       if (b[id] !== text) return b;
@@ -65,29 +188,29 @@ export default function OfficeView({
     }), ms);
   }, []);
 
-  // Roamers wander, and now and then two of them stop for a word.
+  // People who are free wander, and sometimes stop for a word.
   useEffect(() => {
     const move = () => {
       const roamers = staff.filter(a => !isBusy(activityOf(a.id)));
       if (!roamers.length) return;
       setSpots(prev => {
         const next = { ...prev };
-        for (const a of roamers) if (Math.random() < 0.5 || !next[a.id]) next[a.id] = loungeSpot();
-        // Two of them drift together for a chat.
-        if (roamers.length > 1 && Math.random() < 0.45) {
-          const [x, y] = [roamers[Math.floor(Math.random() * roamers.length)], roamers[Math.floor(Math.random() * roamers.length)]];
-          if (x.id !== y.id) {
+        for (const a of roamers) if (!next[a.id] || Math.random() < 0.55) next[a.id] = loungeSpot();
+        if (roamers.length > 1 && Math.random() < 0.4) {
+          const a = roamers[Math.floor(Math.random() * roamers.length)];
+          const b = roamers[Math.floor(Math.random() * roamers.length)];
+          if (a.id !== b.id) {
             const at = loungeSpot();
-            next[x.id] = at;
-            next[y.id] = { x: Math.min(96, at.x + 7), y: at.y };
-            window.setTimeout(() => say(x.id, CHATTER[Math.floor(Math.random() * CHATTER.length)], 2600), 2500);
+            next[a.id] = at;
+            next[b.id] = { x: at.x + 0.9, y: at.y + 0.2 };
+            window.setTimeout(() => say(a.id, CHATTER[Math.floor(Math.random() * CHATTER.length)], 2600), 2600);
           }
         }
         return next;
       });
     };
     move();
-    const id = window.setInterval(move, 6000);
+    const id = window.setInterval(move, 6500);
     return () => window.clearInterval(id);
   }, [staff, activityOf, say]);
 
@@ -105,7 +228,7 @@ export default function OfficeView({
       const who = roamers[Math.floor(Math.random() * roamers.length)] ?? staff[0];
       if (!who) return;
       lastHello.current = now;
-      say(who.id, GREETINGS[Math.floor(Math.random() * GREETINGS.length)], 4000);
+      say(who.id, GREETINGS[Math.floor(Math.random() * GREETINGS.length)], 4200);
     };
     window.addEventListener('mousemove', onMove, { passive: true });
     return () => window.removeEventListener('mousemove', onMove);
@@ -114,14 +237,24 @@ export default function OfficeView({
   const working = staff.filter(a => isBusy(activityOf(a.id)));
   const idle = staff.filter(a => !isBusy(activityOf(a.id)));
 
+  // Draw far things first so near things overlap them.
+  const drawn = staff
+    .map(a => {
+      const busy = isBusy(activityOf(a.id));
+      const at = busy ? seats[a.id] ?? seatOf(DESKS[0]) : spots[a.id] ?? loungeSpot(() => 0.5);
+      return { a, busy, at };
+    })
+    .sort((p, q) => p.at.x + p.at.y - (q.at.x + q.at.y));
+
+  const W = (ROOM.w + ROOM.h) * (TILE / 2);
+  const H = (ROOM.w + ROOM.h) * (TILE / 4) + 210;
+
   return (
     <div className="of-wrap">
       <div className="of-top">
         <span><b>{working.length}</b> at their desks · <b>{idle.length}</b> free · <b>{staff.length}</b> in the office</span>
         {canManage && (
-          <button type="button" className="btn btn-sm" onClick={() => setHiring(!hiring)}>
-            {hiring ? 'Close' : 'Bring someone in…'}
-          </button>
+          <button type="button" className="btn btn-sm" onClick={() => setHiring(!hiring)}>{hiring ? 'Close' : 'Bring someone in…'}</button>
         )}
       </div>
 
@@ -140,44 +273,61 @@ export default function OfficeView({
       )}
 
       <div className="of-room">
-        <div className="of-floor" />
-        <div className="of-label of-label-desks">Desks · working</div>
-        <div className="of-label of-label-lounge">Lounge · free</div>
-        <div className="of-plant of-plant-1" />
-        <div className="of-plant of-plant-2" />
-        <div className="of-couch" />
-        <div className="of-coffee" />
+        <svg viewBox={`${-W / 2 - 60} ${-150} ${W + 120} ${H}`} className="of-svg" role="img" aria-label="The office floor: agents at desks are working, agents walking are free">
+          <defs>
+            <linearGradient id="ofGlass" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.75" />
+              <stop offset="100%" stopColor="#dbeafe" stopOpacity="0.45" />
+            </linearGradient>
+          </defs>
 
-        {Array.from({ length: Math.max(6, working.length) }, (_, i) => {
-          const s = deskSpot(i);
-          return <div key={`desk-${i}`} className="of-desk" style={{ left: `${s.x}%`, top: `${s.y}%` }} />;
-        })}
+          {/* floor slab */}
+          <polygon points={`${pt(0, 0)} ${pt(ROOM.w, 0)} ${pt(ROOM.w, ROOM.h)} ${pt(0, ROOM.h)}`} fill="#fdfdfe" />
+          <polygon points={`${pt(0, ROOM.h)} ${pt(ROOM.w, ROOM.h)} ${pt(ROOM.w, ROOM.h, -16)} ${pt(0, ROOM.h, -16)}`} fill="#e7ecf3" />
+          <polygon points={`${pt(ROOM.w, 0)} ${pt(ROOM.w, ROOM.h)} ${pt(ROOM.w, ROOM.h, -16)} ${pt(ROOM.w, 0, -16)}`} fill="#dbe2ec" />
 
-        {staff.map(a => {
-          const act = activityOf(a.id);
-          const busy = isBusy(act);
-          const at = busy ? seats[a.id] ?? deskSpot(0) : spots[a.id] ?? loungeSpot(() => 0.5);
-          const task = taskOf(a.id);
-          return (
-            <button
+          {/* glass walls along the two far edges */}
+          {Array.from({ length: ROOM.w }, (_, i) => (
+            <g key={`wx-${i}`}>
+              <polygon points={`${pt(i + 0.05, 0, 0)} ${pt(i + 0.95, 0, 0)} ${pt(i + 0.95, 0, 150)} ${pt(i + 0.05, 0, 150)}`} fill="url(#ofGlass)" stroke="#e8eef6" />
+            </g>
+          ))}
+          {Array.from({ length: ROOM.h }, (_, i) => (
+            <g key={`wy-${i}`}>
+              <polygon points={`${pt(0, i + 0.05, 0)} ${pt(0, i + 0.95, 0)} ${pt(0, i + 0.95, 150)} ${pt(0, i + 0.05, 150)}`} fill="url(#ofGlass)" stroke="#e8eef6" />
+            </g>
+          ))}
+
+          {/* furniture along the walls */}
+          <Cabinet at={{ x: 9.6, y: 0.6 }} w={1.6} h={52} />
+          <Cabinet at={{ x: 11.2, y: 0.6 }} w={1.2} h={78} fill="#f5f7fb" />
+          <Cabinet at={{ x: 0.7, y: 8.3 }} w={1.4} h={40} />
+          <Plant at={{ x: 11.3, y: 8.2 }} />
+          <Plant at={{ x: 0.7, y: 0.7 }} />
+          <Couch at={{ x: 10.6, y: 6.6 }} />
+
+          {/* desks, then the chairs that belong to them */}
+          {DESKS.map((d, i) => (
+            <g key={`desk-${i}`}>
+              <Desk at={d} screen={SCREEN_COLORS[i % SCREEN_COLORS.length]} />
+              <Chair at={seatOf(d)} taken={i < busyIds.length} />
+            </g>
+          ))}
+
+          {drawn.map(({ a, busy, at }) => (
+            <Person
               key={a.id}
-              type="button"
-              className={`of-person${busy ? ' seated' : ' roaming'}${selectedId === a.id ? ' sel' : ''}`}
-              style={{ left: `${at.x}%`, top: `${at.y}%` }}
-              onClick={() => onSelect(selectedId === a.id ? null : a.id)}
-              title={`${a.name} — ${a.title}`}
-            >
-              {bubbles[a.id] && <span className="of-bubble">{bubbles[a.id]}</span>}
-              <span className="of-avatar" style={{ borderColor: ACTIVITY_META[act].color }}>
-                {a.name.slice(0, 1)}
-                {busy && <i className="of-typing" />}
-              </span>
-              <span className="of-name">{a.name}</span>
-              {busy && task && <span className="of-task">{task.slice(0, 34)}{task.length > 34 ? '…' : ''}</span>}
-            </button>
-          );
-        })}
-
+              agent={a}
+              at={at}
+              seated={busy}
+              color={ACTIVITY_META[activityOf(a.id)].color}
+              task={taskOf(a.id)}
+              bubble={bubbles[a.id]}
+              selected={selectedId === a.id}
+              onSelect={() => onSelect(selectedId === a.id ? null : a.id)}
+            />
+          ))}
+        </svg>
         {staff.length === 0 && <div className="of-empty">Nobody is in the office yet. Use “Bring someone in”.</div>}
       </div>
     </div>
