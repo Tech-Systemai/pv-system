@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ outreach: data });
       }
       case 'send': {
-        const sent = await sendBatch();
+        const sent = await sendBatch({ force: true });
         const replies = await checkReplies();
         return NextResponse.json({ ...sent, ...replies });
       }

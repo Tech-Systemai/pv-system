@@ -25,11 +25,14 @@ export async function sentLast24h(db: ReturnType<typeof admin>, email: string) {
   return count ?? 0;
 }
 
-export async function sendBatch() {
+export async function sendBatch(opts: { force?: boolean } = {}) {
   const db = admin();
   const settings = await loadSettings(db);
   if (!settingsReady(settings)) return { sent: 0, reason: 'settings' };
-  if (!isWorkHours()) return { sent: 0, reason: 'outside office hours (9–5 ET)' };
+  // Automatic sends wait for the window; a send you asked for goes now.
+  if (!opts.force && settings.send_hours_only !== false && !isWorkHours()) {
+    return { sent: 0, reason: 'outside the sending window (9–5 ET) — use Send approved now to go anyway' };
+  }
   const box = await mailbox();
   if (!box) return { sent: 0, reason: 'no inbox connected' };
 

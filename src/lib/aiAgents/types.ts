@@ -71,6 +71,16 @@ export type AgentMessage = {
   created_at: string;
 };
 
+/** One call you made, with the note you left. */
+export type CallNote = {
+  id: number;
+  lead_id: string;
+  outreach_id: string | null;
+  outcome: 'no_answer' | 'left_voicemail' | 'callback' | 'interested' | 'booked' | 'not_interested';
+  note: string;
+  called_at: string;
+};
+
 export type Run = {
   id: number;
   agent_id: string;
@@ -230,7 +240,7 @@ export type Reason = { text: string; weight: number; toward?: Channel };
 
 export type OutreachStatus =
   | 'draft' | 'compliance' | 'blocked' | 'scheduled' | 'sent' | 'replied' | 'bounced' | 'skipped' | 'failed'
-  | 'to_call' | 'no_answer' | 'callback' | 'interested' | 'booked' | 'not_interested';
+  | 'left_voicemail' | 'to_call' | 'no_answer' | 'callback' | 'interested' | 'booked' | 'not_interested';
 
 export type Outreach = {
   id: string;
@@ -272,6 +282,8 @@ export type OutreachSettings = {
   logo_url: string;
   /** The town we write from, so the email sounds local. */
   home_base: string;
+  /** Automatic sending waits for 9-5; your own send button never does. */
+  send_hours_only: boolean;
 };
 
 export const LEAD_STATUS_META: Record<LeadStatus, { label: string; badge: string }> = {
@@ -296,6 +308,7 @@ export const OUTREACH_STATUS_META: Record<OutreachStatus, { label: string; badge
   replied:        { label: 'Replied',          badge: 'pv-bdg-green' },
   bounced:        { label: 'Bounced',          badge: 'pv-bdg-red' },
   to_call:        { label: 'To call',          badge: 'pv-bdg-amber' },
+  left_voicemail: { label: 'Voicemail',        badge: 'pv-bdg-gray' },
   no_answer:      { label: 'No answer',        badge: 'pv-bdg-gray' },
   callback:       { label: 'Call back',        badge: 'pv-bdg-amber' },
   interested:     { label: 'Interested',       badge: 'pv-bdg-green' },

@@ -186,8 +186,21 @@ export default function EmailsPanel({ leads, outreach, niches, nicheFilter, sett
     setMsg(`Quill wrote ${j.written}${j.skipped ? `, skipped ${j.skipped} (too little to personalise)` : ''}${j.failed ? `, ${j.failed} failed` : ''}. They're below for your review.`);
   };
 
+  // Say plainly what is stopping emails, instead of leaving empty lists.
+  const blockers = [
+    !settings.postal_address.trim() && 'Your postal address — required by law in every cold email, and the only thing nobody can fill in for you.',
+    !inbox.email && 'The outreach inbox is not connected yet.',
+    !waiting.length && !review.length && !queued.length && !sent.length && 'No qualified email-first leads yet. Ask Scout for more leads in the Office.',
+  ].filter(Boolean) as string[];
+
   return (
     <div className="tb-wrap">
+      {blockers.length > 0 && (
+        <div className="up-await">
+          <b>Before any email can go out:</b>
+          <ul className="oc-reasons">{blockers.map((b, i) => <li key={i} className="bad">− {b}</li>)}</ul>
+        </div>
+      )}
       <Inbox inbox={inbox} onAction={onAction} />
       <Settings key={settings.sender_name + settings.postal_address} settings={settings} onSaved={onSettings} onAction={onAction} />
 

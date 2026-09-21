@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (what === 'research' || what === 'all') out.research = await researchBatch(Math.min(12, Math.max(1, Number(body.limit) || 8)));
     if (what === 'write' || what === 'all') out.write = await writeBatch(Math.min(10, Math.max(1, Number(body.limit) || 5)));
     if (what === 'send' || what === 'all') {
-      out.send = await sendBatch();
+      out.send = await sendBatch({ force: true });
       out.replies = await checkReplies();
     }
     out.ready = await readyCount(db);

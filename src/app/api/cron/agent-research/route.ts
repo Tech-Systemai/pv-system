@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isWorkHours } from '@/lib/aiAgents/hours';
 import { admin } from '@/lib/aiAgents/server/runtime';
 import { topUpLeads } from '@/lib/aiAgents/server/leadgen';
 import { researchBatch } from '@/lib/aiAgents/server/research';
 import { checkReplies, sendBatch } from '@/lib/aiAgents/server/sender';
 import { writeBatch } from '@/lib/aiAgents/server/writer';
 
-// The live agents' heartbeat, every 15 minutes from
+// The live agents' heartbeat, around the clock, every 15 minutes from
 // .github/workflows/agent-research.yml: Research scores new leads, Quill writes
 // emails for qualified email-first leads, Post sends the approved queue (within
 // hours and warm-up limits) and checks threads for replies. Spends API credit,
@@ -20,8 +19,6 @@ export async function POST(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  // The team works 9–5 in the founder's time zone and is off outside that.
-  if (!isWorkHours()) return NextResponse.json({ skipped: 'outside office hours (9–5 ET)' });
   const out: Record<string, unknown> = {};
   const step = async (name: string, run: () => Promise<unknown>) => {
     try { out[name] = await run(); } catch (e) { out[name] = { error: (e as Error).message }; }

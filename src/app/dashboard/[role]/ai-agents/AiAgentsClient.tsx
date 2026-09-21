@@ -6,8 +6,8 @@ import { createClient } from '@/utils/supabase/client';
 import { DEFAULT_AGENTS, DEFAULT_DEPARTMENTS, DEFAULT_NICHES, LIVE_AGENTS, RETIRED_DEPTS, RETIRED_SLUGS, staffingRows } from '@/lib/aiAgents/org';
 import {
   effectiveActivity, normalizeAgent,
-  type Activity, type Agent, type AgentEvent, type AgentMessage, type Department, type EventKind, type Lead, type Niche,
-  type Outreach, type OutreachSettings, type OutreachStatus, type Run, type Work,
+  type Activity, type Agent, type AgentEvent, type AgentMessage, type CallNote, type Department, type EventKind, type Lead, type Niche,
+  type Outreach, type OutreachSettings, type Run, type Work,
 } from '@/lib/aiAgents/types';
 import type { EmailAction, InboxStatus } from './EmailsPanel';
 import BuildingView, { type Bubble } from './BuildingView';
@@ -51,7 +51,7 @@ function upsertById<T extends { id: string | number }>(list: T[], row: T): T[] {
 
 export default function AiAgentsClient({
   initialAgents, initialRuns, initialDepartments, initialWork, initialEvents,
-  initialNiches, initialLeads, initialOutreach, initialSettings, inbox, inboxResult,
+  initialNiches, initialLeads, initialOutreach, initialSettings, initialCalls, inbox, inboxResult,
   schemaReady, pipelineReady, integrations, canManage, currentUserId,
 }: {
   initialAgents: Record<string, unknown>[];
@@ -63,6 +63,7 @@ export default function AiAgentsClient({
   initialLeads: Lead[];
   initialOutreach: Outreach[];
   initialSettings: OutreachSettings | null;
+  initialCalls: CallNote[];
   inbox: InboxStatus;
   inboxResult: string;
   schemaReady: boolean;
@@ -82,6 +83,7 @@ export default function AiAgentsClient({
   const [niches, setNiches] = useState<Niche[]>(initialNiches);
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [outreach, setOutreach] = useState<Outreach[]>(initialOutreach);
+  const [calls, setCalls] = useState<CallNote[]>(initialCalls);
   const seenEvents = useRef(new Set(initialEvents.map(e => String(e.id))));
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -151,6 +153,9 @@ export default function AiAgentsClient({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_outreach' }, payload => {
         if (payload.eventType !== 'DELETE') setOutreach(prev => upsertById(prev, payload.new as Outreach));
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ai_call_notes' }, payload => {
+        setCalls(prev => upsertById(prev, payload.new as CallNote));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [ready, emit]);
@@ -174,11 +179,6 @@ export default function AiAgentsClient({
     return out;
   }, [work]);
 
-  const post = async (url: string, body: object) => {
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const json = await res.json().catch(() => ({}));
-    return res.ok ? { ok: true as const, json } : { ok: false as const, error: String(json.error ?? `Request failed (${res.status})`) };
-  };
 
   const openAgent = (id: string) => { setSelectedId(id); setTab('building'); };
 
@@ -208,6 +208,12 @@ export default function AiAgentsClient({
   };
   const canWrite = canManage && ready && staffed;
 
+  const post = async (url: string, body: object) => {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const json = await res.json().catch(() => ({}));
+    return res.ok ? { ok: true as const, json } : { ok: false as const, error: String(json.error ?? `Request failed (${res.status})`) };
+  };
+
   // ── Founder actions ──
   const logEvent = async (ev: Omit<AgentEvent, 'id' | 'created_at'>) => {
     const { data } = await dbOp('ai_agent_events', 'insert', ev);
@@ -234,16 +240,14 @@ export default function AiAgentsClient({
     return null;
   };
 
-  const logCall = async (id: string, status: OutreachStatus, notes: string): Promise<string | null> => {
-    const o = outreach.find(x => x.id === id);
-    if (!o) return 'Call not found';
-    const now = new Date().toISOString();
-    const r = await dbOp('ai_outreach', 'update', { status, notes, sent_at: o.sent_at ?? now, updated_at: now }, { id });
-    if (r.error) return r.error;
-    if (r.data?.[0]) setOutreach(prev => upsertById(prev, r.data![0] as Outreach));
-    const leadStatus = status === 'booked' ? 'booked' : status === 'not_interested' ? 'not_interested' : status === 'interested' ? 'replied' : 'contacted';
-    const l = await dbOp('ai_leads', 'update', { status: leadStatus, updated_at: now }, { id: o.lead_id });
-    if (l.data?.[0]) setLeads(prev => upsertById(prev, l.data![0] as Lead));
+  /** Log a call you made: the note is kept and the lead moves out of the call list. */
+  const logCall = async (leadId: string, outreachId: string | null, outcome: CallNote['outcome'], note: string): Promise<string | null> => {
+    const r = await post('/api/agents/calls', { leadId, outreachId, outcome, note });
+    if (!r.ok) return r.error;
+    const j = r.json as { call?: CallNote; outreach?: Outreach; lead?: Lead };
+    if (j.call) setCalls(prev => upsertById(prev, j.call!));
+    if (j.outreach) setOutreach(prev => upsertById(prev, j.outreach!));
+    if (j.lead) setLeads(prev => upsertById(prev, j.lead!));
     return null;
   };
 
@@ -471,7 +475,7 @@ export default function AiAgentsClient({
           canResearch={canWrite && integrations.claude} onResearch={runResearch} />
       )}
       {tab === 'outreach' && (
-        <OutreachView leads={leads} outreach={outreach} niches={niches} onOpenLead={setLeadId} onLogCall={logCall}
+        <OutreachView leads={leads} outreach={outreach} niches={niches} calls={calls} onOpenLead={setLeadId} onLogCall={logCall}
           settings={settings} inbox={inbox} onSettings={setSettings} onEmailAction={emailAction} />
       )}
       {tab === 'niches' && (

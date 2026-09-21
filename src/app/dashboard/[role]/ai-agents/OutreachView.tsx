@@ -1,68 +1,155 @@
 'use client';
 
 import { useState } from 'react';
-import { OUTREACH_STATUS_META, type Lead, type Niche, type Outreach, type OutreachStatus } from '@/lib/aiAgents/types';
-import { ScoreBar } from './LeadDrawer';
+import { QUALIFY_AT } from '@/lib/aiAgents/pipeline';
+import {
+  LEAD_STATUS_META, OUTREACH_STATUS_META,
+  type CallNote, type Lead, type Niche, type Outreach, type OutreachSettings,
+} from '@/lib/aiAgents/types';
+import { ChannelChip, ScoreBar } from './LeadDrawer';
 import { timeAgo } from './LiveFeed';
 import EmailsPanel, { type EmailAction, type InboxStatus } from './EmailsPanel';
-import type { OutreachSettings } from '@/lib/aiAgents/types';
 
-type Sub = 'calls' | 'emails' | 'replies';
+// Everything you do with a lead after research: your call list, the calls you
+// have made, the emails, replies, and who qualified or did not, with reasons.
 
-const CALL_OUTCOMES: { status: OutreachStatus; label: string }[] = [
-  { status: 'no_answer', label: 'No answer' },
-  { status: 'callback', label: 'Call back' },
-  { status: 'interested', label: 'Interested' },
-  { status: 'booked', label: 'Booked demo' },
-  { status: 'not_interested', label: 'Not interested' },
+type Sub = 'calls' | 'called' | 'emails' | 'replies' | 'qualified' | 'passed';
+
+const OUTCOMES: { key: CallNote['outcome']; label: string; accent?: boolean }[] = [
+  { key: 'no_answer', label: 'No answer' },
+  { key: 'left_voicemail', label: 'Left voicemail' },
+  { key: 'callback', label: 'Call back later' },
+  { key: 'interested', label: 'Interested' },
+  { key: 'booked', label: 'Booked a call', accent: true },
+  { key: 'not_interested', label: 'Not interested' },
 ];
 
-function CallCard({ o, lead, niche, onOpenLead, onLog }: {
-  o: Outreach; lead?: Lead; niche?: Niche;
+export function WebLink({ url }: { url?: string }) {
+  if (!url) return <span className="tb-sub">no website</span>;
+  const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  return (
+    <a className="oc-link" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+      {url.replace(/^https?:\/\//i, '')} ↗
+    </a>
+  );
+}
+
+/** One lead on the call list: the details, why they qualified, and the outcome buttons. */
+function CallCard({ lead, niche, outreach, history, onOpenLead, onLog }: {
+  lead: Lead; niche?: Niche; outreach?: Outreach; history: CallNote[];
   onOpenLead: (id: string) => void;
-  onLog: (id: string, status: OutreachStatus, notes: string) => Promise<string | null>;
+  onLog: (leadId: string, outreachId: string | null, outcome: CallNote['outcome'], note: string) => Promise<string | null>;
 }) {
-  const [notes, setNotes] = useState(o.notes);
+  const [outcome, setOutcome] = useState<CallNote['outcome'] | null>(null);
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  if (!lead) return null;
-  const log = async (status: OutreachStatus) => {
+
+  const save = async () => {
+    if (!outcome) return;
     setBusy(true);
     setErr('');
-    const e = await onLog(o.id, status, notes.trim());
+    const e = await onLog(lead.id, outreach?.id ?? null, outcome, note.trim());
     setBusy(false);
-    if (e) setErr(e);
+    if (e) return setErr(e);
+    setOutcome(null);
+    setNote('');
   };
+
   return (
-    <div className={`oc-call${o.status === 'callback' ? ' oc-callback' : ''}`}>
+    <div className="oc-call">
       <div className="oc-call-h">
         <button type="button" className="oc-biz" onClick={() => onOpenLead(lead.id)}>{lead.business_name}</button>
-        {o.status === 'callback' && <span className="pv-bdg pv-bdg-amber">CALL BACK</span>}
-      </div>
-      <div className="oc-call-meta">
-        <a href={`tel:${lead.phone}`} className="oc-phone">📞 {lead.phone}</a>
-        <span>{lead.owner_name || 'Owner unknown'}</span>
-        <span>{niche?.name} · {lead.city}</span>
         <ScoreBar score={lead.wtp_score} />
       </div>
-      {lead.talking_points.length > 0 && <ul className="ld-points">{lead.talking_points.map((t, i) => <li key={i}>{t}</li>)}</ul>}
-      <input className="oc-notes" placeholder="Notes from the call…" value={notes} onChange={e => setNotes(e.target.value)} />
-      <div className="oc-outcomes">
-        {CALL_OUTCOMES.map(c => (
-          <button key={c.status} type="button" className={`btn btn-sm${c.status === 'booked' ? ' btn-acc' : ''}`} disabled={busy} onClick={() => log(c.status)}>{c.label}</button>
-        ))}
+      <div className="oc-call-meta">
+        <a href={`tel:${lead.phone}`} className="oc-phone">📞 {lead.phone || 'no number'}</a>
+        <WebLink url={lead.website} />
+        <span>{lead.owner_name || 'Owner unknown'}</span>
+        <span>{niche?.name} · {lead.city}</span>
       </div>
+      {lead.signals.research_notes && <div className="oc-note">{lead.signals.research_notes}</div>}
+      {lead.talking_points.length > 0 && <ul className="ld-points">{lead.talking_points.map((t, i) => <li key={i}>{t}</li>)}</ul>}
+      {history.length > 0 && (
+        <div className="oc-history">
+          {history.map(h => (
+            <div key={h.id}>
+              <b>{h.outcome.replace('_', ' ')}</b> <span suppressHydrationWarning>{timeAgo(h.called_at)}</span>{h.note ? ` — ${h.note}` : ''}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {outcome ? (
+        <div className="oc-log">
+          <b>{OUTCOMES.find(o => o.key === outcome)?.label}</b>
+          <textarea rows={2} autoFocus value={note} onChange={e => setNote(e.target.value)}
+            placeholder="What was said? Anything to remember for next time…" />
+          <div className="ag-work-actions">
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => setOutcome(null)}>Cancel</button>
+            <button type="button" className="btn btn-sm btn-acc" disabled={busy} onClick={save}>
+              {busy ? <><span className="spin" />Saving…</> : 'Save the call'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="oc-outcomes">
+          {OUTCOMES.map(o => (
+            <button key={o.key} type="button" className={`btn btn-sm${o.accent ? ' btn-acc' : ''}`} onClick={() => setOutcome(o.key)}>{o.label}</button>
+          ))}
+        </div>
+      )}
       {err && <div className="ag-err">{err}</div>}
     </div>
   );
 }
 
-export default function OutreachView({ leads, outreach, niches, onOpenLead, onLogCall, settings, inbox, onSettings, onEmailAction }: {
+/** Why research said yes, or what held them back. */
+function Reasons({ lead }: { lead: Lead }) {
+  const good = lead.wtp_reasons.filter(r => r.weight > 0).slice(0, 3);
+  const bad = lead.wtp_reasons.filter(r => r.weight < 0).slice(0, 3);
+  const shown = bad.length && (lead.wtp_score ?? 0) < QUALIFY_AT ? bad : good;
+  return (
+    <ul className="oc-reasons">
+      {shown.map((r, i) => <li key={i} className={r.weight > 0 ? 'good' : 'bad'}>{r.weight > 0 ? '+' : '−'} {r.text}</li>)}
+      {shown.length === 0 && <li className="tb-sub">No reasons recorded.</li>}
+    </ul>
+  );
+}
+
+function LeadCards({ leads, niches, onOpenLead }: { leads: Lead[]; niches: Niche[]; onOpenLead: (id: string) => void }) {
+  if (!leads.length) return <div className="card"><div className="empty">Nothing here yet.</div></div>;
+  return (
+    <div className="oc-cards">
+      {leads.slice(0, 120).map(l => (
+        <div key={l.id} className="oc-lead" onClick={() => onOpenLead(l.id)}>
+          <div className="oc-call-h">
+            <b>{l.business_name}</b>
+            <ScoreBar score={l.wtp_score} />
+          </div>
+          <div className="oc-call-meta">
+            <span>{niches.find(n => n.key === l.niche)?.name} · {l.city}</span>
+            <ChannelChip channel={l.contact_channel} confidence={l.channel_confidence} />
+            <WebLink url={l.website} />
+            {l.email && <span className="tb-sub">{l.email}</span>}
+            <span className={`pv-bdg ${LEAD_STATUS_META[l.status].badge}`}>{LEAD_STATUS_META[l.status].label.toUpperCase()}</span>
+          </div>
+          <Reasons lead={l} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function OutreachView({
+  leads, outreach, niches, calls, onOpenLead, onLogCall, settings, inbox, onSettings, onEmailAction,
+}: {
   leads: Lead[];
   outreach: Outreach[];
   niches: Niche[];
+  calls: CallNote[];
   onOpenLead: (id: string) => void;
-  onLogCall: (id: string, status: OutreachStatus, notes: string) => Promise<string | null>;
+  onLogCall: (leadId: string, outreachId: string | null, outcome: CallNote['outcome'], note: string) => Promise<string | null>;
   settings: OutreachSettings | null;
   inbox: InboxStatus;
   onSettings: (s: OutreachSettings) => void;
@@ -71,29 +158,43 @@ export default function OutreachView({ leads, outreach, niches, onOpenLead, onLo
   const [sub, setSub] = useState<Sub>('calls');
   const [nicheF, setNicheF] = useState('all');
 
-  const leadOf = Object.fromEntries(leads.map(l => [l.id, l]));
-  const nicheOf = (o: Outreach) => niches.find(n => n.key === leadOf[o.lead_id]?.niche);
-  const inNiche = (o: Outreach) => nicheF === 'all' || leadOf[o.lead_id]?.niche === nicheF;
+  const leadById = Object.fromEntries(leads.map(l => [l.id, l]));
+  const inNiche = (l?: Lead) => !!l && (nicheF === 'all' || l.niche === nicheF);
+  const nicheOf = (l: Lead) => niches.find(n => n.key === l.niche);
+  const callsByLead: Record<string, CallNote[]> = {};
+  for (const c of calls) (callsByLead[c.lead_id] ??= []).push(c);
 
-  const calls = outreach.filter(o => o.channel === 'call' && inNiche(o));
-  const toCall = calls.filter(o => o.status === 'to_call' || o.status === 'callback')
-    .sort((a, b) => (leadOf[b.lead_id]?.wtp_score ?? 0) - (leadOf[a.lead_id]?.wtp_score ?? 0));
-  const called = calls.filter(o => !['to_call', 'callback'].includes(o.status)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-  // Researched, qualified, email-first leads with nothing sent yet: the Email Writer's queue.
-  const contacted = new Set(outreach.map(o => o.lead_id));
-  const emailReady = leads
-    .filter(l => l.status === 'qualified' && l.contact_channel === 'email' && !contacted.has(l.id))
-    .filter(l => nicheF === 'all' || l.niche === nicheF)
+  const callRows = outreach.filter(o => o.channel === 'call' && inNiche(leadById[o.lead_id]));
+  const toCall = callRows.filter(o => ['to_call', 'callback'].includes(o.status))
+    .sort((a, b) => (leadById[b.lead_id]?.wtp_score ?? 0) - (leadById[a.lead_id]?.wtp_score ?? 0));
+  const called = callRows.filter(o => !['to_call', 'callback'].includes(o.status))
+    .sort((a, b) => (b.sent_at ?? b.updated_at).localeCompare(a.sent_at ?? a.updated_at));
+  const replies = outreach.filter(o => inNiche(leadById[o.lead_id]) && ['replied', 'interested', 'booked'].includes(o.status))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const emailsToHandle = outreach.filter(o => o.channel === 'email' && ['draft', 'blocked'].includes(o.status)).length;
+  const qualified = leads.filter(l => inNiche(l) && ['qualified', 'contacted', 'replied', 'booked'].includes(l.status))
     .sort((a, b) => (b.wtp_score ?? 0) - (a.wtp_score ?? 0));
-  const replies = outreach.filter(o => inNiche(o) && ['replied', 'interested', 'booked'].includes(o.status)).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const passed = leads.filter(l => inNiche(l) && ['disqualified', 'not_interested'].includes(l.status))
+    .sort((a, b) => (b.wtp_score ?? 0) - (a.wtp_score ?? 0));
+
+  const TABS: { key: Sub; label: string; n: number }[] = [
+    { key: 'calls', label: 'Call list', n: toCall.length },
+    { key: 'called', label: 'Called', n: called.length },
+    { key: 'emails', label: 'Emails', n: emailsToHandle },
+    { key: 'replies', label: 'Replies', n: replies.length },
+    { key: 'qualified', label: 'Qualified', n: qualified.length },
+    { key: 'passed', label: 'Passed on', n: passed.length },
+  ];
 
   return (
     <div className="tb-wrap">
       <div className="oc-top">
         <div className="ag-filters">
-          <button type="button" className={sub === 'calls' ? 'on' : ''} onClick={() => setSub('calls')}>Your call list ({toCall.length})</button>
-          <button type="button" className={sub === 'emails' ? 'on' : ''} onClick={() => setSub('emails')}>Emails ({emailReady.length + outreach.filter(o => o.channel === 'email' && o.status === 'draft').length} to handle)</button>
-          <button type="button" className={sub === 'replies' ? 'on' : ''} onClick={() => setSub('replies')}>Replies &amp; interest ({replies.length})</button>
+          {TABS.map(t => (
+            <button key={t.key} type="button" className={sub === t.key ? 'on' : ''} onClick={() => setSub(t.key)}>
+              {t.label} <b className="oc-count">{t.n}</b>
+            </button>
+          ))}
         </div>
         <select className="fld-input" value={nicheF} onChange={e => setNicheF(e.target.value)}>
           <option value="all">All niches</option>
@@ -104,26 +205,54 @@ export default function OutreachView({ leads, outreach, niches, onOpenLead, onLo
 
       {sub === 'calls' && (
         <>
-          <div className="tb-sub" style={{ margin: '2px 0 10px' }}>
-            Leads Research decided to call, highest willingness to pay first. Log each call and the pipeline moves on.
-          </div>
-          {toCall.length === 0 ? <div className="card"><div className="empty">No calls waiting.</div></div> : (
+          <div className="tb-sub">Leads research picked for a call, best first. Log every call: the note is kept and the lead moves to “Called”.</div>
+          {toCall.length === 0 ? <div className="card"><div className="empty">No calls waiting. Ask Scout for more leads in the Office.</div></div> : (
             <div className="oc-calls">
-              {toCall.slice(0, 30).map(o => <CallCard key={o.id} o={o} lead={leadOf[o.lead_id]} niche={nicheOf(o)} onOpenLead={onOpenLead} onLog={onLogCall} />)}
-            </div>
-          )}
-          {called.length > 0 && (
-            <div className="card tb-card" style={{ marginTop: 14 }}>
-              <div className="card-title" style={{ marginBottom: 8 }}>Calls made</div>
-              {called.slice(0, 25).map(o => (
-                <div key={o.id} className="ag-queued">
-                  <span>{leadOf[o.lead_id]?.business_name}{o.notes ? ` — ${o.notes}` : ''}</span>
-                  <span className={`pv-bdg ${OUTREACH_STATUS_META[o.status].badge}`}>{OUTREACH_STATUS_META[o.status].label.toUpperCase()}</span>
-                </div>
-              ))}
+              {toCall.slice(0, 40).map(o => {
+                const lead = leadById[o.lead_id];
+                return lead ? (
+                  <CallCard key={o.id} lead={lead} niche={nicheOf(lead)} outreach={o}
+                    history={callsByLead[lead.id] ?? []} onOpenLead={onOpenLead} onLog={onLogCall} />
+                ) : null;
+              })}
             </div>
           )}
         </>
+      )}
+
+      {sub === 'called' && (
+        called.length === 0 ? <div className="card"><div className="empty">No calls logged yet.</div></div> : (
+          <div className="oc-cards">
+            {called.map(o => {
+              const lead = leadById[o.lead_id];
+              if (!lead) return null;
+              const history = callsByLead[lead.id] ?? [];
+              return (
+                <div key={o.id} className="oc-lead" onClick={() => onOpenLead(lead.id)}>
+                  <div className="oc-call-h">
+                    <b>{lead.business_name}</b>
+                    <span className={`pv-bdg ${OUTREACH_STATUS_META[o.status].badge}`}>{OUTREACH_STATUS_META[o.status].label.toUpperCase()}</span>
+                  </div>
+                  <div className="oc-call-meta">
+                    <a href={`tel:${lead.phone}`} className="oc-phone" onClick={e => e.stopPropagation()}>📞 {lead.phone}</a>
+                    <WebLink url={lead.website} />
+                    <span>{nicheOf(lead)?.name} · {lead.city}</span>
+                    <span className="tb-sub" suppressHydrationWarning>{o.sent_at ? timeAgo(o.sent_at) : ''}</span>
+                  </div>
+                  {history.length > 0 && (
+                    <div className="oc-history">
+                      {history.map(h => (
+                        <div key={h.id}>
+                          <b>{h.outcome.replace('_', ' ')}</b> <span suppressHydrationWarning>{timeAgo(h.called_at)}</span>{h.note ? ` — ${h.note}` : ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )
       )}
 
       {sub === 'emails' && (
@@ -132,22 +261,38 @@ export default function OutreachView({ leads, outreach, niches, onOpenLead, onLo
       )}
 
       {sub === 'replies' && (
-        <div className="card tb-card">
-          {replies.length === 0 ? <div className="empty">No replies yet.</div> : replies.map(o => {
-            const lead = leadOf[o.lead_id];
-            return (
-              <div key={o.id} className="oc-reply" onClick={() => lead && onOpenLead(lead.id)}>
-                <span>{o.channel === 'call' ? '📞' : '✉'}</span>
-                <span className="oc-reply-t">
-                  <b>{lead?.business_name}</b> <span className="tb-sub">{nicheOf(o)?.name} · {lead?.city}</span>
-                  <span>{o.notes || OUTREACH_STATUS_META[o.status].label}</span>
-                </span>
-                <span className={`pv-bdg ${OUTREACH_STATUS_META[o.status].badge}`}>{OUTREACH_STATUS_META[o.status].label.toUpperCase()}</span>
-                <span className="tb-sub" suppressHydrationWarning>{timeAgo(o.replied_at ?? o.updated_at)}</span>
-              </div>
-            );
-          })}
-        </div>
+        replies.length === 0 ? <div className="card"><div className="empty">No replies yet.</div></div> : (
+          <div className="card tb-card">
+            {replies.map(o => {
+              const lead = leadById[o.lead_id];
+              return (
+                <div key={o.id} className="oc-reply" onClick={() => lead && onOpenLead(lead.id)}>
+                  <span>{o.channel === 'call' ? '📞' : '✉'}</span>
+                  <span className="oc-reply-t">
+                    <b>{lead?.business_name}</b> <span className="tb-sub">{lead && nicheOf(lead)?.name} · {lead?.city}</span>
+                    <span>{o.notes || OUTREACH_STATUS_META[o.status].label}</span>
+                  </span>
+                  <span className={`pv-bdg ${OUTREACH_STATUS_META[o.status].badge}`}>{OUTREACH_STATUS_META[o.status].label.toUpperCase()}</span>
+                  <span className="tb-sub" suppressHydrationWarning>{timeAgo(o.replied_at ?? o.updated_at)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
+      {sub === 'qualified' && (
+        <>
+          <div className="tb-sub">Scored {QUALIFY_AT} or higher, so they are worth your time. The reasons are what research actually found.</div>
+          <LeadCards leads={qualified} niches={niches} onOpenLead={onOpenLead} />
+        </>
+      )}
+
+      {sub === 'passed' && (
+        <>
+          <div className="tb-sub">Scored under {QUALIFY_AT}, so nobody contacts them. Each one shows what held it back.</div>
+          <LeadCards leads={passed} niches={niches} onOpenLead={onOpenLead} />
+        </>
       )}
     </div>
   );

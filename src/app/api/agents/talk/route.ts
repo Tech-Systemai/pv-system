@@ -3,7 +3,11 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { LIVE_AGENTS, NEXT_UP } from '@/lib/aiAgents/org';
+import { topUpLeads } from '@/lib/aiAgents/server/leadgen';
+import { researchBatch } from '@/lib/aiAgents/server/research';
 import { admin, logEvent, requireManager } from '@/lib/aiAgents/server/runtime';
+import { checkReplies, sendBatch } from '@/lib/aiAgents/server/sender';
+import { writeBatch } from '@/lib/aiAgents/server/writer';
 
 // Talking to an agent in the office. It answers as itself, from its real job,
 // its live work and what it has actually done. If the founder gives it
@@ -11,8 +15,42 @@ import { admin, logEvent, requireManager } from '@/lib/aiAgents/server/runtime';
 
 export const maxDuration = 120;
 
+// What an agent can actually go and do, right now, in this conversation.
+const ACTIONS = ['none', 'find_leads', 'research', 'write_emails', 'send_emails'] as const;
+
+/** Run the job the agent just agreed to, and report what happened. */
+async function runAction(action: string): Promise<string> {
+  const db = admin();
+  if (action === 'find_leads') {
+    const r = await topUpLeads(db, { force: true, max: 40 }) as Record<string, unknown>;
+    return r.ok
+      ? `Started a Google Maps pull: ${r.niche} in ${r.city}. They land in a couple of minutes and I research them straight away.`
+      : `Could not start a pull: ${r.error ?? r.skipped}`;
+  }
+  if (action === 'research') {
+    const r = await researchBatch(12, 4);
+    return r.researched
+      ? `Researched ${r.researched} leads just now — ${r.qualified} qualified${r.failed ? `, ${r.failed} failed` : ''}.`
+      : 'Nothing was waiting to be researched.';
+  }
+  if (action === 'write_emails') {
+    const r = await writeBatch(5) as { written: number; waiting?: string };
+    if (r.waiting === 'settings') return 'I cannot write yet: the postal address is still missing in the Outreach settings.';
+    return r.written ? `Wrote ${r.written} emails just now — they are waiting for your approval in Outreach.` : 'No qualified email-first leads were waiting.';
+  }
+  if (action === 'send_emails') {
+    const sent = await sendBatch({ force: true });
+    const replies = await checkReplies();
+    return sent.sent
+      ? `Sent ${sent.sent}${replies.replies ? `, and ${replies.replies} new replies came in` : ''}.`
+      : `Nothing sent: ${sent.reason ?? 'nothing approved yet'}.`;
+  }
+  return '';
+}
+
 const Reply = z.object({
-  reply: z.string().describe('What the agent says back. One to three short sentences, plain and practical.'),
+  reply: z.string().describe('What the agent says back. One to three short sentences, plain and practical. If you are about to run something, say so in the present tense — never promise a later sweep.'),
+  action: z.enum(ACTIONS).describe('The job to run right now, if the founder asked for work you can do. "none" when there is nothing to run.'),
   task_title: z.string().describe('If the founder asked for work, a short title for it (under 80 chars); otherwise ""'),
   task_brief: z.string().describe('The details of that work in the founder\'s own terms; otherwise ""'),
 });
@@ -48,7 +86,12 @@ How to talk:
 - Speak as yourself, briefly: one to three sentences, no corporate filler, no "As an AI".
 - Never claim to have done something unless it is in your work or recent activity below.
 - If the founder asks for something another agent owns, say who owns it.
-- If the founder gives you work, acknowledge it concretely and say what you will do first. Note that assignments are saved to your desk: you pick them up when you next run, and free-text jobs outside your pipeline wait until the founder wires that up.
+- You are on call around the clock. When the founder asks for work you can run, set "action" and do it now. Never say you will do it later, in a sweep, or on a schedule.
+  · find_leads — pull a fresh batch of businesses from Google Maps (Scout's job)
+  · research — score and qualify the leads that are waiting (Sage's job)
+  · write_emails — write the next emails for qualified leads (Quill's job)
+  · send_emails — send the emails the founder has already approved (Post's job)
+- If what they want is not one of those, say plainly that you cannot run it yet, and that you have put it on your desk.
 - If you need something from the founder to do the job (a decision, access, a detail), ask for that one thing.`;
 
   const context = [
@@ -84,7 +127,15 @@ How to talk:
     const { data: theirs } = await db.from('ai_agent_messages')
       .insert({ agent_id: agentId, role: 'agent', text: out.reply, work_id: workRow?.id ?? null }).select().single();
 
-    return NextResponse.json({ messages: [mine, theirs].filter(Boolean), work: workRow });
+    // Do the job now and report back in the same conversation.
+    let result = null;
+    if (out.action && out.action !== 'none') {
+      const ran = await runAction(out.action);
+      const { data } = await db.from('ai_agent_messages').insert({ agent_id: agentId, role: 'agent', text: ran }).select().single();
+      result = data;
+      await logEvent(db, agent.slug ?? '', 'progress', `{agent}, asked by the founder: ${ran}`);
+    }
+    return NextResponse.json({ messages: [mine, theirs, result].filter(Boolean), work: workRow });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

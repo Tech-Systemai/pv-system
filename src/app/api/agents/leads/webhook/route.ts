@@ -66,7 +66,14 @@ export async function POST(req: NextRequest) {
   // Research the fresh batch after replying, so Apify is not kept waiting.
   if (fresh.length && process.env.ANTHROPIC_API_KEY) {
     after(async () => {
-      await researchBatch(Math.min(fresh.length, 12));
+      // Sage works straight through the new batch rather than waiting for a sweep.
+      const until = Date.now() + 250_000;
+      let left = fresh.length;
+      while (left > 0 && Date.now() < until) {
+        const r = await researchBatch(Math.min(12, left), 4);
+        if (!r.researched) break;
+        left -= r.researched;
+      }
     });
   }
   return NextResponse.json({ ok: true, added: fresh.length });
