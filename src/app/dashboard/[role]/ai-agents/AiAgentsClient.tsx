@@ -483,6 +483,7 @@ export default function AiAgentsClient({
             onSetOffice={setOffice}
             onRun={runAgents}
             onTask={sendTask}
+            bubbles={bubbles}
             routines={routines}
             onSaveRoutine={saveRoutine}
             onRunRoutine={runRoutine}
