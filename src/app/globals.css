@@ -1484,3 +1484,32 @@ a { color: inherit; text-decoration: none; }
 .oc-callback { border-left-color: #fbbf24; }
 .oc-warm { border-left-color: #10b981; background: #f6fdf9; }
 .oc-again { font-size: 11px; color: var(--ink-4); align-self: center; margin-right: 2px; }
+
+/* ── AI AGENTS · task bar, routines, skills ── */
+.tk-wrap { display: flex; flex-direction: column; gap: 6px; }
+.tk-bar { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--accent-line); box-shadow: 0 2px 10px rgba(124,58,237,.06); }
+.tk-icon { color: var(--accent); font-size: 13px; }
+.tk-bar input { flex: 1; border: 0; outline: none; background: none; font: inherit; font-size: 13.5px; color: var(--ink); }
+.tk-examples { display: flex; gap: 6px; flex-wrap: wrap; padding-left: 6px; }
+.tk-examples button { border: 1px dashed var(--line-strong); background: none; border-radius: 99px; padding: 3px 10px; font-size: 11.5px; color: var(--ink-4); cursor: pointer; }
+.tk-examples button:hover { color: var(--accent-ink); border-color: var(--accent-line); }
+.tk-out { display: flex; flex-direction: column; gap: 3px; padding: 10px 14px; border-radius: 12px; background: var(--accent-soft); font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.tk-out.err { background: var(--err-soft); color: var(--err); }
+.tk-out b { font-size: 12px; color: var(--accent-ink); }
+.tk-result { font-weight: 600; color: var(--ink); }
+.rt-panel { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.rt-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rt-head > b { font-size: 13px; }
+.rt-head .tb-sub { flex: 1; }
+.rt-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); opacity: .6; }
+.rt-row.on { opacity: 1; }
+.rt-name { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.rt-name small { font-size: 11.5px; color: var(--ink-4); }
+.rt-last { color: var(--ink-3); }
+.rt-actions { display: flex; gap: 5px; }
+.rt-edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; padding: 10px; border-radius: 10px; background: var(--bg); }
+.rt-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 700; color: var(--ink-4); }
+.rt-edit input, .rt-edit select { border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 9px; font: inherit; font-size: 12.5px; font-weight: 400; background: var(--surface); color: var(--ink); outline: none; }
+.rt-edit .ag-work-actions { grid-column: 1 / -1; }
+.of-skill { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; background: var(--bg); }
+.of-skill input, .of-skill textarea { border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 12.5px; background: var(--surface); color: var(--ink); outline: none; resize: vertical; }

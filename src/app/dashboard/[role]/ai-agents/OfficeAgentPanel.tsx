@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { LIVE_AGENTS, NEXT_UP } from '@/lib/aiAgents/org';
-import { ACTIVITY_META, WORK_META, type Activity, type Agent, type AgentMessage, type Department, type Work } from '@/lib/aiAgents/types';
+import { ACTIVITY_META, WORK_META, type Activity, type Agent, type AgentMessage, type Department, type Skill, type Work } from '@/lib/aiAgents/types';
 import { timeAgo } from './LiveFeed';
 
 /** Talking to one agent: who they are, what they are on, and what you ask of them. */
 export default function OfficeAgentPanel({
-  agent, department, activity, task, work, messages, canManage, sending, onSend, onSetOffice, onClose,
+  agent, department, activity, task, work, messages, skills, canManage, sending, onSend, onSetOffice, onSaveSkill, onDeleteSkill, onClose,
 }: {
   agent: Agent;
   department?: Department;
@@ -15,14 +15,19 @@ export default function OfficeAgentPanel({
   task: string;
   work: Work[];
   messages: AgentMessage[];
+  skills: Skill[];
   canManage: boolean;
   sending: boolean;
   onSend: (text: string) => Promise<string | null>;
   onSetOffice: (agent: Agent, inOffice: boolean) => void;
+  onSaveSkill: (s: Partial<Skill>) => Promise<string | null>;
+  onDeleteSkill: (id: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [text, setText] = useState('');
   const [err, setErr] = useState('');
+  const [skill, setSkill] = useState<Partial<Skill> | null>(null);
+  const [savingSkill, setSavingSkill] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const meta = ACTIVITY_META[activity];
   const duty = LIVE_AGENTS[agent.slug ?? ''];
@@ -81,6 +86,43 @@ export default function OfficeAgentPanel({
             {done.map(w => <div key={w.id} className="of-task-row"><span>✓ {w.title}</span><span className="tb-sub" suppressHydrationWarning>{timeAgo(w.completed_at ?? w.updated_at)}</span></div>)}
           </div>
         )}
+
+        <div className="ag-sec">
+          <div className="ag-sec-t">
+            How {agent.name} should work {skills.length > 0 && <span className="ag-count">{skills.length}</span>}
+          </div>
+          <div className="ag-hint">Teach it your way once. Everything here is added to its brief before every job it runs.</div>
+          {skills.map(s => (
+            <div key={s.id} className="of-task-row">
+              <span><b>{s.name}</b> — {s.body.slice(0, 90)}{s.body.length > 90 ? '…' : ''}</span>
+              {canManage && (
+                <span className="ag-work-actions" style={{ margin: 0 }}>
+                  <button type="button" className="btn btn-sm" onClick={() => setSkill(s)}>Edit</button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => onDeleteSkill(s.id)}>Remove</button>
+                </span>
+              )}
+            </div>
+          ))}
+          {canManage && !skill && (
+            <button type="button" className="btn btn-sm" onClick={() => setSkill({ name: '', body: '', scope: 'agent', target: agent.slug ?? '', active: true })}>
+              + Teach {agent.name} something
+            </button>
+          )}
+          {skill && (
+            <div className="of-skill">
+              <input value={skill.name ?? ''} onChange={e => setSkill({ ...skill, name: e.target.value })} placeholder="What is it called? e.g. How I qualify a roofer" />
+              <textarea rows={4} value={skill.body ?? ''} onChange={e => setSkill({ ...skill, body: e.target.value })}
+                placeholder="In your words: what to look for, what to say, what to avoid…" />
+              <div className="ag-work-actions">
+                <button type="button" className="btn btn-sm" onClick={() => setSkill(null)}>Cancel</button>
+                <button type="button" className="btn btn-sm btn-acc" disabled={savingSkill || !skill.body?.trim()}
+                  onClick={async () => { setSavingSkill(true); const e = await onSaveSkill({ ...skill, target: agent.slug ?? '' }); setSavingSkill(false); if (!e) setSkill(null); }}>
+                  {savingSkill ? <><span className="spin" />Saving…</> : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="ag-sec">
           <div className="ag-sec-t">Conversation</div>

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { LIVE_AGENTS, NEXT_UP } from '@/lib/aiAgents/org';
 import { topUpLeads } from '@/lib/aiAgents/server/leadgen';
 import { researchBatch } from '@/lib/aiAgents/server/research';
+import { skillsFor } from '@/lib/aiAgents/server/jobs';
 import { admin, logEvent, requireManager } from '@/lib/aiAgents/server/runtime';
 import { checkReplies, sendBatch } from '@/lib/aiAgents/server/sender';
 import { writeBatch } from '@/lib/aiAgents/server/writer';
@@ -108,7 +109,7 @@ How to talk:
     const res = await new Anthropic().messages.parse({
       model: 'claude-opus-5',
       max_tokens: 4000,
-      system,
+      system: system + (await skillsFor(agent.slug ?? '', agent.department ?? '')),
       messages,
       output_config: { format: zodOutputFormat(Reply), effort: 'low' },
     });

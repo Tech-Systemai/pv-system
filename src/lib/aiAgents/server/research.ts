@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { QUALIFY_AT, channelStats, identifyChannel, scoreWillingness, talkingPoints } from '../pipeline';
 import type { Lead, LeadSignals, Niche, Outreach } from '../types';
+import { skillsFor } from './jobs';
 import { pickEmail } from './apify';
 import { admin, agentId, logEvent, setDesk } from './runtime';
 
@@ -112,7 +113,7 @@ async function extract(lead: Lead, site: { text: string; emails: string[] }): Pr
   const res = await claude().messages.parse({
     model: MODEL,
     max_tokens: 16000,
-    system: SYSTEM,
+    system: SYSTEM + (await skillsFor('research-qualifier', 'research')),
     messages: [{ role: 'user', content }],
     // Fact extraction, not open-ended reasoning: medium effort holds quality at lower cost.
     output_config: { format: zodOutputFormat(Findings), effort: 'medium' },

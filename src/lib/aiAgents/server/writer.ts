@@ -3,6 +3,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { checkEmail } from '../pipeline';
 import type { Lead, Niche, OutreachSettings } from '../types';
+import { skillsFor } from './jobs';
 import { admin, agentId, logEvent, setDesk } from './runtime';
 
 // Quill writes one email per lead, from that lead's research, not a template.
@@ -98,13 +99,14 @@ export function settingsReady(s: OutreachSettings | null): s is OutreachSettings
 }
 
 export async function draftFor(lead: Lead, niche: Niche | undefined, s: OutreachSettings, revisionNotes = '', previous = ''): Promise<DraftT> {
+  const skills = await skillsFor('outreach-writer', 'outreach');
   const content = revisionNotes
     ? `${leadBrief(lead, niche)}\n\nYour previous draft:\n${previous}\n\nThe founder wants this changed: ${revisionNotes}\nRewrite the email with that change.`
     : leadBrief(lead, niche);
   const res = await claude().messages.parse({
     model: MODEL,
     max_tokens: 16000,
-    system: system(s),
+    system: system(s) + skills,
     messages: [{ role: 'user', content }],
     output_config: { format: zodOutputFormat(Draft) },
   });

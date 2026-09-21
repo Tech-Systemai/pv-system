@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LIVE_AGENTS } from '@/lib/aiAgents/org';
-import { ACTIVITY_META, type Activity, type Agent } from '@/lib/aiAgents/types';
+import { ACTIVITY_META, type Activity, type Agent, type Routine } from '@/lib/aiAgents/types';
+import TaskBar, { type TaskResult } from './TaskBar';
+import RoutinesPanel from './RoutinesPanel';
 
 // An isometric picture of the floor. Nothing here is invented: an agent sits at
 // a desk when it is actually working and walks around when it is not. The
@@ -169,7 +171,8 @@ function Person({
 // ── The floor ──────────────────────────────────────────────────────────────────
 
 export default function OfficeView({
-  agents, activityOf, taskOf, selectedId, onSelect, canManage, onSetOffice, onRun,
+  agents, activityOf, taskOf, selectedId, onSelect, canManage, onSetOffice, onRun, onTask,
+  routines, onSaveRoutine, onRunRoutine, onDeleteRoutine,
 }: {
   agents: Agent[];
   activityOf: (id: string) => Activity | 'offline';
@@ -179,7 +182,13 @@ export default function OfficeView({
   canManage: boolean;
   onSetOffice: (agent: Agent, inOffice: boolean) => void;
   onRun: (what: 'topup' | 'research' | 'write' | 'send') => Promise<string>;
+  onTask: (text: string) => Promise<TaskResult>;
+  routines: Routine[];
+  onSaveRoutine: (r: Partial<Routine>) => Promise<string | null>;
+  onRunRoutine: (id: string) => Promise<string>;
+  onDeleteRoutine: (id: string) => Promise<void>;
 }) {
+  const [showRoutines, setShowRoutines] = useState(false);
   const [running, setRunning] = useState('');
   const [runMsg, setRunMsg] = useState('');
   const staff = useMemo(
@@ -273,6 +282,7 @@ export default function OfficeView({
 
   return (
     <div className="of-wrap">
+      {canManage && <TaskBar onTask={onTask} />}
       <div className="of-top">
         <span><b>{working.length}</b> at their desks · <b>{idle.length}</b> free · <b>{staff.length}</b> in the office</span>
         {canManage && (
@@ -288,11 +298,15 @@ export default function OfficeView({
                 {running === b.key ? <><span className="spin" />Working…</> : b.label}
               </button>
             ))}
+            <button type="button" className="btn btn-sm" onClick={() => setShowRoutines(!showRoutines)}>{showRoutines ? 'Close routines' : 'Routines'}</button>
             <button type="button" className="btn btn-sm" onClick={() => setHiring(!hiring)}>{hiring ? 'Close' : 'Bring someone in…'}</button>
           </div>
         )}
       </div>
       {runMsg && <div className="up-await">{runMsg}</div>}
+      {showRoutines && (
+        <RoutinesPanel routines={routines} canEdit={canManage} onSave={onSaveRoutine} onRun={onRunRoutine} onDelete={onDeleteRoutine} />
+      )}
 
       {hiring && (
         <div className="of-hire">

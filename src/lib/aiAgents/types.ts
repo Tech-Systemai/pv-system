@@ -81,6 +81,30 @@ export type CallNote = {
   called_at: string;
 };
 
+/** Work the office starts by itself, on your schedule. */
+export type Routine = {
+  id: string;
+  name: string;
+  action: 'find_leads' | 'research' | 'write_emails' | 'send_emails';
+  params: Record<string, unknown>;
+  days: string;
+  at_hour: number;
+  at_minute: number;
+  active: boolean;
+  last_run_at: string | null;
+  last_result: string;
+};
+
+/** Your process, taught once and applied before every job. */
+export type Skill = {
+  id: string;
+  name: string;
+  scope: 'agent' | 'department' | 'all';
+  target: string;
+  body: string;
+  active: boolean;
+};
+
 export type Run = {
   id: number;
   agent_id: string;

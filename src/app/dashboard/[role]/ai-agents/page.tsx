@@ -26,6 +26,8 @@ export default async function AiAgentsPage({ searchParams }: { searchParams: Pro
     { data: settings, error: settingsError },
     { data: box },
     { data: callNotes },
+    { data: routines },
+    { data: skills },
   ] = await Promise.all([
     admin.from('profiles').select('role').eq('id', user.id).single(),
     admin.from('ai_agents').select('*').neq('status', 'archived').order('created_at', { ascending: true }),
@@ -40,6 +42,8 @@ export default async function AiAgentsPage({ searchParams }: { searchParams: Pro
     // Only the address and when it was connected; the token never leaves the server.
     admin.from('ai_mailboxes').select('email, connected_at').order('connected_at', { ascending: false }).limit(1).maybeSingle(),
     admin.from('ai_call_notes').select('*').order('called_at', { ascending: false }).limit(500),
+    admin.from('ai_routines').select('*').order('at_hour', { ascending: true }),
+    admin.from('ai_skills').select('*').order('created_at', { ascending: true }),
   ]);
 
   const canManage = ['owner', 'admin', 'supervisor'].includes(profile?.role ?? '');
@@ -65,6 +69,8 @@ export default async function AiAgentsPage({ searchParams }: { searchParams: Pro
       initialOutreach={outreach ?? []}
       initialSettings={s}
       initialCalls={callNotes ?? []}
+      initialRoutines={routines ?? []}
+      initialSkills={skills ?? []}
       inbox={inbox}
       inboxResult={inboxResult ?? ''}
       // v91 adds the departments table; v92 adds niches, leads and outreach.

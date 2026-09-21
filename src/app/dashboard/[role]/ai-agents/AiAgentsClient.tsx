@@ -7,7 +7,7 @@ import { DEFAULT_AGENTS, DEFAULT_DEPARTMENTS, DEFAULT_NICHES, LIVE_AGENTS, RETIR
 import {
   effectiveActivity, normalizeAgent,
   type Activity, type Agent, type AgentEvent, type AgentMessage, type CallNote, type Department, type EventKind, type Lead, type Niche,
-  type Outreach, type OutreachSettings, type Run, type Work,
+  type Outreach, type OutreachSettings, type Routine, type Run, type Skill, type Work,
 } from '@/lib/aiAgents/types';
 import type { EmailAction, InboxStatus } from './EmailsPanel';
 import BuildingView, { type Bubble } from './BuildingView';
@@ -51,7 +51,7 @@ function upsertById<T extends { id: string | number }>(list: T[], row: T): T[] {
 
 export default function AiAgentsClient({
   initialAgents, initialRuns, initialDepartments, initialWork, initialEvents,
-  initialNiches, initialLeads, initialOutreach, initialSettings, initialCalls, inbox, inboxResult,
+  initialNiches, initialLeads, initialOutreach, initialSettings, initialCalls, initialRoutines, initialSkills, inbox, inboxResult,
   schemaReady, pipelineReady, integrations, canManage, currentUserId,
 }: {
   initialAgents: Record<string, unknown>[];
@@ -64,6 +64,8 @@ export default function AiAgentsClient({
   initialOutreach: Outreach[];
   initialSettings: OutreachSettings | null;
   initialCalls: CallNote[];
+  initialRoutines: Routine[];
+  initialSkills: Skill[];
   inbox: InboxStatus;
   inboxResult: string;
   schemaReady: boolean;
@@ -84,6 +86,8 @@ export default function AiAgentsClient({
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [outreach, setOutreach] = useState<Outreach[]>(initialOutreach);
   const [calls, setCalls] = useState<CallNote[]>(initialCalls);
+  const [routines, setRoutines] = useState<Routine[]>(initialRoutines);
+  const [skills, setSkills] = useState<Skill[]>(initialSkills);
   const seenEvents = useRef(new Set(initialEvents.map(e => String(e.id))));
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -314,6 +318,45 @@ export default function AiAgentsClient({
     if (row) setOutreach(prev => upsertById(prev, row));
     return r.ok ? { ok: true, json: r.json as Record<string, unknown> } : r;
   };
+  // The task bar: one box, routed to whoever owns the job.
+  const sendTask = async (text: string) => {
+    const r = await post('/api/agents/task', { text });
+    if (!r.ok) return { error: r.error };
+    const j = r.json as { agent?: { name: string; title: string }; reply?: string; result?: string; work?: Work };
+    if (j.work) setWork(prev => upsertById(prev, j.work!));
+    return j;
+  };
+
+  const saveRoutine = async (r: Partial<Routine>): Promise<string | null> => {
+    const res = await post('/api/agents/routines', { action: 'save_routine', routine: r });
+    if (!res.ok) return res.error;
+    const row = res.json.routine as Routine;
+    setRoutines(prev => (prev.some(x => x.id === row.id) ? prev.map(x => (x.id === row.id ? row : x)) : [...prev, row]));
+    return null;
+  };
+  const runRoutine = async (id: string): Promise<string> => {
+    const res = await post('/api/agents/routines', { action: 'run_routine', id });
+    if (!res.ok) return res.error;
+    const row = res.json.routine as Routine;
+    setRoutines(prev => prev.map(x => (x.id === row.id ? row : x)));
+    return String(res.json.result ?? 'Done');
+  };
+  const deleteRoutine = async (id: string) => {
+    await post('/api/agents/routines', { action: 'delete_routine', id });
+    setRoutines(prev => prev.filter(x => x.id !== id));
+  };
+  const saveSkill = async (s: Partial<Skill>): Promise<string | null> => {
+    const res = await post('/api/agents/routines', { action: 'save_skill', skill: s });
+    if (!res.ok) return res.error;
+    const row = res.json.skill as Skill;
+    setSkills(prev => (prev.some(x => x.id === row.id) ? prev.map(x => (x.id === row.id ? row : x)) : [...prev, row]));
+    return null;
+  };
+  const deleteSkill = async (id: string) => {
+    await post('/api/agents/routines', { action: 'delete_skill', id });
+    setSkills(prev => prev.filter(x => x.id !== id));
+  };
+
   const runAgents = async (what: 'topup' | 'research' | 'write' | 'send'): Promise<string> => {
     const r = await post('/api/agents/run', { what });
     if (!r.ok) return r.error;
@@ -439,6 +482,11 @@ export default function AiAgentsClient({
             canManage={canWrite}
             onSetOffice={setOffice}
             onRun={runAgents}
+            onTask={sendTask}
+            routines={routines}
+            onSaveRoutine={saveRoutine}
+            onRunRoutine={runRoutine}
+            onDeleteRoutine={deleteRoutine}
           />
           {selected && (
             <div className="ag-side">
@@ -450,10 +498,13 @@ export default function AiAgentsClient({
                 task={taskOf(selected.id)}
                 work={work.filter(w => w.agent_id === selected.id)}
                 messages={messages[selected.id] ?? []}
+                skills={skills.filter(s => (s.scope === 'agent' && s.target === selected.slug) || (s.scope === 'department' && s.target === selected.department))}
                 canManage={canWrite}
                 sending={talking}
                 onSend={t => talk(selected.id, t)}
                 onSetOffice={setOffice}
+                onSaveSkill={saveSkill}
+                onDeleteSkill={deleteSkill}
                 onClose={() => setSelectedId(null)}
               />
             </div>
