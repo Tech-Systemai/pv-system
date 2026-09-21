@@ -2,7 +2,7 @@ import { isWorkHours } from '../hours';
 import type { OutreachSettings } from '../types';
 import { buildMime, firstReply, mailbox, sendMessage } from './gmail';
 import { admin, logEvent, setDesk } from './runtime';
-import { loadSettings, settingsReady } from './writer';
+import { asHtml, loadSettings, settingsReady } from './writer';
 
 // Post sends from the connected inbox and watches for replies. Because the
 // inbox is on the main octopusengines.com domain, sending is deliberately
@@ -55,7 +55,7 @@ export async function sendBatch() {
     }
     await setDesk(db, 'outreach-sender', 'working', `Sending to ${lead.business_name}`);
     try {
-      const raw = buildMime({ from: box.email, fromName: settings.sender_name, to: lead.email, subject: o.subject, body: o.body });
+      const raw = buildMime({ from: box.email, fromName: settings.sender_name, to: lead.email, subject: o.subject, body: o.body, html: asHtml(o.body, settings) });
       const msg = await sendMessage(box, raw);
       const now = new Date().toISOString();
       await db.from('ai_outreach').update({

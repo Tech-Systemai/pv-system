@@ -310,6 +310,19 @@ export default function AiAgentsClient({
     if (row) setOutreach(prev => upsertById(prev, row));
     return r.ok ? { ok: true, json: r.json as Record<string, unknown> } : r;
   };
+  const runAgents = async (what: 'topup' | 'research' | 'write' | 'send'): Promise<string> => {
+    const r = await post('/api/agents/run', { what });
+    if (!r.ok) return r.error;
+    const j = r.json as Record<string, { error?: string; skipped?: string } & Record<string, unknown>>;
+    const bits: string[] = [];
+    if (j.leads) bits.push(j.leads.error ? `Leads: ${j.leads.error}` : j.leads.skipped ? `Leads: ${j.leads.skipped}` : `Scout is pulling ${j.leads.niche} in ${j.leads.city} — they land in a couple of minutes`);
+    if (j.research) bits.push(`Researched ${j.research.researched ?? 0}, ${j.research.qualified ?? 0} qualified`);
+    if (j.write) bits.push(`Quill wrote ${j.write.written ?? 0}${j.write.skipped ? `, skipped ${j.write.skipped}` : ''}`);
+    if (j.send) bits.push(j.send.sent ? `Sent ${j.send.sent}` : `Nothing sent: ${j.send.reason ?? 'nothing approved'}`);
+    if (typeof r.json.ready === 'number') bits.push(`${r.json.ready} leads ready to work`);
+    return bits.join(' · ') || 'Nothing to do right now.';
+  };
+
   const runResearch = async (): Promise<string> => {
     const r = await post('/api/agents/research', { limit: 5 });
     if (!r.ok) return r.error;
@@ -421,6 +434,7 @@ export default function AiAgentsClient({
             onSelect={id => { setSelectedId(id); if (id && !messages[id]) void loadMessages(id); }}
             canManage={canWrite}
             onSetOffice={setOffice}
+            onRun={runAgents}
           />
           {selected && (
             <div className="ag-side">

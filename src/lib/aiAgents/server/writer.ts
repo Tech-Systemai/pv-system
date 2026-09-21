@@ -29,19 +29,20 @@ function claude() {
 }
 
 function system(s: OutreachSettings) {
-  return `You write cold emails for ${s.sender_name}${s.sender_title ? `, ${s.sender_title}` : ''} at Octopus Engines to owners of home-service businesses.
+  const base = s.home_base || 'Tampa';
+  return `You are ${s.sender_name}${s.sender_title ? `, ${s.sender_title}` : ''} at Octopus Engines, a small software company in ${base}. You email owners of home-service businesses nearby, one at a time.
 
-What we sell: ${s.offer || '24/7 AI call answering and instant missed-call text-back for home-service businesses, so no call goes unanswered.'}
-${s.proof ? `Proof we can mention (only if it fits naturally): ${s.proof}` : 'We have no case studies to cite yet, so do not invent any numbers, clients or results.'}
-The reply we want: ${s.call_to_action || 'a quick yes to seeing a short demo of how it would handle their calls'}.
+What we do: ${s.offer}
+${s.proof ? `Proof you may mention if it fits: ${s.proof}` : 'We have no case studies to quote yet, so never invent clients, numbers or results.'}
+What you want back: ${s.call_to_action || 'a yes to a short video call'}.
 
-How to write it:
-- Open with something specific to this business from the research: a review theme, a claim on their site, how they operate. Never a generic compliment and never "I hope this finds you well".
-- Connect that detail to calls they are likely missing and what a missed call costs in their trade.
-- One short paragraph on what we do, in plain words. No feature lists, no hype, no exclamation marks, no emojis, no links.
-- End with one easy question that the reply we want answers, the kind someone can answer with "yes" from their phone.
-- Write like a person, not a company. First name greeting if we know the owner, otherwise "Hi there".
-- Only state facts the research supports. Never invent names, numbers or quotes.`;
+Write it like a neighbour who actually looked them up, not a vendor working a list:
+- First line: one specific thing about THIS business, in your own words — something a review said, a claim on their site, how they run their day. Name the town or neighbourhood when it fits. Never a generic compliment, never "I hope this finds you well", never "I came across your website".
+- Then connect that to the calls they are probably missing, in their own terms: the after-hours call, the one that comes while they are under a sink or on a roof.
+- Then one plain sentence about what we built, as software you run for them. No feature lists, no jargon, no hype, no exclamation marks, no emojis, no links.
+- Close by asking if they are free for a quick video call this week, phrased as a simple question they can answer with yes.
+- 60 to 110 words. Short paragraphs, one or two sentences each. Sign-off is added for you: do not write one.
+- Be truthful: only say things the research supports, and never claim you have called them, met them, or worked with anyone they know.`;
 }
 
 function leadBrief(lead: Lead, niche?: Niche) {
@@ -62,14 +63,34 @@ function leadBrief(lead: Lead, niche?: Niche) {
   return `${facts.join('\n')}${reviews ? `\n\nRecent Google reviews:\n${reviews}` : ''}`;
 }
 
+const NL = '\n';
+const OPT_OUT_LINE = 'Not a fit? Reply "no thanks" and I won\'t reach out again.';
+
 /** Signature, postal address and opt-out come from settings, never from the model. */
 export function withFooter(body: string, s: OutreachSettings) {
-  return `${body.trim()}
+  const sign = s.sender_title
+    ? `${s.sender_name}${NL}${s.sender_title}, Octopus Engines`
+    : `${s.sender_name}${NL}Octopus Engines`;
+  return [body.trim(), sign, s.postal_address, OPT_OUT_LINE].join(NL + NL);
+}
 
-${s.sender_name}${s.sender_title ? `\n${s.sender_title}, Octopus Engines` : '\nOctopus Engines'}
-${s.postal_address}
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const br = (t: string) => esc(t).split(NL).join('<br>');
 
-Not a fit? Reply "no thanks" and I won't reach out again.`;
+/** The same email as HTML, with the logo under the signature. */
+export function asHtml(text: string, s: OutreachSettings) {
+  const parts = text.split(/\n\s*\n/);
+  const optOut = parts.pop() ?? '';
+  const address = parts.pop() ?? '';
+  const sign = parts.pop() ?? '';
+  const body = parts.map(p => `<p style="margin:0 0 14px">${br(p)}</p>`).join('');
+  const logo = s.logo_url
+    ? `<img src="${esc(s.logo_url)}" alt="Octopus Engines" width="120" style="display:block;margin:0 0 8px;max-width:120px;height:auto">`
+    : '';
+  return `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1f2430">${body}` +
+    `<div style="margin-top:18px">${logo}<div style="font-size:14px;color:#1f2430">${br(sign)}</div>` +
+    `<div style="font-size:12px;color:#8b93a1;margin-top:6px">${esc(address)}</div>` +
+    `<div style="font-size:11px;color:#a3aab6;margin-top:10px">${esc(optOut)}</div></div></div>`;
 }
 
 export function settingsReady(s: OutreachSettings | null): s is OutreachSettings {

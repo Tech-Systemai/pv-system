@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isWorkHours } from '@/lib/aiAgents/hours';
+import { admin } from '@/lib/aiAgents/server/runtime';
+import { topUpLeads } from '@/lib/aiAgents/server/leadgen';
 import { researchBatch } from '@/lib/aiAgents/server/research';
 import { checkReplies, sendBatch } from '@/lib/aiAgents/server/sender';
 import { writeBatch } from '@/lib/aiAgents/server/writer';
@@ -24,6 +26,7 @@ export async function POST(req: NextRequest) {
   const step = async (name: string, run: () => Promise<unknown>) => {
     try { out[name] = await run(); } catch (e) { out[name] = { error: (e as Error).message }; }
   };
+  if (process.env.APIFY_TOKEN) await step('leads', () => topUpLeads(admin()));
   if (process.env.ANTHROPIC_API_KEY) {
     await step('research', () => researchBatch(6));
     await step('write', () => writeBatch(4));

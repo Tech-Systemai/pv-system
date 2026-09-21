@@ -68,16 +68,36 @@ function encodeHeader(v: string) {
   return /^[\x20-\x7e]*$/.test(v) ? v : `=?UTF-8?B?${Buffer.from(v, 'utf8').toString('base64')}?=`;
 }
 
-export function buildMime(o: { from: string; fromName: string; to: string; subject: string; body: string }) {
-  const lines = [
+const b64 = (s: string) => Buffer.from(s.replace(/\r?\n/g, '\r\n'), 'utf8').toString('base64').replace(/(.{76})/g, '$1\r\n');
+
+/** Plain text, or text plus an HTML version (for the signature logo). */
+export function buildMime(o: { from: string; fromName: string; to: string; subject: string; body: string; html?: string }) {
+  const head = [
     `From: ${encodeHeader(o.fromName)} <${o.from}>`,
     `To: ${o.to}`,
     `Subject: ${encodeHeader(o.subject)}`,
     'MIME-Version: 1.0',
+  ];
+  if (!o.html) {
+    return Buffer.from([...head, 'Content-Type: text/plain; charset="UTF-8"', 'Content-Transfer-Encoding: base64', '', b64(o.body)].join('\r\n'), 'utf8').toString('base64url');
+  }
+  const boundary = `oe_${Date.now().toString(36)}`;
+  const lines = [
+    ...head,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
     '',
-    Buffer.from(o.body.replace(/\r?\n/g, '\r\n'), 'utf8').toString('base64').replace(/(.{76})/g, '$1\r\n'),
+    b64(o.body),
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    b64(o.html),
+    `--${boundary}--`,
+    '',
   ];
   return Buffer.from(lines.join('\r\n'), 'utf8').toString('base64url');
 }

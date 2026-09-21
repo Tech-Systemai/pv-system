@@ -264,6 +264,14 @@ export type OutreachSettings = {
   call_to_action: string;
   daily_limit: number;
   auto_send: boolean;
+  /** Keep this many qualified, untouched leads ahead of you. */
+  lead_target: number;
+  /** Cities Scout works through when a niche has none of its own. */
+  pull_cities: string;
+  /** Shown in the email signature, if you have one hosted. */
+  logo_url: string;
+  /** The town we write from, so the email sounds local. */
+  home_base: string;
 };
 
 export const LEAD_STATUS_META: Record<LeadStatus, { label: string; badge: string }> = {

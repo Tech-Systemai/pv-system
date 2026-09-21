@@ -42,7 +42,7 @@ function Inbox({ inbox, onAction }: { inbox: InboxStatus; onAction: EmailAction 
     <div className="em-card em-inbox">
       <div>
         <b>✉ {inbox.email}</b>
-        <span className="tb-sub">Warm-up limit today: <b>{inbox.cap}</b> emails · sent in the last 24h: <b>{inbox.sent24h}</b>. Sends on weekdays 8:30–5:00 ET, a couple at a time.</span>
+        <span className="tb-sub">Warm-up limit today: <b>{inbox.cap}</b> emails · sent in the last 24h: <b>{inbox.sent24h}</b>. Sends 9–5 ET, a couple at a time.</span>
       </div>
       <button type="button" className="btn btn-sm" disabled={busy} onClick={send}>{busy ? <><span className="spin" />Sending…</> : 'Send approved now'}</button>
       {msg && <span className="tb-sub" style={{ flexBasis: '100%' }}>{msg}</span>}
@@ -76,11 +76,15 @@ function Settings({ settings, onSaved, onAction }: { settings: OutreachSettings;
         <div className="em-form">
           <label>Your name (signs every email)<input value={d.sender_name} onChange={e => set('sender_name', e.target.value)} placeholder="Olivia …" /></label>
           <label>Title<input value={d.sender_title} onChange={e => set('sender_title', e.target.value)} placeholder="Founder" /></label>
-          <label className="wide">Postal address (the law requires one in every cold email)<input value={d.postal_address} onChange={e => set('postal_address', e.target.value)} placeholder="123 Main St, Suite 100, Tampa, FL 33602" /></label>
+          <label className="wide">Postal address — required by law in cold email, and the one thing I cannot fill in for you<input value={d.postal_address} onChange={e => set('postal_address', e.target.value)} placeholder="123 Main St, Suite 100, Tampa, FL 33602" /></label>
           <label className="wide">The offer, in your words<textarea rows={2} value={d.offer} onChange={e => set('offer', e.target.value)} placeholder="24/7 AI answering + missed-call text-back. Setup in a day, $X/month, no contract…" /></label>
           <label className="wide">Proof you can mention (leave empty if none yet; Quill never invents any)<textarea rows={2} value={d.proof} onChange={e => set('proof', e.target.value)} placeholder="e.g. a Tampa plumber booked 11 extra jobs in the first month" /></label>
           <label className="wide">The reply you want<input value={d.call_to_action} onChange={e => set('call_to_action', e.target.value)} placeholder='e.g. "yes" to a 60-second recording of how it would answer their calls' /></label>
           <label>Daily ceiling (max 50)<input type="number" min={1} max={50} value={d.daily_limit} onChange={e => set('daily_limit', Number(e.target.value))} /></label>
+          <label>We write from<input value={d.home_base} onChange={e => set('home_base', e.target.value)} placeholder="Tampa" /></label>
+          <label>Keep this many leads ready<input type="number" min={5} max={200} value={d.lead_target} onChange={e => set('lead_target', Number(e.target.value))} /></label>
+          <label className="wide">Cities to work through<input value={d.pull_cities} onChange={e => set('pull_cities', e.target.value)} placeholder="Tampa, FL; St Petersburg, FL; Clearwater, FL" /></label>
+          <label className="wide">Logo image URL (shown in the signature)<input value={d.logo_url} onChange={e => set('logo_url', e.target.value)} placeholder="https://portal.octopusengines.com/octopus-logo.png" /></label>
           <label className="em-check"><input type="checkbox" checked={d.auto_send} onChange={e => set('auto_send', e.target.checked)} /> Send without my approval (leave off until you trust the drafts)</label>
           <div className="ag-work-actions wide">
             {msg && <span className={msg === 'Saved' ? 'ag-ok' : 'ag-err'}>{msg}</span>}

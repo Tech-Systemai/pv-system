@@ -130,15 +130,34 @@ function Person({
     >
       <ellipse cx={0} cy={0} rx={15} ry={7} fill="#0f172a" opacity={0.12} />
       <g className="of-body" transform={`translate(0, ${-lift})`}>
-        <path d={`M -9 -4 Q -9 -30 0 -30 Q 9 -30 9 -4 Z`} fill={color} />
-        <circle cx={0} cy={-38} r={9} fill="#f6d7bd" />
-        <path d="M -9 -41 Q 0 -50 9 -41 Q 0 -46 -9 -41 Z" fill="#3f3a4d" />
-        {selected && <circle cx={0} cy={-20} r={26} fill="none" stroke="#7c3aed" strokeWidth={2} strokeDasharray="4 4" className="of-ring" />}
+        {/* legs (hidden behind the desk when seated) */}
+        {!seated && <>
+          <rect x={-7} y={-16} width={5} height={16} rx={2.5} fill="#e7ebf1" />
+          <rect x={2} y={-16} width={5} height={16} rx={2.5} fill="#e7ebf1" />
+          <rect x={-8} y={-2} width={7} height={3} rx={1.5} fill="#cbd3dd" />
+          <rect x={1} y={-2} width={7} height={3} rx={1.5} fill="#cbd3dd" />
+        </>}
+        {/* torso: white shell with a dark core and the agent's colour across the chest */}
+        <path d="M -8.5 -34 Q -10 -20 -7.5 -14 L 7.5 -14 Q 10 -20 8.5 -34 Z" fill="#f4f6f9" />
+        <path d="M -5.5 -30 Q -6.5 -21 -4.5 -16.5 L 4.5 -16.5 Q 6.5 -21 5.5 -30 Z" fill="#23262e" />
+        <path d="M -8.5 -34 Q 0 -37 8.5 -34 L 8 -30 Q 0 -33 -8 -30 Z" fill={color} />
+        {/* arms */}
+        <rect x={-12.5} y={-33} width={4} height={18} rx={2} fill="#e7ebf1" />
+        <rect x={8.5} y={-33} width={4} height={18} rx={2} fill="#e7ebf1" />
+        <circle cx={-10.5} cy={-14} r={2.4} fill="#23262e" />
+        <circle cx={10.5} cy={-14} r={2.4} fill="#23262e" />
+        {/* neck + helmet with a visor and two red eyes */}
+        <rect x={-2} y={-38} width={4} height={5} fill="#3c4048" />
+        <path d="M -8 -46 Q -8 -56 0 -56 Q 8 -56 8 -46 Q 8 -38 0 -38 Q -8 -38 -8 -46 Z" fill="#f7f9fc" />
+        <path d="M -6.2 -48 Q -6.2 -53.5 0 -53.5 Q 6.2 -53.5 6.2 -48 Q 6.2 -43.5 0 -43.5 Q -6.2 -43.5 -6.2 -48 Z" fill="#17191f" />
+        <path d="M -4.4 -49.2 L -1.2 -48.2 L -4.4 -46.8 Z" fill="#ff3b30" />
+        <path d="M 4.4 -49.2 L 1.2 -48.2 L 4.4 -46.8 Z" fill="#ff3b30" />
+        {selected && <circle cx={0} cy={-30} r={30} fill="none" stroke="#7c3aed" strokeWidth={2} strokeDasharray="4 4" className="of-ring" />}
       </g>
-      <text className="of-name" y={seated ? -lift - 56 : 16} textAnchor="middle">{agent.name}</text>
-      {seated && task && <text className="of-task" y={-lift - 44} textAnchor="middle">{task.length > 26 ? `${task.slice(0, 26)}…` : task}</text>}
+      <text className="of-name" y={seated ? -lift - 74 : 18} textAnchor="middle">{agent.name}</text>
+      {seated && task && <text className="of-task" y={-lift - 62} textAnchor="middle">{task.length > 26 ? `${task.slice(0, 26)}…` : task}</text>}
       {bubble && (
-        <g className="of-bubble" transform={`translate(0, ${-lift - (seated ? 84 : 58)})`}>
+        <g className="of-bubble" transform={`translate(0, ${-lift - (seated ? 96 : 76)})`}>
           <rect x={-Math.max(26, bubble.length * 4.2)} y={-15} width={Math.max(52, bubble.length * 8.4)} height={24} rx={12} fill="#fff" stroke="#e2e8f0" />
           <text y={2} textAnchor="middle">{bubble}</text>
         </g>
@@ -150,7 +169,7 @@ function Person({
 // ── The floor ──────────────────────────────────────────────────────────────────
 
 export default function OfficeView({
-  agents, activityOf, taskOf, selectedId, onSelect, canManage, onSetOffice,
+  agents, activityOf, taskOf, selectedId, onSelect, canManage, onSetOffice, onRun,
 }: {
   agents: Agent[];
   activityOf: (id: string) => Activity | 'offline';
@@ -159,7 +178,10 @@ export default function OfficeView({
   onSelect: (id: string | null) => void;
   canManage: boolean;
   onSetOffice: (agent: Agent, inOffice: boolean) => void;
+  onRun: (what: 'topup' | 'research' | 'write' | 'send') => Promise<string>;
 }) {
+  const [running, setRunning] = useState('');
+  const [runMsg, setRunMsg] = useState('');
   const staff = useMemo(
     () => agents.filter(a => a.in_office && a.status !== 'archived').sort((a, b) => a.sort_order - b.sort_order),
     [agents],
@@ -254,9 +276,23 @@ export default function OfficeView({
       <div className="of-top">
         <span><b>{working.length}</b> at their desks · <b>{idle.length}</b> free · <b>{staff.length}</b> in the office</span>
         {canManage && (
-          <button type="button" className="btn btn-sm" onClick={() => setHiring(!hiring)}>{hiring ? 'Close' : 'Bring someone in…'}</button>
+          <div className="of-actions">
+            {([
+              { key: 'topup' as const, label: 'Find more leads' },
+              { key: 'research' as const, label: 'Research them' },
+              { key: 'write' as const, label: 'Write emails' },
+              { key: 'send' as const, label: 'Send approved' },
+            ]).map(b => (
+              <button key={b.key} type="button" className="btn btn-sm" disabled={!!running}
+                onClick={async () => { setRunning(b.key); setRunMsg(''); setRunMsg(await onRun(b.key)); setRunning(''); }}>
+                {running === b.key ? <><span className="spin" />Working…</> : b.label}
+              </button>
+            ))}
+            <button type="button" className="btn btn-sm" onClick={() => setHiring(!hiring)}>{hiring ? 'Close' : 'Bring someone in…'}</button>
+          </div>
         )}
       </div>
+      {runMsg && <div className="up-await">{runMsg}</div>}
 
       {hiring && (
         <div className="of-hire">

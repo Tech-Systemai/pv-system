@@ -10,7 +10,7 @@ import { rewriteOne, writeBatch } from '@/lib/aiAgents/server/writer';
 
 export const maxDuration = 300;
 
-const SETTINGS_FIELDS = ['sender_name', 'sender_title', 'postal_address', 'offer', 'proof', 'call_to_action', 'daily_limit', 'auto_send'] as const;
+const SETTINGS_FIELDS = ['sender_name', 'sender_title', 'postal_address', 'offer', 'proof', 'call_to_action', 'daily_limit', 'auto_send', 'lead_target', 'pull_cities', 'logo_url', 'home_base'] as const;
 
 export async function POST(req: NextRequest) {
   const manager = await requireManager();
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
         const patch: Record<string, unknown> = { id: 'default', updated_at: now };
         for (const k of SETTINGS_FIELDS) if (k in (body.settings ?? {})) patch[k] = body.settings[k];
         if ('daily_limit' in patch) patch.daily_limit = Math.min(50, Math.max(1, Number(patch.daily_limit) || 30));
+        if ('lead_target' in patch) patch.lead_target = Math.min(200, Math.max(5, Number(patch.lead_target) || 40));
         const { data, error } = await db.from('ai_outreach_settings').upsert(patch).select().single();
         if (error) throw new Error(error.message);
         return NextResponse.json({ settings: data });
