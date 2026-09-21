@@ -13,7 +13,11 @@ import EmailsPanel, { type EmailAction, type InboxStatus } from './EmailsPanel';
 // Everything you do with a lead after research: your call list, the calls you
 // have made, the emails, replies, and who qualified or did not, with reasons.
 
-type Sub = 'calls' | 'called' | 'emails' | 'replies' | 'qualified' | 'passed';
+type Sub = 'calls' | 'called' | 'interested' | 'emails' | 'replies' | 'qualified' | 'passed';
+
+// Who lands in which tab once you have logged a call.
+const INTERESTED: string[] = ['interested', 'booked'];
+const CALLED: string[] = ['no_answer', 'left_voicemail', 'callback', 'not_interested'];
 
 const OUTCOMES: { key: CallNote['outcome']; label: string; accent?: boolean }[] = [
   { key: 'no_answer', label: 'No answer' },
@@ -35,8 +39,8 @@ export function WebLink({ url }: { url?: string }) {
 }
 
 /** One lead on the call list: the details, why they qualified, and the outcome buttons. */
-function CallCard({ lead, niche, outreach, history, onOpenLead, onLog }: {
-  lead: Lead; niche?: Niche; outreach?: Outreach; history: CallNote[];
+function CallCard({ lead, niche, outreach, history, status, onOpenLead, onLog }: {
+  lead: Lead; niche?: Niche; outreach?: Outreach; history: CallNote[]; status?: string;
   onOpenLead: (id: string) => void;
   onLog: (leadId: string, outreachId: string | null, outcome: CallNote['outcome'], note: string) => Promise<string | null>;
 }) {
@@ -57,9 +61,14 @@ function CallCard({ lead, niche, outreach, history, onOpenLead, onLog }: {
   };
 
   return (
-    <div className="oc-call">
+    <div className={`oc-call${status === 'callback' ? ' oc-callback' : ''}${status && INTERESTED.includes(status) ? ' oc-warm' : ''}`}>
       <div className="oc-call-h">
         <button type="button" className="oc-biz" onClick={() => onOpenLead(lead.id)}>{lead.business_name}</button>
+        {status && status !== 'to_call' && (
+          <span className={`pv-bdg ${OUTREACH_STATUS_META[status as keyof typeof OUTREACH_STATUS_META].badge}`}>
+            {OUTREACH_STATUS_META[status as keyof typeof OUTREACH_STATUS_META].label.toUpperCase()}
+          </span>
+        )}
         <ScoreBar score={lead.wtp_score} />
       </div>
       <div className="oc-call-meta">
@@ -94,6 +103,7 @@ function CallCard({ lead, niche, outreach, history, onOpenLead, onLog }: {
         </div>
       ) : (
         <div className="oc-outcomes">
+          {status && status !== 'to_call' && <span className="oc-again">Log another call:</span>}
           {OUTCOMES.map(o => (
             <button key={o.key} type="button" className={`btn btn-sm${o.accent ? ' btn-acc' : ''}`} onClick={() => setOutcome(o.key)}>{o.label}</button>
           ))}
@@ -165,11 +175,15 @@ export default function OutreachView({
   for (const c of calls) (callsByLead[c.lead_id] ??= []).push(c);
 
   const callRows = outreach.filter(o => o.channel === 'call' && inNiche(leadById[o.lead_id]));
-  const toCall = callRows.filter(o => ['to_call', 'callback'].includes(o.status))
+  const toCall = callRows.filter(o => o.status === 'to_call')
     .sort((a, b) => (leadById[b.lead_id]?.wtp_score ?? 0) - (leadById[a.lead_id]?.wtp_score ?? 0));
-  const called = callRows.filter(o => !['to_call', 'callback'].includes(o.status))
+  // Called: you reached out and left a note. Call-backs sit at the top, since they are owed one.
+  const called = callRows.filter(o => CALLED.includes(o.status))
+    .sort((a, b) => (b.status === 'callback' ? 1 : 0) - (a.status === 'callback' ? 1 : 0)
+      || (b.sent_at ?? b.updated_at).localeCompare(a.sent_at ?? a.updated_at));
+  const interested = callRows.filter(o => INTERESTED.includes(o.status))
     .sort((a, b) => (b.sent_at ?? b.updated_at).localeCompare(a.sent_at ?? a.updated_at));
-  const replies = outreach.filter(o => inNiche(leadById[o.lead_id]) && ['replied', 'interested', 'booked'].includes(o.status))
+  const replies = outreach.filter(o => o.channel === 'email' && inNiche(leadById[o.lead_id]) && o.status === 'replied')
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
   const emailsToHandle = outreach.filter(o => o.channel === 'email' && ['draft', 'blocked'].includes(o.status)).length;
   const qualified = leads.filter(l => inNiche(l) && ['qualified', 'contacted', 'replied', 'booked'].includes(l.status))
@@ -180,6 +194,7 @@ export default function OutreachView({
   const TABS: { key: Sub; label: string; n: number }[] = [
     { key: 'calls', label: 'Call list', n: toCall.length },
     { key: 'called', label: 'Called', n: called.length },
+    { key: 'interested', label: 'Interested', n: interested.length },
     { key: 'emails', label: 'Emails', n: emailsToHandle },
     { key: 'replies', label: 'Replies', n: replies.length },
     { key: 'qualified', label: 'Qualified', n: qualified.length },
@@ -211,7 +226,7 @@ export default function OutreachView({
               {toCall.slice(0, 40).map(o => {
                 const lead = leadById[o.lead_id];
                 return lead ? (
-                  <CallCard key={o.id} lead={lead} niche={nicheOf(lead)} outreach={o}
+                  <CallCard key={o.id} lead={lead} niche={nicheOf(lead)} outreach={o} status={o.status}
                     history={callsByLead[lead.id] ?? []} onOpenLead={onOpenLead} onLog={onLogCall} />
                 ) : null;
               })}
@@ -221,38 +236,37 @@ export default function OutreachView({
       )}
 
       {sub === 'called' && (
-        called.length === 0 ? <div className="card"><div className="empty">No calls logged yet.</div></div> : (
-          <div className="oc-cards">
-            {called.map(o => {
-              const lead = leadById[o.lead_id];
-              if (!lead) return null;
-              const history = callsByLead[lead.id] ?? [];
-              return (
-                <div key={o.id} className="oc-lead" onClick={() => onOpenLead(lead.id)}>
-                  <div className="oc-call-h">
-                    <b>{lead.business_name}</b>
-                    <span className={`pv-bdg ${OUTREACH_STATUS_META[o.status].badge}`}>{OUTREACH_STATUS_META[o.status].label.toUpperCase()}</span>
-                  </div>
-                  <div className="oc-call-meta">
-                    <a href={`tel:${lead.phone}`} className="oc-phone" onClick={e => e.stopPropagation()}>📞 {lead.phone}</a>
-                    <WebLink url={lead.website} />
-                    <span>{nicheOf(lead)?.name} · {lead.city}</span>
-                    <span className="tb-sub" suppressHydrationWarning>{o.sent_at ? timeAgo(o.sent_at) : ''}</span>
-                  </div>
-                  {history.length > 0 && (
-                    <div className="oc-history">
-                      {history.map(h => (
-                        <div key={h.id}>
-                          <b>{h.outcome.replace('_', ' ')}</b> <span suppressHydrationWarning>{timeAgo(h.called_at)}</span>{h.note ? ` — ${h.note}` : ''}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )
+        <>
+          <div className="tb-sub">Everyone you have phoned, with your notes. Call-backs are first — log the next call right here when you get to them.</div>
+          {called.length === 0 ? <div className="card"><div className="empty">No calls logged yet.</div></div> : (
+            <div className="oc-calls">
+              {called.slice(0, 60).map(o => {
+                const lead = leadById[o.lead_id];
+                return lead ? (
+                  <CallCard key={o.id} lead={lead} niche={nicheOf(lead)} outreach={o} status={o.status}
+                    history={callsByLead[lead.id] ?? []} onOpenLead={onOpenLead} onLog={onLogCall} />
+                ) : null;
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {sub === 'interested' && (
+        <>
+          <div className="tb-sub">The ones who said yes on the phone: interested, or already booked in.</div>
+          {interested.length === 0 ? <div className="card"><div className="empty">Nobody has said yes yet.</div></div> : (
+            <div className="oc-calls">
+              {interested.map(o => {
+                const lead = leadById[o.lead_id];
+                return lead ? (
+                  <CallCard key={o.id} lead={lead} niche={nicheOf(lead)} outreach={o} status={o.status}
+                    history={callsByLead[lead.id] ?? []} onOpenLead={onOpenLead} onLog={onLogCall} />
+                ) : null;
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {sub === 'emails' && (
