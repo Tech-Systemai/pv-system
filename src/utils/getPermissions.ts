@@ -27,6 +27,10 @@ export const PERM_DEFAULTS: PermMatrix = {
   // Smart Time is a personal workspace: every row is scoped to the signed-in
   // user, so there is no admin view of anyone else's plan.
   'smart-time': { owner: 'both', admin: 'agent', supervisor: 'agent', accountant: 'agent', sales: 'agent', cx: 'agent' },
+  // Cold Calling is the same: your own target, your own calling days, your own
+  // counters. Off for accountants and CX by default — turn it on here if they
+  // ever pick up the phone.
+  'cold-calling': { owner: 'both', admin: 'agent', supervisor: 'agent', accountant: 'none', sales: 'agent', cx: 'none' },
 };
 
 // Normalise a raw value that might be a legacy boolean or a ViewType string

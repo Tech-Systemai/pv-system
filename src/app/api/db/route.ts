@@ -14,15 +14,18 @@ const ALLOWED_TABLES = [
   'ai_agents', 'ai_agent_runs', 'ai_departments', 'ai_agent_work', 'ai_agent_events', 'ai_niches', 'ai_leads', 'ai_outreach', 'ai_agent_messages',
   'smart_time_prefs', 'smart_time_tasks', 'smart_time_dumps', 'smart_time_plans',
   'smart_time_reviews', 'smart_time_period_log',
+  'cold_call_prefs', 'cold_call_weeks', 'cold_call_days',
 ];
 
-// Smart Time rows belong to exactly one person — their brain dumps, their day
-// plan, their period log. Writes are stamped with the caller's id and every
-// read, update and delete is filtered to it, so no request can reach another
-// user's rows even though /api/db runs as the service role.
+// Smart Time and Cold Calling rows belong to exactly one person — their brain
+// dumps, their day plan, their period log, their call counters. Writes are
+// stamped with the caller's id and every read, update and delete is filtered to
+// it, so no request can reach another user's rows even though /api/db runs as
+// the service role.
 const PERSONAL_TABLES = new Set([
   'smart_time_prefs', 'smart_time_tasks', 'smart_time_dumps', 'smart_time_plans',
   'smart_time_reviews', 'smart_time_period_log',
+  'cold_call_prefs', 'cold_call_weeks', 'cold_call_days',
 ]);
 
 export async function POST(req: NextRequest) {

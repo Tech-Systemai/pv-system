@@ -43,6 +43,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   'personal-files':       { title: 'Personal Files',      sub: 'Confidential employee record · commendations & incidents · admins & owners only' },
   'ai-agents':            { title: 'AI Agents',           sub: 'Octopus Engines HQ · every floor, every agent, every lead' },
   'smart-time':           { title: 'Smart Time',          sub: 'Dump it all in · sorted tasks, time estimates and a day planned around your prayers' },
+  'cold-calling':         { title: 'Cold Calling',        sub: 'Daily target · the days you are calling this week · every dial, owner, booking and close' },
 };
 
 export default function TopBarTitle({ role }: { role: string }) {

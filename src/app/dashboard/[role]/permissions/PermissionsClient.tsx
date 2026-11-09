@@ -34,6 +34,7 @@ const MODULE_META: Record<string, { label: string; icon: string }> = {
   payroll:    { label: 'Payroll',         icon: '💵' },
   finance:    { label: 'Finance',         icon: '$'  },
   wise:       { label: 'WISE',            icon: '💡' },
+  'cold-calling': { label: 'Cold Calling', icon: '📞' },
 };
 
 const ROLE_HUES: Record<string, number> = {
