@@ -1,0 +1,6 @@
+frames/
+frames_nc/
+stills/
+*.wav
+sfx.json
+ln.txt
