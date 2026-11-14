@@ -1,0 +1,36 @@
+{
+  "about": "Reels ready to post to Instagram @octopusengines. Post only items with status \"ready\". Always use the captioned file listed here, never a *-no-captions.mp4 file.",
+  "repo": "Tech-Systemai/pv-system",
+  "branch": "claude/angi-leads-motion-reel-xivkjk",
+  "updated": "2026-11-14",
+  "items": [
+    {
+      "id": "2026-11-14-ads-to-booked-consult",
+      "title": "Ads to booked consult",
+      "status": "ready",
+      "file": "reels/ads-to-booked-consult/ads-to-booked-consult.mp4",
+      "duration_seconds": 22,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Most agencies hand you a lead and walk away.\n\nWe don't. We run the ads, text the homeowner fast, and book the consult on your calendar. You just show up.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-clicks-vs-booked-jobs",
+      "title": "Clicks don't pay. Booked jobs do.",
+      "status": "ready",
+      "file": "reels/clicks-booked-jobs/clicks-booked-jobs.mp4",
+      "duration_seconds": 29,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Clicks don't pay your bills. Booked consults do.\n\nNext time your agency sends a report, ask one question: how many jobs did we book?\n\nWant kitchen & bath leads that turn into booked consults? DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #contractormarketing #marketingagency"
+    },
+    {
+      "id": "2026-11-14-angi-lead",
+      "title": "You paid for that Angi lead. So did other remodelers.",
+      "status": "hold",
+      "hold_reason": "Quote card cites the Angi Help Center; the owner must confirm the wording against the source page before this is posted. Change status to \"ready\" once confirmed.",
+      "file": "reels/angi-lead/angi-lead-reel.mp4",
+      "duration_seconds": 28,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "You paid for that Angi lead. So did other remodelers.\n\nRun your own ads and the lead comes to you, not to a list.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractorleads"
+    }
+  ]
+}
