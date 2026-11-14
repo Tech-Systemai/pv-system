@@ -5,6 +5,134 @@
   "updated": "2026-11-14",
   "items": [
     {
+      "id": "2026-11-14-mindset-series-full",
+      "title": "The mindset series (all 10 in one)",
+      "status": "hold",
+      "hold_reason": "Compilation of the ten mindset reels above. Posting it as well repeats all ten on the feed. Change to \"ready\" only if you want the long version posted too.",
+      "file": "reels/mindset-series/octopus-engines-full-reel.mp4",
+      "duration_seconds": 74,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Ten ways to think about growing your remodeling business, in 74 seconds.\n\nPlant seeds. Invest first. Empty calendars cost more than help ever will.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-the-countdown",
+      "title": "The countdown",
+      "status": "ready",
+      "file": "reels/mindset-series/10-the-countdown.mp4",
+      "duration_seconds": 13,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Today you invest with us.\nNext month, consults on your calendar.\nA few jobs later, it's paid for itself.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-scared-money-test",
+      "title": "The scared money test",
+      "status": "ready",
+      "file": "reels/mindset-series/09-scared-money-test.mp4",
+      "duration_seconds": 12,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Scared to invest a dollar to make five? That's not saving. That's staying small.\n\n($1 to $5 is an example.)\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-empty-calendar",
+      "title": "Empty calendar",
+      "status": "ready",
+      "file": "reels/mindset-series/08-empty-calendar.mp4",
+      "duration_seconds": 9,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "An empty calendar costs more than hiring us ever will.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-your-tools",
+      "title": "Your tools",
+      "status": "ready",
+      "file": "reels/mindset-series/07-your-tools.mp4",
+      "duration_seconds": 11,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "You bought tools to make money.\n\nWe're a tool too. One that books consults.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-rich-remodelers-secret",
+      "title": "The rich remodeler's secret",
+      "status": "ready",
+      "file": "reels/mindset-series/06-rich-remodelers-secret.mp4",
+      "duration_seconds": 10,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Big remodelers don't get lucky.\n\nThey invest in growth first.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-free-work-myth",
+      "title": "The free-work myth",
+      "status": "ready",
+      "file": "reels/mindset-series/05-free-work-myth.mp4",
+      "duration_seconds": 13,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Nobody calls us asking us to work for free. And you shouldn't build kitchens for free either.\n\nInvest in leads that pay. DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-cheap-is-expensive",
+      "title": "Cheap is expensive",
+      "status": "ready",
+      "file": "reels/mindset-series/04-cheap-is-expensive.mp4",
+      "duration_seconds": 10,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Not hiring help to save money?\n\nYou just paid for it with empty weeks.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-math-flip",
+      "title": "The math flip",
+      "status": "ready",
+      "file": "reels/mindset-series/03-math-flip.mp4",
+      "duration_seconds": 11,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Your first job from us pays us back. Every job after that is money in your pocket.\n\n(Numbers in the video are examples.)\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-two-remodelers",
+      "title": "Two remodelers. Guess who's booked.",
+      "status": "ready",
+      "file": "reels/mindset-series/02-two-remodelers.mp4",
+      "duration_seconds": 14,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Same skills. Same city.\n\nOne waits for the phone. One invests in a team that fills his calendar.\n\nGuess who's booked. DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-the-seed",
+      "title": "The seed",
+      "status": "ready",
+      "file": "reels/mindset-series/01-the-seed.mp4",
+      "duration_seconds": 13,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "You don't throw seeds away. You plant them.\n\nWorking with us is planting. Booked consults are the harvest.\n\nFlorida kitchen & bath remodelers: DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-agency-promises",
+      "title": "They'll say anything to win your account",
+      "status": "ready",
+      "file": "reels/agency-promises/agency-promises.mp4",
+      "duration_seconds": 30,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "\"Agencies tell us what we want to hear. Then they don't care.\" - a remodeler\n\nBefore you hire anyone, ask three things:\n1. Who checks the leads?\n2. How fast do you call back?\n3. Do you track booked consults, or just clicks?\n\nLeads don't pay you. Booked jobs do. DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-meta-bot-leads-alt-opening",
+      "title": "Lots of Meta leads, nobody picks up? (alt opening)",
+      "status": "hold",
+      "hold_reason": "Alternate opening of 'Your Meta leads might be bots'. Everything after the first 5 seconds is identical, so posting both repeats the same reel. Change to \"ready\" only if you want both on the feed.",
+      "file": "reels/meta-bot-leads/meta-bot-leads-alt-opening.mp4",
+      "duration_seconds": 32,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Getting lots of leads from Meta, but nobody picks up?\n\nSome leads aren't people. They're bots, and every fake lead teaches Meta to send you more. The fix: your own landing page with bot protection.\n\nWant real kitchen & bath leads in Florida? DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
+      "id": "2026-11-14-meta-bot-leads",
+      "title": "Your Meta leads might be bots",
+      "status": "ready",
+      "file": "reels/meta-bot-leads/meta-bot-leads.mp4",
+      "duration_seconds": 32,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "A remodeler spent $6,000 on ads. Every lead was fake.\n\nBots fill out lead forms, and every fake lead teaches Meta to send you more. The fix: send clicks to a landing page you control, with bot protection on it.\n\nWant real kitchen & bath leads in Florida? DM us.\n\n#kitchenremodel #bathroomremodel #remodeling #floridacontractor #contractormarketing"
+    },
+    {
       "id": "2026-11-14-ads-to-booked-consult",
       "title": "Ads to booked consult",
       "status": "ready",
