@@ -2,8 +2,18 @@
   "about": "Reels ready to post to Instagram @octopusengines. Post only items with status \"ready\". Always use the captioned file listed here, never a *-no-captions.mp4 file.",
   "repo": "Tech-Systemai/pv-system",
   "branch": "claude/angi-leads-motion-reel-xivkjk",
-  "updated": "2026-11-14",
+  "updated": "2026-11-15",
   "items": [
+    {
+      "id": "2026-11-15-stop-boosting-posts",
+      "title": "Stop boosting posts. Likes don't book kitchens.",
+      "status": "hold",
+      "hold_reason": "First reel in the owner's own cloned voice, and it makes a claim about Facebook (a boost mostly reaches people likely to like the post; a lead ad targets a service area and asks qualifying questions). The owner must watch the final cut, confirm the claim, and be ready to answer 'ADS' comments with the setup. Change status to \"ready\" once approved. On-screen likes, names and numbers are tagged EXAMPLE.",
+      "file": "reels/stop-boosting-posts/stop-boosting-posts.mp4",
+      "duration_seconds": 45,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Boosting a post gets you likes. Your cousin. Your old high school buddy. Not homeowners ready to remodel.\n\nA real lead ad targets your service area and asks the right questions first: kitchen or bath, do you own the home, when do you want to start.\n\nThen we text every lead within minutes and book the consult on your calendar.\n\nFlorida kitchen & bath remodelers: comment ADS and I'll show you the setup.\n\n#kitchenremodel #bathroomremodel #remodelingcontractor #floridacontractor #contractormarketing"
+    },
     {
       "id": "2026-11-14-seo-companies-lie",
       "title": "Why SEO companies lie to you",

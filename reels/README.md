@@ -13,16 +13,10 @@ reels/<slug>/
 
 ## Standing rules for every new reel
 
-1. **Voiceover = "Eric".** Kokoro TTS, voice `am_eric`, `lang="en-us"`, `speed=1.05`.
-   ```
-   pip install kokoro-onnx soundfile pyloudnorm
-   # model files: https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
-   #   kokoro-v1.0.onnx, voices-v1.0.bin
-   from kokoro_onnx import Kokoro
-   k = Kokoro("kokoro-v1.0.onnx", "voices-v1.0.bin")
-   audio, sr = k.create("Line", voice="am_eric", speed=1.05, lang="en-us")
-   ```
-   Generate each line separately and fit it to its timing slot (measure the lines first, then set the timeline).
+1. **Voiceover = the owner's own cloned voice** (Chatterbox, runs locally; settings "B": `exaggeration=0.8`, `cfg_weight=0.35`).
+   One clip per line with `vo_lines.py` (see `stop-boosting-posts/`), then lay the lines out and fit the timeline to them.
+   The voice reference clip is private (owner's Google Drive). **Never commit it, or any recording of the owner, to this public repo.**
+   Older reels used Kokoro "Eric" (`am_eric`, en-us, speed 1.05); use Eric only if the owner asks.
 2. **Mix:** duck the music under the voice; finish at **-14 LUFS** integrated, peaks under -1 dBFS.
 3. **Deliver both versions:** captioned (`<slug>.mp4`) and clean (`<slug>-no-captions.mp4`), with audio.
 4. **Add it to `reels/ready.json`** so the posting bots pick it up:
