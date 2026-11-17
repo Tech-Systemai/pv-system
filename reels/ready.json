@@ -2,8 +2,17 @@
   "about": "Reels ready to post to Instagram @octopusengines. Post only items with status \"ready\". Always use the captioned file listed here, never a *-no-captions.mp4 file.",
   "repo": "Tech-Systemai/pv-system",
   "branch": "claude/angi-leads-motion-reel-xivkjk",
-  "updated": "2026-11-15",
+  "updated": "2026-11-17",
   "items": [
+    {
+      "id": "2026-11-17-speed-books-jobs",
+      "title": "Leads were never the problem. Speed was.",
+      "status": "ready",
+      "file": "reels/speed-books-jobs/speed-books-jobs.mp4",
+      "duration_seconds": 62,
+      "format": "1080x1920 MP4, captions burned in, voiceover + music",
+      "post_caption": "Your next kitchen job is searching for a remodeler right now. Will you be the first one to answer?\n\nMore leads won't fix a slow callback. Here's how we run it:\n\n1. Ads in your service area only\n2. A form that asks first: kitchen or bath, do you own the home, when do you want to start\n3. A text to every new lead within minutes\n4. The consult booked on your calendar\n\nFlorida kitchen & bath remodelers: comment BOOK and I'll DM you how it works.\n\n#kitchenremodel #bathroomremodel #remodelingcontractor #floridacontractor #contractormarketing"
+    },
     {
       "id": "2026-11-15-stop-boosting-posts",
       "title": "Stop boosting posts. Likes don't book kitchens.",

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Speed books jobs</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+@font-face{font-family:"Archivo";src:url(fonts/archivo.woff2) format("woff2");font-weight:100 900;font-stretch:62% 125%;}
+@font-face{font-family:"JB";src:url(fonts/jbmono.woff2) format("woff2");font-weight:100 800;}
+:root{--lite:#F2F0EC;--dark:#1B1A20;--ink:#16151A;--card:#FFFFFF;--cardD:#26252D;--lineL:#E2DED7;--lineD:#36353F;--mute:#8E8A96;--acc:#FF5A1F;--ok:#22B45A;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden}
+#stage{position:absolute;left:0;top:0;width:1080px;height:1920px;overflow:hidden;background:var(--lite);font-family:"Archivo",sans-serif;transform-origin:0 0;-webkit-font-smoothing:antialiased}
+.beat{position:absolute;inset:0;display:none}
+.beat.L{color:var(--ink)}
+.beat.D{color:#F4F2EE}
+.beat.D::before{content:"";position:absolute;left:-200px;top:520px;width:1480px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(255,90,31,.22),transparent 60%)}
+.beat.L::before{content:"";position:absolute;left:-200px;top:520px;width:1480px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.95),transparent 60%)}
+.M{font-family:"JB",monospace;font-weight:600;letter-spacing:.04em}
+.abs{position:absolute}
+.card{position:absolute;border-radius:34px;will-change:transform}
+.L .card{background:var(--card);box-shadow:0 30px 80px rgba(40,30,20,.13),0 2px 0 rgba(0,0,0,.03)}
+.D .card{background:var(--cardD);border:2px solid var(--lineD);box-shadow:0 40px 90px rgba(0,0,0,.45)}
+.chip{position:absolute;display:inline-flex;align-items:center;gap:12px;padding:12px 22px 10px;border-radius:40px;font-size:28px;font-variation-settings:"wdth" 90,"wght" 700;white-space:nowrap;will-change:transform}
+.chipA{background:var(--acc);color:#fff}
+.chipO{background:var(--ok);color:#fff}
+.L .chipN{background:#EAE6DF;color:var(--ink)} .D .chipN{background:#34333C;color:#F4F2EE}
+.ex{position:absolute;font-size:20px;color:var(--mute);letter-spacing:.12em}
+svg{display:block;overflow:visible}
+
+#brand{position:absolute;left:0;width:1080px;top:118px;display:flex;justify-content:center;align-items:center;gap:14px;z-index:20;font-size:34px;font-variation-settings:"wdth" 95,"wght" 700;letter-spacing:-.01em}
+#logo{width:46px;height:46px;border-radius:12px;display:grid;place-items:center}
+#hl{position:absolute;left:70px;width:940px;top:210px;z-index:20;text-align:center;font-size:104px;line-height:1.0;font-variation-settings:"wdth" 92,"wght" 820;letter-spacing:-.045em}
+#hl .w{display:inline-block;will-change:transform;margin:0 .1em;position:relative}
+#hl .a{color:var(--acc)}
+#hl .a::after{content:"";position:absolute;left:0;right:0;bottom:-.04em;height:.07em;border-radius:.05em;background:currentColor;transform-origin:0 50%;transform:scaleX(var(--u,0))}
+#px{position:absolute;inset:0;z-index:30;pointer-events:none}
+#deco{position:absolute;inset:0;z-index:0;pointer-events:none}
+#grain{position:absolute;left:-40px;top:-40px;width:1160px;height:2000px;opacity:.05;z-index:40;pointer-events:none;mix-blend-mode:multiply}
+
+/* phone */
+.phone{position:absolute;border-radius:64px;background:#111;padding:18px;box-shadow:0 50px 100px rgba(0,0,0,.35);will-change:transform}
+.phone .scr{width:100%;height:100%;border-radius:48px;background:#fff;overflow:hidden;position:relative;color:#16151A}
+.bub{position:absolute;max-width:76%;padding:22px 28px 20px;border-radius:32px;font-size:32px;line-height:1.2;font-variation-settings:"wdth" 92,"wght" 560;will-change:transform}
+.bub.in{left:26px;background:#ECEAE6;border-bottom-left-radius:10px}
+.bub.out{right:26px;background:var(--acc);color:#fff;border-bottom-right-radius:10px}
+.row{display:flex;align-items:center;gap:18px}
+.pin{position:absolute;width:40px;height:40px;margin:-40px 0 0 -20px;will-change:transform}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="deco" width="1080" height="1920"></canvas>
+  <div id="beats" style="position:absolute;inset:0;z-index:1"></div>
+  <div id="brand"><div id="logo"><svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="12" r="8" fill="#fff"/><path d="M7 15c0 8-4 9-4 12M11 18c0 6-2 8-2 10M15 19v10M19 18c0 6 2 8 2 10M23 15c0 8 4 9 4 12" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round"/><circle cx="12" cy="11" r="1.8" fill="#FF5A1F"/><circle cx="18" cy="11" r="1.8" fill="#FF5A1F"/></svg></div><span>Octopus Engines</span></div>
+  <div id="hl"></div>
+  <canvas id="px" width="1080" height="1920"></canvas>
+  <canvas id="grain" width="580" height="1000"></canvas>
+</div>
+<script>
+/* VO timing [start, end, text], rewritten by audio.py from the real voice clips */
+const VO = /*VO*/[
+ [0.15, 3.79, "Your next kitchen job is searching for a remodeler right now."],
+ [3.99, 6.36, "And if you hate chasing leads,"],
+ [6.46, 8.21, "this is going to change your year."],
+ [8.56, 10.55, "Everyone's buying more leads."],
+ [10.77, 13.62, "But leads were never what held you back."],
+ [13.82, 15.10, "Speed was."],
+ [15.50, 17.01, "Here's how we fix it."],
+ [17.31, 20.71, "First, we run ads in your service area only."],
+ [21.01, 23.98, "Every form asks the right questions first."],
+ [24.28, 28.18, "Kitchen or bath? Do you own the home? When do you want to start?"],
+ [28.58, 32.66, "Then, the second a homeowner hits submit, they get a text."],
+ [32.96, 35.87, "Within minutes. Not days."],
+ [36.17, 38.58, "And the consult lands right on your calendar."],
+ [38.98, 41.17, "Don't want to answer the phone all day?"],
+ [41.37, 42.80, "You never have to."],
+ [43.20, 46.15, "Quick tip: call new leads back fast."],
+ [46.35, 49.87, "The longer you wait, the more likely they called someone else."],
+ [50.27, 51.72, "Your job is the remodel."],
+ [51.92, 53.99, "Our job is your calendar."],
+ [54.39, 57.16, "Florida kitchen and bath remodelers!"],
+ [57.36, 60.35, "Comment the word book, and I'll show you how it works."],
+]/*/VO*/;
+const L=VO.map(v=>v[0]), R=VO.map(v=>v[1]);
+const DUR=+(R[R.length-1]+1.8).toFixed(2);
+const CAPTIONS=!/nocap/.test(location.search);
+
+/* on-screen headline per line; *word* = accent + underline */
+const HL=[
+ "Your next *kitchen* job is searching right now",
+ "And if you *hate* chasing leads,",
+ "this changes your *year.*",
+ "Everyone's buying *more* leads.",
+ "But leads were *never* what held you back.",
+ "*Speed* was.",
+ "Here's how we *fix* it.",
+ "First, ads in your *service area* only.",
+ "Every form asks the *right* questions first.",
+ "Kitchen or bath? Own the home? *When?*",
+ "The second they hit submit, they get a *text.*",
+ "Within *minutes.* Not days.",
+ "The consult lands on your *calendar.*",
+ "Don't want to answer the *phone* all day?",
+ "You *never* have to.",
+ "Quick tip: call new leads back *fast.*",
+ "Wait too long and they call *someone else.*",
+ "Your job is the *remodel.*",
+ "Our job is your *calendar.*",
+ "Florida *kitchen & bath* remodelers:",
+ "Comment *\"BOOK\"* and I'll show you how.",
+];
+/* beats: [first line, last line, theme, builder] */
+const $=id=>document.getElementById(id);
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const P=(t,a,b)=>clamp((t-a)/(b-a));
+const E={o3:x=>1-(1-x)**3,o5:x=>1-(1-x)**5,io:x=>x<.5?4*x*x*x:1-(-2*x+2)**3/2,back:x=>1+2.7*(x-1)**3+1.7*(x-1)**2};
+const spr=(u,k=8,w=13)=>u<=0?0:1-Math.exp(-k*u)*Math.cos(w*u);
+function X(el,o){ if(!el) return; const s=o.s??1,x=o.x||0,y=o.y||0,r=o.r||0;
+  el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${r.toFixed(2)}deg) scale(${s.toFixed(4)})`;
+  if(o.o!==undefined) el.style.opacity=o.o.toFixed(3); }
+const pop=(el,u,d=0,from=0)=>X(el,{s:from+(1-from)*spr(u-d),o:P(u,d,d+.06)});
+const rise=(el,u,d=0,dy=160,r=0)=>X(el,{y:(1-E.o5(P(u,d,d+.55)))*dy,r:(1-E.o5(P(u,d,d+.6)))*r,o:P(u,d,d+.1)});
+function H(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content; }
+const ic={
+ cal:c=>`<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+ phone:c=>`<svg width="44" height="44" viewBox="0 0 24 24" fill="${c}"><path d="M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.6 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1L6.6 10.8z"/></svg>`,
+ msg:c=>`<svg width="44" height="44" viewBox="0 0 24 24" fill="${c}"><path d="M4 4h16a2 2 0 012 2v10a2 2 0 01-2 2H8l-4 4V6a2 2 0 012-2z"/></svg>`,
+ chk:c=>`<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+ x:c=>`<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="3.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+ pin:c=>`<svg width="40" height="40" viewBox="0 0 24 24" fill="${c}"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6.5a2.5 2.5 0 010 5z"/></svg>`,
+ bulb:c=>`<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0012 3z"/></svg>`,
+ search:c=>`<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>`,
+};
+const av=(i,sz=72)=>{ const cs=['#F4B183','#9CC7F0','#B9E3A8','#F7D47A','#D7B8F2','#F2A7B6']; return `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${cs[i%6]};position:relative;overflow:hidden;flex:none"><div style="position:absolute;left:32%;top:20%;width:36%;height:36%;border-radius:50%;background:rgba(0,0,0,.28)"></div><div style="position:absolute;left:18%;top:62%;width:64%;height:60%;border-radius:50%;background:rgba(0,0,0,.28)"></div></div>`; };
+
+/* ---------- visual builders: return update(u, beatLocalTimes) ---------- */
+const B=[];
+// 0 search
+B.push(['L',(el)=>{ el.append(H(`<div class="phone" id="p0" style="left:250px;top:640px;width:580px;height:1000px"><div class="scr">
+  <div style="position:absolute;left:30px;right:30px;top:70px;height:96px;border-radius:50px;background:#F1EFEB;display:flex;align-items:center;gap:16px;padding:0 28px">${ic.search('#8E8A96')}<span id="q0" style="font-size:34px;font-variation-settings:'wght' 560;white-space:nowrap"></span><span id="c0" style="width:3px;height:40px;background:#FF5A1F"></span></div>
+  <div id="r0" style="position:absolute;left:30px;right:30px;top:200px">${[0,1,2].map(i=>`<div class="rr" style="padding:26px 6px;border-bottom:2px solid #EEE"><div style="font-size:22px;color:#8E8A96" class="M">${['SPONSORED · YOUR AD','LOCAL RESULT','LOCAL RESULT'][i]}</div><div style="font-size:34px;font-variation-settings:'wght' 720;margin-top:8px;color:${i?'#16151A':'#FF5A1F'}">${['Kitchen remodel · free consult','Bath remodel near you','Kitchen & bath pros'][i]}</div><div style="height:16px;width:${80-i*12}%;background:#EEE;border-radius:8px;margin-top:14px"></div></div>`).join('')}</div>
+  </div></div><div class="chip chipA" id="k0" style="left:640px;top:600px">${ic.pin('#fff').replace(/40/g,'30')} near me</div>`));
+  const Q="kitchen remodel near me";
+  return u=>{ rise($('p0'),u,0,500,-4); const n=Math.floor(clamp((u-.4)/1.3)*Q.length); $('q0').textContent=Q.slice(0,n); $('c0').style.opacity=Math.floor(u*2.5)%2?1:.2;
+    [...el.querySelectorAll('.rr')].forEach((r,i)=>rise(r,u,1.8+i*.15,60)); pop($('k0'),u,1.4); }; }]);
+// 1 missed calls
+B.push(['D',(el)=>{ el.append(H(`<div id="m1">${[0,1,2,3].map(i=>`<div class="card mc" style="left:150px;top:${700+i*170}px;width:780px;height:140px;display:flex;align-items:center;gap:26px;padding:0 34px"><div style="width:84px;height:84px;border-radius:24px;background:rgba(255,90,31,.15);display:grid;place-items:center">${ic.phone('#FF5A1F')}</div><div><div style="font-size:36px;font-variation-settings:'wght' 720">Missed call</div><div class="M" style="font-size:22px;color:#8E8A96;margin-top:6px">UNKNOWN · ${['2:14 PM','2:41 PM','3:05 PM','3:30 PM'][i]}</div></div><div class="M" style="margin-left:auto;font-size:24px;color:#FF5A1F">CALL BACK?</div></div>`).join('')}</div>`));
+  return u=>[...el.querySelectorAll('.mc')].forEach((c,i)=>X(c,{y:(1-E.o5(P(u,i*.22,i*.22+.45)))*-300,s:.9+.1*E.o5(P(u,i*.22,i*.22+.45)),r:Math.sin(u*40+i)*(u-i*.22<.6&&u>i*.22?1.2:0),o:P(u,i*.22,i*.22+.1)})); }]);
+// 2 year calendar
+B.push(['L',(el)=>{ let g=''; for(let m=0;m<12;m++){ g+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:14px;border-radius:18px;background:#F6F4F0"><div class="M" style="grid-column:1/8;font-size:18px;color:#8E8A96;margin-bottom:4px">${'JFMAMJJASOND'[m]}</div>${[...Array(28)].map((_,d)=>`<i class="dd" data-k="${m*28+d}" style="display:block;height:18px;border-radius:5px;background:#E4E0D9"></i>`).join('')}</div>`; }
+  el.append(H(`<div class="card" id="y2" style="left:110px;top:680px;width:860px;padding:26px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px">${g}</div><div class="chip chipA" id="k2" style="left:620px;top:640px">${ic.cal('#fff').replace(/44/g,'30')} booked</div>`));
+  const ds=[...el.querySelectorAll('.dd')]; const pick=ds.map((_,i)=>((i*7919)%97)<34);
+  return u=>{ rise($('y2'),u,0,300); pop($('k2'),u,.5); const f=P(u,.3,1.9); ds.forEach((d,i)=>{ d.style.background=pick[i]&&i/ds.length<f?'#FF5A1F':'#E4E0D9'; }); }; }]);
+// 3 buying leads
+B.push(['D',(el)=>{ el.append(H(`<div>${[0,1,2,3,4].map(i=>`<div class="card lc" style="left:${160+(i%2)*120}px;top:${1120-i*95}px;width:640px;height:150px;display:flex;align-items:center;gap:22px;padding:0 30px">${av(i)}<div><div style="font-size:32px;font-variation-settings:'wght' 720">New lead</div><div class="M" style="font-size:20px;color:#8E8A96;margin-top:6px">SHARED · ${i+3} PROS GOT IT</div></div><div class="chip chipA" style="position:relative;margin-left:auto">$</div></div>`).join('')}</div><div class="ex M" style="left:160px;top:1340px">EXAMPLE</div>`));
+  return u=>[...el.querySelectorAll('.lc')].forEach((c,i)=>X(c,{y:(1-E.o5(P(u,i*.2,i*.2+.5)))*-900,r:(1-E.o5(P(u,i*.2,i*.2+.6)))*(i%2?8:-8)+(i%2?2:-2),o:P(u,i*.2,i*.2+.05)})); }]);
+// 4 never leads
+B.push(['L',(el)=>{ el.append(H(`<div class="card" id="c4" style="left:190px;top:720px;width:700px;height:420px;padding:40px">
+  <div class="M" style="font-size:22px;color:#8E8A96">WHAT HOLDS YOU BACK?</div>
+  ${['More leads','Better leads','Speed'].map((s,i)=>`<div class="row o4" style="margin-top:26px;font-size:46px;font-variation-settings:'wght' 760;${i==2?'color:#FF5A1F':''}"><div style="width:52px;height:52px;border-radius:14px;display:grid;place-items:center;background:${i==2?'#FF5A1F':'#EAE6DF'}">${i==2?ic.chk('#fff'):ic.x('#8E8A96')}</div><span class="t4" style="position:relative">${s}<b style="position:absolute;left:-4px;right:-4px;top:52%;height:5px;background:#16151A;transform-origin:0 50%;transform:scaleX(0)"></b></span></div>`).join('')}</div>`));
+  const os=[...el.querySelectorAll('.o4')];
+  return u=>{ rise($('c4'),u,0,300); os.forEach((o,i)=>{ rise(o,u,.25+i*.18,40); if(i<2) o.querySelector('b').style.transform=`scaleX(${E.o3(P(u,1.2+i*.2,1.45+i*.2))})`; o.style.opacity=i<2?(1-.55*P(u,1.3+i*.2,1.6+i*.2))*P(u,.25+i*.18,.35+i*.18):P(u,.61,.71); }); }; }]);
+// 5 speed stopwatch
+B.push(['D',(el)=>{ el.append(H(`<div id="w5" style="position:absolute;left:290px;top:660px;width:500px;height:560px"><svg width="500" height="560" viewBox="0 0 500 560"><rect x="215" y="0" width="70" height="44" rx="12" fill="#3A3944"/><circle cx="250" cy="310" r="228" fill="#26252D" stroke="#36353F" stroke-width="6"/><circle id="ring5" cx="250" cy="310" r="200" fill="none" stroke="#FF5A1F" stroke-width="22" stroke-linecap="round" stroke-dasharray="1257" stroke-dashoffset="1257" transform="rotate(-90 250 310)"/>${[...Array(12)].map((_,i)=>`<line x1="250" y1="130" x2="250" y2="${i%3?150:162}" stroke="#55545F" stroke-width="6" stroke-linecap="round" transform="rotate(${i*30} 250 310)"/>`).join('')}<line id="hand5" x1="250" y1="310" x2="250" y2="150" stroke="#F4F2EE" stroke-width="10" stroke-linecap="round"/><circle cx="250" cy="310" r="18" fill="#FF5A1F"/></svg></div><div class="chip chipA" id="k5" style="left:380px;top:1260px;font-size:40px">0:05 MIN</div>`));
+  return u=>{ pop($('w5'),u,0,.6); $('hand5').setAttribute('transform',`rotate(${(E.o3(P(u,.1,1.0))*330).toFixed(1)} 250 310)`); $('ring5').style.strokeDashoffset=(1257*(1-E.o3(P(u,.1,1.0)))).toFixed(1); pop($('k5'),u,.5); }; }]);
+// 6 three steps
+B.push(['L',(el)=>{ el.append(H(`<div>${[['ADS','Your area'],['TEXT','In minutes'],['CALENDAR','Booked']].map((s,i)=>`<div class="card st6" style="left:140px;top:${700+i*230}px;width:800px;height:190px;display:flex;align-items:center;gap:34px;padding:0 40px"><div style="width:110px;height:110px;border-radius:30px;background:${i==2?'#FF5A1F':'#16151A'};color:#fff;display:grid;place-items:center;font-size:58px;font-variation-settings:'wght' 850">${i+1}</div><div><div style="font-size:54px;font-variation-settings:'wdth' 90,'wght' 830;letter-spacing:-.02em">${s[0]}</div><div class="M" style="font-size:24px;color:#8E8A96;margin-top:4px">${s[1].toUpperCase()}</div></div></div>`).join('')}</div>`));
+  return u=>[...el.querySelectorAll('.st6')].forEach((c,i)=>X(c,{x:(1-E.o5(P(u,i*.15,i*.15+.5)))*(i%2?1100:-1100),o:1})); }]);
+// 7 service area map
+B.push(['D',(el)=>{ let pins=''; const pts=[[300,320],[420,250],[560,380],[650,260],[380,470],[520,520],[700,470],[150,150],[880,140],[120,560],[900,600],[820,330]];
+  pts.forEach(([x,y],i)=>{ const inside=Math.hypot(x-500,y-380)<300; pins+=`<div class="pin p7" data-in="${inside?1:0}" style="left:${x}px;top:${y}px">${ic.pin(inside?'#FF5A1F':'#6B6976')}</div>`; });
+  el.append(H(`<div class="card" id="m7" style="left:40px;top:640px;width:1000px;height:760px;overflow:hidden;background:#2B2A33">
+   <svg width="1000" height="760" style="position:absolute;inset:0"><g stroke="#3A3944" stroke-width="14" fill="none" stroke-linecap="round"><path d="M-20 200 Q300 260 520 160 T1020 220"/><path d="M-20 560 Q400 480 600 600 T1020 520"/><path d="M260 -20 Q300 400 220 780"/><path d="M760 -20 Q700 380 820 780"/></g><circle id="ra7" cx="500" cy="380" r="300" fill="rgba(255,90,31,.12)" stroke="#FF5A1F" stroke-width="6" stroke-dasharray="1885" stroke-dashoffset="1885"/></svg>${pins}
+   <div class="chip chipA" id="k7" style="left:380px;top:28px">SERVICE AREA</div></div>`));
+  const ps=[...el.querySelectorAll('.p7')];
+  return u=>{ rise($('m7'),u,0,400); $('ra7').style.strokeDashoffset=(1885*(1-E.o3(P(u,.4,1.3)))).toFixed(1); pop($('k7'),u,1.1);
+    ps.forEach((p,i)=>{ const inn=p.dataset.in==='1'; X(p,{y:(1-spr(u-.3-i*.06,9,15))*-80,o:P(u,.3+i*.06,.36+i*.06)*(inn?1:1-.75*P(u,1.4,1.8)),s:inn?1+.25*Math.sin(P(u,1.4,1.8)*Math.PI):1}); }); }; }]);
+// 8-9 lead form
+B.push(['L',(el)=>{ el.append(H(`<div class="card" id="f8" style="left:130px;top:640px;width:820px;padding:40px 44px 44px">
+   <div class="row"><div style="width:72px;height:72px;border-radius:20px;background:#FF5A1F;display:grid;place-items:center">${ic.cal('#fff')}</div><div><div style="font-size:38px;font-variation-settings:'wght' 780">Free remodel consult</div><div class="M" style="font-size:20px;color:#8E8A96;margin-top:4px">LEAD FORM · 3 QUESTIONS</div></div></div>
+   ${[['Kitchen or bath?','Kitchen'],['Do you own the home?','Yes'],['When do you want to start?','This month']].map((q,i)=>`<div class="q8" style="margin-top:30px;padding:26px 28px;border-radius:24px;background:#F6F4F0;display:flex;align-items:center;gap:20px"><div style="font-size:36px;font-variation-settings:'wght' 700">${q[0]}</div><div class="chip chipO a8" style="position:relative;margin-left:auto">${ic.chk('#fff').replace(/30/g,'24')} ${q[1]}</div></div>`).join('')}
+   <div style="margin-top:34px;height:96px;border-radius:24px;background:#16151A;color:#fff;display:grid;place-items:center;font-size:36px;font-variation-settings:'wght' 760">Submit</div></div>`));
+  const qs=[...el.querySelectorAll('.q8')], as=[...el.querySelectorAll('.a8')];
+  return (u,T)=>{ rise($('f8'),u,0,700,-3); qs.forEach((q,i)=>rise(q,u,.3+i*.12,40));
+    as.forEach((a,i)=>{ const d=T.ql[i]; pop(a,u,d); }); }; },{ql:t=>[t[9][0]-t.b0+.55, t[9][0]-t.b0+1.5, t[9][0]-t.b0+2.6]}]);
+// 10 submit -> text
+B.push(['D',(el)=>{ el.append(H(`<div class="phone" id="p10" style="left:250px;top:620px;width:580px;height:900px"><div class="scr" style="background:#FAF9F7">
+   <div style="padding:60px 30px 20px;text-align:center;border-bottom:2px solid #EEE">${av(1,90).replace('position:relative','position:relative;margin:0 auto')}<div style="font-size:30px;font-variation-settings:'wght' 700;margin-top:12px">Your remodel team</div></div>
+   <div class="bub out" id="b10a" style="top:270px">Hi Maria! Got your kitchen request. Free to talk today?</div>
+   <div class="bub in" id="b10b" style="top:470px">Yes! After 4 works</div>
+   <div class="M" id="t10" style="position:absolute;left:0;right:0;top:220px;text-align:center;font-size:20px;color:#8E8A96">SENT 0:47 AFTER SUBMIT</div></div></div>
+   <div class="chip chipA" id="k10" style="left:640px;top:600px">${ic.msg('#fff').replace(/44/g,'28')} new text</div><div class="ex M" style="left:250px;top:1550px">EXAMPLE</div>`));
+  return u=>{ rise($('p10'),u,0,600,4); pop($('k10'),u,.9); X($('t10'),{o:P(u,1.1,1.3)}); rise($('b10a'),u,1.2,60); rise($('b10b'),u,2.3,60); }; }]);
+// 11 minutes not days
+B.push(['L',(el)=>{ el.append(H(`<div class="card" id="c11a" style="left:120px;top:700px;width:840px;height:250px;padding:40px 46px"><div class="M" style="font-size:24px;color:#22B45A">US</div><div style="font-size:120px;font-variation-settings:'wdth' 80,'wght' 850;letter-spacing:-.03em;margin-top:6px;color:#22B45A">MINUTES</div></div>
+  <div class="card" id="c11b" style="left:120px;top:1000px;width:840px;height:250px;padding:40px 46px"><div class="M" style="font-size:24px;color:#8E8A96">MOST REMODELERS</div><div style="position:relative;display:inline-block;font-size:120px;font-variation-settings:'wdth' 80,'wght' 850;letter-spacing:-.03em;margin-top:6px;color:#B5B0BA">DAYS<b id="s11" style="position:absolute;left:-10px;right:-10px;top:50%;height:12px;background:#FF5A1F;border-radius:6px;transform-origin:0 50%;transform:scaleX(0)"></b></div></div>`));
+  return (u,T)=>{ rise($('c11a'),u,0,500); rise($('c11b'),u,T.nd,500); $('s11').style.transform=`scaleX(${E.o3(P(u,T.nd+.45,T.nd+.7))})`; }; },{nd:t=>t[11][0]-t.b0+.75}]);
+// 12 calendar
+B.push(['D',(el)=>{ const days=['MON','TUE','WED','THU','FRI'];
+  el.append(H(`<div class="card" id="c12" style="left:80px;top:660px;width:920px;height:720px;padding:34px">
+   <div class="row" style="justify-content:space-between"><div style="font-size:40px;font-variation-settings:'wght' 780">This week</div>${ic.cal('#FF5A1F')}</div>
+   <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:26px">${days.map(d=>`<div class="M" style="font-size:22px;color:#8E8A96;text-align:center">${d}</div>`).join('')}
+   ${[...Array(15)].map((_,i)=>`<div style="height:150px;border-radius:18px;background:#2F2E37;position:relative">${i==1||i==8?`<div style="position:absolute;inset:10px 10px auto;height:60px;border-radius:12px;background:#44434E"></div>`:''}</div>`).join('')}</div>
+   <div class="card" id="ev12" style="left:220px;top:300px;width:330px;height:150px;background:#FF5A1F;border:0;padding:20px 22px;color:#fff;box-shadow:0 20px 50px rgba(255,90,31,.45)"><div class="M" style="font-size:20px;opacity:.85">TUE · 4:30 PM</div><div style="font-size:36px;font-variation-settings:'wght' 800;margin-top:6px">Kitchen consult</div><div style="font-size:24px;margin-top:4px;opacity:.9">Maria · booked</div></div></div>`));
+  return u=>{ rise($('c12'),u,0,500); const d=1.0; X($('ev12'),{y:(1-spr(u-d,7,12))*-700,r:(1-E.o5(P(u,d,d+.7)))*-10,o:P(u,d,d+.05),s:1+.06*Math.sin(P(u,d+.45,d+.8)*Math.PI)}); }; }]);
+// 13 ringing phone
+B.push(['L',(el)=>{ el.append(H(`<div class="phone" id="p13" style="left:300px;top:660px;width:480px;height:800px"><div class="scr" style="background:#16151A;color:#fff;text-align:center">
+  <div style="margin-top:120px;font-size:30px;opacity:.6">incoming call</div><div style="font-size:52px;font-variation-settings:'wght' 760;margin-top:12px">Unknown</div>
+  <div style="position:absolute;bottom:90px;left:0;right:0;display:flex;justify-content:space-around"><div style="width:120px;height:120px;border-radius:50%;background:#E5484D;display:grid;place-items:center">${ic.phone('#fff')}</div><div style="width:120px;height:120px;border-radius:50%;background:#22B45A;display:grid;place-items:center">${ic.phone('#fff')}</div></div></div></div>
+  <div class="chip chipA" id="k13" style="left:620px;top:620px">×14 today</div>`));
+  return u=>{ pop($('p13'),u,0,.7); const sh=Math.sin(u*55)*6*(Math.floor(u*1.6)%2===0?1:0); X($('p13'),{r:sh,s:spr(u,8,13)*.3+.7,o:1}); pop($('k13'),u,.6); }; }]);
+// 14 never have to
+B.push(['D',(el)=>{ el.append(H(`<div class="card" id="c14" style="left:130px;top:760px;width:820px;height:180px;display:flex;align-items:center;gap:26px;padding:0 36px"><div style="width:96px;height:96px;border-radius:26px;background:#FF5A1F;display:grid;place-items:center">${ic.cal('#fff')}</div><div><div style="font-size:38px;font-variation-settings:'wght' 780">Consult booked</div><div class="M" style="font-size:22px;color:#8E8A96;margin-top:6px">WE HANDLED THE TEXTS</div></div><div style="margin-left:auto">${ic.chk('#22B45A')}</div></div>
+  <div class="card" id="c14b" style="left:180px;top:980px;width:720px;height:150px;display:flex;align-items:center;gap:26px;padding:0 36px;opacity:.75"><div style="width:80px;height:80px;border-radius:22px;background:#34333C;display:grid;place-items:center">${ic.cal('#FF5A1F').replace(/44/g,'36')}</div><div style="font-size:32px;font-variation-settings:'wght' 700">Consult booked</div><div style="margin-left:auto">${ic.chk('#22B45A')}</div></div>`));
+  return u=>{ rise($('c14'),u,.05,-400); rise($('c14b'),u,.35,-400); }; }]);
+// 15 tip
+B.push(['L',(el)=>{ el.append(H(`<div class="chip chipA" id="tg15" style="left:140px;top:690px;font-size:30px">+ TIP</div><div class="card" id="c15" style="left:140px;top:770px;width:800px;height:420px;padding:44px">
+  <div class="row">${av(4,100)}<div><div style="font-size:42px;font-variation-settings:'wght' 780">New lead · Bath</div><div class="M" style="font-size:22px;color:#8E8A96;margin-top:6px">JUST NOW</div></div><div id="bl15" style="margin-left:auto">${ic.bulb('#FF5A1F')}</div></div>
+  <div id="cb15" style="margin-top:60px;height:130px;border-radius:30px;background:#22B45A;color:#fff;display:flex;align-items:center;justify-content:center;gap:18px;font-size:48px;font-variation-settings:'wght' 800">${ic.phone('#fff')} Call back now</div></div>`));
+  return u=>{ pop($('tg15'),u,0); rise($('c15'),u,.1,500); X($('cb15'),{s:1+.04*Math.max(0,Math.sin((u-1)*7))}); X($('bl15'),{s:spr(u-.6,8,13),r:Math.sin(u*6)*8}); }; }]);
+// 16 someone else
+B.push(['D',(el)=>{ el.append(H(`<div class="card" id="c16" style="left:120px;top:700px;width:840px;height:200px;display:flex;align-items:center;gap:26px;padding:0 36px">${av(4,100)}<div><div style="font-size:40px;font-variation-settings:'wght' 760">New lead · Bath</div><div class="M" id="ago16" style="font-size:24px;color:#FF5A1F;margin-top:6px">WAITING 0 MIN</div></div></div>
+  <div class="card" id="o16" style="left:220px;top:1060px;width:640px;height:200px;display:flex;align-items:center;gap:24px;padding:0 34px"><div style="width:90px;height:90px;border-radius:24px;background:#34333C;display:grid;place-items:center">${ic.phone('#8E8A96')}</div><div><div style="font-size:36px;font-variation-settings:'wght' 760">Another remodeler</div><div class="M" style="font-size:22px;color:#8E8A96;margin-top:6px">CALLED FIRST</div></div></div>`));
+  return u=>{ rise($('c16'),u,0,400); const m=Math.floor(E.io(P(u,.3,1.8))*180); $('ago16').textContent=m<60?`WAITING ${m} MIN`:`WAITING ${Math.floor(m/60)} HR ${m%60} MIN`;
+    const g=P(u,2.0,2.5); X($('c16'),{y:E.io(g)*330,x:E.io(g)*60,s:1-.25*E.io(g),o:1-.6*g,r:E.io(g)*6}); rise($('o16'),u,1.2,300); }; }]);
+// 17 remodel
+B.push(['L',(el)=>{ el.append(H(`<div class="card" id="c17" style="left:190px;top:680px;width:700px;height:640px;overflow:hidden;padding:0">
+  <svg width="700" height="640" viewBox="0 0 700 640"><rect width="700" height="640" fill="#F6F4F0"/><rect x="0" y="420" width="700" height="220" fill="#E9E4DC"/><rect x="60" y="250" width="580" height="190" rx="10" fill="#FFFFFF" stroke="#DCD6CC" stroke-width="4"/><rect x="40" y="230" width="620" height="30" rx="8" fill="#16151A"/>${[0,1,2,3].map(i=>`<rect x="${80+i*140}" y="280" width="120" height="140" rx="10" fill="#F2EEE8" stroke="#DCD6CC" stroke-width="3"/><rect x="${125+i*140}" y="300" width="30" height="6" rx="3" fill="#16151A"/>`).join('')}<rect x="80" y="60" width="240" height="130" rx="10" fill="#FFFFFF" stroke="#DCD6CC" stroke-width="4"/><rect x="380" y="60" width="240" height="130" rx="10" fill="#FFFFFF" stroke="#DCD6CC" stroke-width="4"/><path d="M450 230v-60h40" stroke="#16151A" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="560" cy="120" r="34" fill="#FF5A1F"/></svg></div>
+  <div class="chip chipN" id="k17" style="left:150px;top:640px">YOU · build it</div>`));
+  return u=>{ pop($('c17'),u,0,.8); pop($('k17'),u,.4); }; }]);
+// 18 our calendar
+B.push(['D',(el)=>{ el.append(H(`<div class="card" id="c18" style="left:240px;top:700px;width:600px;height:600px;display:grid;place-items:center;border-radius:60px"><div style="text-align:center"><div style="width:220px;height:220px;border-radius:60px;background:#FF5A1F;display:grid;place-items:center;margin:0 auto">${ic.cal('#fff').replace(/44/g,'130')}</div><div style="font-size:46px;font-variation-settings:'wght' 800;margin-top:30px">Booked consults</div><div class="M" style="font-size:22px;color:#8E8A96;margin-top:8px">US · fill it</div></div></div>`));
+  return u=>{ pop($('c18'),u,0,.6); X($('c18'),{s:.6+.4*spr(u),r:Math.sin(u*2)*2,o:1}); }; }]);
+// 19 Florida
+B.push(['L',(el)=>{ el.append(H(`<div>${['Kitchen remodelers','Bath remodelers'].map((s,i)=>`<div class="card fl" style="left:${150+i*80}px;top:${740+i*230}px;width:700px;height:190px;display:flex;align-items:center;gap:26px;padding:0 36px"><div style="width:100px;height:100px;border-radius:28px;background:${i?'#16151A':'#FF5A1F'};display:grid;place-items:center">${ic.pin('#fff').replace(/40/g,'54')}</div><div><div style="font-size:46px;font-variation-settings:'wght' 800">${s}</div><div class="M" style="font-size:22px;color:#8E8A96;margin-top:6px">FLORIDA</div></div></div>`).join('')}</div>`));
+  return u=>[...el.querySelectorAll('.fl')].forEach((c,i)=>X(c,{x:(1-E.o5(P(u,i*.2,i*.2+.5)))*(i?1100:-1100)})); }]);
+// 20 CTA comment
+B.push(['L',(el)=>{ el.append(H(`<div class="card" id="pr20" style="left:150px;top:640px;width:780px;height:230px;padding:30px 34px;display:flex;align-items:center;gap:26px"><div style="width:130px;height:130px;border-radius:50%;background:#16151A;display:grid;place-items:center">${document.getElementById('logo').innerHTML.replace(/width="30" height="30"/,'width="80" height="80"')}</div><div><div style="font-size:42px;font-variation-settings:'wght' 800">octopusengines</div><div style="font-size:26px;color:#8E8A96;margin-top:4px">Kitchen & bath leads · Florida</div></div><div id="fb20" style="margin-left:auto;padding:18px 30px 16px;border-radius:18px;background:#FF5A1F;color:#fff;font-size:30px;font-variation-settings:'wght' 760">Follow</div></div>
+  <div class="card" id="cb20" style="left:150px;top:920px;width:780px;height:150px;padding:0 30px;display:flex;align-items:center;gap:22px">${av(2,80)}<div style="flex:1;height:90px;border-radius:45px;background:#F1EFEB;display:flex;align-items:center;padding:0 30px;font-size:40px;font-variation-settings:'wght' 760"><span id="ty20"></span><span id="cr20" style="width:3px;height:44px;background:#FF5A1F;margin-left:4px"></span><span id="ph20" style="color:#AAA5AE;font-variation-settings:'wght' 500">Add a comment…</span></div><div style="font-size:30px;color:#FF5A1F;font-variation-settings:'wght' 760">Post</div></div>
+  <div class="card" id="dm20" style="left:150px;top:1110px;width:780px;height:150px;padding:0 30px;display:flex;align-items:center;gap:22px"><div style="width:80px;height:80px;border-radius:50%;background:#FF5A1F;display:grid;place-items:center">${ic.msg('#fff').replace(/44/g,'40')}</div><div><div style="font-size:34px;font-variation-settings:'wght' 760">DM sent: here's how it works</div><div class="M" style="font-size:20px;color:#8E8A96;margin-top:4px">FROM @OCTOPUSENGINES</div></div></div>`));
+  const W="BOOK";
+  return (u,T)=>{ rise($('pr20'),u,0,400); rise($('cb20'),u,.25,400); const ty=T.ty, n=Math.floor(clamp((u-ty)/.6)*W.length), sent=u>ty+1.0;
+    $('ty20').textContent=sent?'':W.slice(0,n); $('ph20').style.display=n===0||sent?'':'none'; $('cr20').style.opacity=sent?0:(Math.floor(u*2.4)%2?1:.15);
+    rise($('dm20'),u,ty+1.3,200); X($('fb20'),{s:1+.08*Math.max(0,Math.sin((u-ty-2.2)*6))}); }; },{ty:t=>t[20][0]-t.b0+.4}]);
+
+/* beats map: index -> lines */
+const BEATS=[[0,0],[1,1],[2,2],[3,3],[4,4],[5,5],[6,6],[7,7],[8,9],[10,10],[11,11],[12,12],[13,13],[14,14],[15,15],[16,16],[17,17],[18,18],[19,19],[20,20]];
+const START=BEATS.map(([a],i)=>i?L[a]-.18:0);
+const host=$('beats'); const UP=[];
+BEATS.forEach(([a,b],i)=>{ const [th,fn,extra]=B[i]; const el=document.createElement('div'); el.className='beat '+th; host.append(el);
+  const T={b0:START[i]}; const ln=VO.map(v=>v); const tt=ln.map(v=>v); tt.b0=START[i];
+  const ex={}; if(extra) for(const k in extra) ex[k]=extra[k](Object.assign(VO.map(v=>v),{b0:START[i]}));
+  UP.push({el,th,up:fn(el),ex}); });
+
+/* headline: words appear as spoken */
+const hl=$('hl'); let curLine=-1, words=[];
+function setLine(i){ curLine=i; hl.innerHTML=''; words=[];
+  const toks=HL[i].match(/\*[^*]+\*|\S+/g); let total=0;
+  toks.forEach(tk=>{ const acc=tk.startsWith('*'); const txt=tk.replace(/\*/g,''); txt.split(' ').forEach(w=>{ const s=document.createElement('span'); s.className='w'+(acc?' a':''); s.textContent=w; hl.append(s,' '); words.push({s,acc,len:w.length+1}); total+=w.length+1; }); });
+  let c=0; words.forEach(w=>{ w.f=c/total; c+=w.len; }); }
+function headline(t){
+  let i=0; for(let k=0;k<VO.length;k++) if(t>=L[k]-.12) i=k;
+  if(i!==curLine) setLine(i);
+  const a=L[i]-.08, d=Math.max(.5,(R[i]-L[i])*.85);
+  words.forEach(w=>{ const wt=a+w.f*d, u=t-wt; X(w.s,{y:(1-E.o5(P(u,0,.32)))*46,o:P(u,0,.12),s:.92+.08*E.o5(P(u,0,.3))}); if(w.acc) w.s.style.setProperty('--u',E.o3(P(u,.15,.5)).toFixed(3)); });
+  hl.style.display=CAPTIONS?'':'none';
+}
+
+/* pixel wipe between beats + drifting squares */
+const px=$('px').getContext('2d'), deco=$('deco').getContext('2d');
+const CELL=90, CW=12, CH=22, rnd=(i)=>{ const x=Math.sin(i*127.1+311.7)*43758.5453; return x-Math.floor(x); };
+function wipe(t){
+  px.clearRect(0,0,1080,1920);
+  for(let i=1;i<BEATS.length;i++){ const s=START[i]; if(t<s-.2||t>s+.2) continue;
+    const from=UP[i-1].th==='L'?'#F2F0EC':'#1B1A20', to=UP[i].th==='L'?'#F2F0EC':'#1B1A20';
+    for(let y=0;y<CH;y++) for(let x=0;x<CW;x++){ const k=y*CW+x, r=rnd(k+i*977)*.16+(y/CH)*.04;
+      if(t<s){ if(t>s-.2+r){ px.fillStyle=to; px.fillRect(x*CELL,y*CELL,CELL,CELL);} }
+      else { if(t<s+r){ px.fillStyle=from===to?to:to; px.globalAlpha=1; px.fillRect(x*CELL,y*CELL,CELL,CELL);} } }
+    // accent sprinkles on the seam
+    for(let j=0;j<26;j++){ const r=rnd(j*31+i*7); const age=t-(s-.2+r*.3); if(age<0||age>.5) continue; px.fillStyle='#FF5A1F'; px.globalAlpha=1-age*2; const sz=18+rnd(j+5)*26; px.fillRect(rnd(j*3+i)*1080, rnd(j*5+i*3)*1920-age*200, sz, sz); px.globalAlpha=1; }
+  }
+}
+function drift(t,th){
+  deco.clearRect(0,0,1080,1920);
+  for(let j=0;j<16;j++){ const sp=20+rnd(j)*40, x=rnd(j*7)*1080+Math.sin(t*.6+j)*30, y=((rnd(j*13)*2200-t*sp)%2200+2200)%2200-140, sz=14+rnd(j*3)*22;
+    deco.globalAlpha=(th==='L'?.5:.35)*rnd(j*17)+.15; deco.fillStyle=j%3?'#FF5A1F':(th==='L'?'#D9D3CA':'#3A3944'); deco.fillRect(x,y,sz,sz); }
+  deco.globalAlpha=1;
+}
+const gr=$('grain').getContext('2d'); const gimg=gr.createImageData(580,1000);
+function grain(f){ let s=f*9301+49297; for(let i=0;i<gimg.data.length;i+=4){ s=(s*16807)%2147483647; const v=s%255; gimg.data[i]=gimg.data[i+1]=gimg.data[i+2]=v; gimg.data[i+3]=255; } gr.putImageData(gimg,0,0); }
+
+function seek(t){
+  t=clamp(t,0,DUR);
+  let bi=0; for(let i=0;i<BEATS.length;i++) if(t>=START[i]) bi=i;
+  UP.forEach((b,i)=>{ const on=i===bi; b.el.style.display=on?'block':'none'; if(on) b.up(t-START[i],b.ex); });
+  const th=UP[bi].th; $('stage').style.background=th==='L'?'#F2F0EC':'#1B1A20'; $('brand').style.color=th==='L'?'#16151A':'#F4F2EE'; $('logo').style.background=th==='L'?'#16151A':'#FF5A1F';
+  $('hl').style.color=th==='L'?'#16151A':'#F4F2EE';
+  headline(t); drift(t,th); wipe(t);
+  const f=Math.round(t*30); if(f%2===0) grain(f>>1);
+}
+window.seek=seek; window.DUR=DUR;
+if(!/render/.test(location.search)){
+  const fit=()=>{ const s=Math.min(innerWidth/1080,innerHeight/1920); const st=$('stage'); st.style.transform=`scale(${s})`; st.style.left=(innerWidth-1080*s)/2+'px'; };
+  addEventListener('resize',fit); fit();
+  document.fonts.ready.then(()=>{ const t0=performance.now(); (function loop(n){ seek(((n-t0)/1000)%(DUR+1)); requestAnimationFrame(loop); })(t0); });
+} else { document.fonts.ready.then(()=>{ seek(0); window.READY=true; }); }
+</script>
+</body>
+</html>
